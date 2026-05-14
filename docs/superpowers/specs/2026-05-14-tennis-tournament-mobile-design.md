@@ -1,350 +1,352 @@
-# Tennis Club Monthly Tournament Mobile Site Design
+# 테니스 클럽 월례대회 모바일 사이트 설계서
 
-## Goal
+## 목표
 
-Build a mobile-first web prototype for a tennis club monthly tournament. The first version is for the club president to review before deciding whether to use it in real events.
+테니스 클럽 월례대회에서 사용할 모바일 우선 웹 프로토타입을 만든다. 1차 버전은 회장님이 실제 사용 여부를 검토할 수 있는 확인용 버전이다.
 
-The site must run as a mobile website, not an installed app. Deployment can come later. The prototype can run locally first.
+이 사이트는 설치형 앱이 아니라 휴대폰 브라우저에서 바로 접속하는 모바일 웹사이트여야 한다. 인터넷 배포는 나중에 진행해도 되며, 먼저 로컬에서 실행 가능한 프로토타입으로 만든다.
 
-## Users
+## 사용자
 
-### Administrator
+### 관리자
 
-The administrator runs the tournament.
+관리자는 대회를 운영하는 사람이다.
 
-- Enters admin mode with one simple shared password.
-- Manages members.
-- Creates tournaments.
-- Selects participants for each tournament.
-- Manually assigns participants into groups.
-- Chooses the match schedule format for each group.
-- Generates an initial schedule.
-- Edits the schedule at any time.
-- Enters and updates match scores.
+- 간단한 공용 비밀번호로 관리자 화면에 접속한다.
+- 회원을 관리한다.
+- 대회를 생성한다.
+- 대회 참가자를 선택한다.
+- 참가자를 직접 그룹에 배정한다.
+- 그룹별 대진표 방식을 선택한다.
+- 초기 대진표를 생성한다.
+- 생성된 대진표를 언제든 수정한다.
+- 경기 결과를 입력하고 수정한다.
 
-### Members
+### 회원
 
-Members only view tournament information.
+회원은 대회 정보를 조회만 한다.
 
-- No login.
-- Open a shared link on a phone browser.
-- View the match schedule.
-- View group rankings.
-- View overall rankings.
+- 로그인하지 않는다.
+- 공유받은 링크를 휴대폰 브라우저에서 연다.
+- 대진표를 본다.
+- 그룹별 순위표를 본다.
+- 전체 통합 순위표를 본다.
 
-## Product Scope
+## 1차 프로토타입 범위
 
-### Included In The First Prototype
+### 포함할 기능
 
-- Mobile web app.
-- Simple admin password access.
-- Public read-only tournament link.
-- Member management.
-- Tournament creation.
-- Participant selection.
-- Manual group assignment.
-- Group-level schedule format selection.
-- Initial schedule generation from `Hanul AA` and `KDK-V2010` reference formats.
-- Match add, delete, reorder, participant swap, and score edit.
-- Automatic ranking calculation.
-- Group ranking as the default ranking view.
-- Overall ranking as an optional view.
-- Simple, direct UI for older users.
+- 모바일 웹 앱.
+- 관리자 간단 비밀번호 접속.
+- 회원용 공개 읽기 전용 링크.
+- 회원 관리.
+- 대회 생성.
+- 참가자 선택.
+- 수동 그룹 편성.
+- 그룹별 대진표 방식 선택.
+- `한울AA`, `KDK-V2010` 참고 방식 기반 초기 대진표 생성.
+- 경기 추가, 삭제, 순서 변경, 선수 교체, 점수 수정.
+- 자동 순위 계산.
+- 기본 순위 화면은 그룹별 순위.
+- 전체 통합 순위 화면 제공.
+- 고연령층도 쓰기 쉬운 단순하고 직관적인 화면.
 
-### Deferred Until Later
+### 나중에 할 기능
 
-- Multi-admin accounts.
-- Full authentication with user IDs.
-- Online deployment and domain setup.
-- Push notifications.
-- Advanced real-time sync with websockets.
-- Historical analytics.
-- Payment or fee management.
+- 관리자 여러 명 계정 관리.
+- 아이디/비밀번호 기반 정식 로그인.
+- 인터넷 배포와 도메인 연결.
+- 푸시 알림.
+- 웹소켓 기반 고급 실시간 동기화.
+- 대회 기록 분석.
+- 회비나 참가비 관리.
 
-## Tournament Flow
+## 대회 운영 흐름
 
-1. Admin opens the admin page.
-2. Admin enters the simple password.
-3. Admin creates a tournament with name and date.
-4. Admin selects participating members.
-5. Admin creates one or more groups.
-6. Admin manually places participants into groups.
-7. Admin chooses a schedule format for each group:
-   - Hanul AA
+1. 관리자가 관리자 페이지를 연다.
+2. 관리자가 간단 비밀번호를 입력한다.
+3. 관리자가 대회명과 날짜로 대회를 생성한다.
+4. 관리자가 참가 회원을 선택한다.
+5. 관리자가 하나 이상의 그룹을 만든다.
+6. 관리자가 참가자를 직접 각 그룹에 넣는다.
+7. 관리자가 그룹별 대진표 방식을 선택한다.
+   - 한울AA
    - KDK-V2010
-8. Admin generates the initial schedule.
-9. Admin edits matches as needed.
-10. Admin enters scores during the event.
-11. Members open the shared link to view schedule and rankings.
+8. 관리자가 초기 대진표를 생성한다.
+9. 관리자가 필요한 경우 경기를 추가, 삭제, 수정한다.
+10. 관리자가 대회 중 경기 점수를 입력한다.
+11. 회원은 공유 링크로 대진표와 순위표를 확인한다.
 
-## Grouping Requirements
+## 그룹 편성 요구사항
 
-A tournament can have one group or multiple groups.
+하나의 대회는 한 그룹으로 운영할 수도 있고, 여러 그룹으로 나눠 운영할 수도 있다.
 
-Example with 13 participants:
+예를 들어 참가자가 13명일 때 다음 방식이 가능해야 한다.
 
-- One group of 13.
-- Two groups: 7 and 6.
-- Three groups: 4, 4, and 5.
+- 13명 전체를 1개 그룹으로 운영.
+- 7명, 6명으로 나눠 2개 그룹으로 운영.
+- 4명, 4명, 5명으로 나눠 3개 그룹으로 운영.
 
-The administrator must directly choose which player belongs to each group. Automatic grouping is not required for the first prototype.
+참가자를 어느 그룹에 넣을지는 관리자가 직접 선택한다. 1차 프로토타입에서는 자동 그룹 분배가 필수 기능이 아니다.
 
-Each group can have its own schedule format. For example:
+각 그룹은 서로 다른 대진표 방식을 사용할 수 있다.
 
-- Group A: Hanul AA
-- Group B: KDK-V2010
+예:
 
-## Schedule Model
+- A조: 한울AA
+- B조: KDK-V2010
 
-The schedule generator creates an initial list of matches. After generation, the schedule is fully editable.
+## 대진표 모델
 
-The app should treat every match in the schedule as a normal ranking match.
+대진표 생성기는 초기 경기 목록을 만들어주는 역할을 한다. 생성 후에는 관리자가 대진표를 자유롭게 수정할 수 있어야 한다.
 
-Admin can:
+앱은 대진표 안의 모든 경기를 순위에 반영되는 정식 경기로 처리한다.
 
-- Add a match.
-- Delete a match.
-- Change match order.
-- Change participants.
-- Change score.
+관리자는 다음 작업을 할 수 있다.
 
-There is no separate exhibition match concept in the first prototype. If the admin adds a match, it is included in ranking calculations.
+- 경기 추가.
+- 경기 삭제.
+- 경기 순서 변경.
+- 경기 참가자 변경.
+- 점수 입력 및 수정.
 
-## Schedule Formats
+1차 프로토타입에서는 `번외경기`라는 별도 개념을 두지 않는다. 관리자가 대진표에 경기를 추가하면 그 경기도 일반 경기처럼 순위 계산에 포함한다.
 
-The uploaded reference images are:
+## 대진표 방식
+
+프로젝트 폴더의 참고 이미지는 다음과 같다.
 
 - `한울AA.png`
 - `KDK-V2010.png`
 
-These images should be used to understand the pairing patterns and expected table style. The app does not need to reproduce the exact spreadsheet layout internally.
+이 이미지는 선수 배정 패턴과 표 형태를 이해하기 위한 기준 자료로 사용한다. 앱 내부 구조가 이미지의 엑셀식 표 모양을 그대로 따라갈 필요는 없다.
 
-The recommended internal model is a list of matches:
+권장 내부 구조는 경기 목록 방식이다.
 
-- Group ID
-- Match order
-- Team or player slots
-- Score
-- Completion state
+- 그룹 ID
+- 경기 순서
+- 양쪽 팀 또는 선수 칸
+- 점수
+- 경기 완료 상태
 
-This makes it easier to edit matches on mobile.
+이 방식이 모바일에서 경기 추가, 삭제, 선수 교체, 점수 입력을 처리하기 쉽다.
 
-## Match Structure
+## 경기 구조
 
-Most games appear to be doubles-style pairings where a match has two sides and each side can contain one or more players.
+참고 대진표는 복식 경기 방식에 가깝다. 따라서 각 경기는 양쪽 진영을 가지고, 각 진영에는 한 명 이상이 들어갈 수 있게 설계한다.
 
-For the first prototype, represent each match as:
+1차 프로토타입의 경기 데이터는 다음 형태로 둔다.
 
-- Group
-- Match number
-- Side A participants
-- Side B participants
-- Side A score
-- Side B score
+- 그룹.
+- 경기 번호.
+- A팀 참가자.
+- B팀 참가자.
+- A팀 점수.
+- B팀 점수.
 
-This keeps the model flexible enough for generated schedules and manually added matches.
+이 구조는 자동 생성 대진표와 관리자가 추가한 경기를 모두 다룰 수 있다.
 
-## Ranking Rules
+## 순위 계산 규칙
 
-Rankings are calculated from all matches in the relevant scope.
+순위는 해당 범위의 모든 완료 경기 결과를 기준으로 계산한다.
 
-Default order:
+순위 기준은 다음 순서다.
 
-1. Wins.
-2. Score difference.
-3. Points scored.
-4. Fewer points conceded.
+1. 승수.
+2. 득실차.
+3. 득점.
+4. 실점이 적은 순.
 
-Definitions:
+각 항목의 의미는 다음과 같다.
 
-- `Wins`: number of matches won.
-- `Losses`: number of matches lost.
-- `Points scored`: total points won by the player across completed matches.
-- `Points conceded`: total points lost by the player across completed matches.
-- `Score difference`: points scored minus points conceded.
+- `승수`: 이긴 경기 수.
+- `패수`: 진 경기 수.
+- `득점`: 해당 선수가 완료 경기에서 얻은 점수 합계.
+- `실점`: 해당 선수가 완료 경기에서 잃은 점수 합계.
+- `득실차`: 득점에서 실점을 뺀 값.
 
-If a doubles match is played, each participant on the winning side receives one win, and each participant on the losing side receives one loss. Points scored and conceded are applied to every participant on that side.
+복식 경기에서는 이긴 팀의 모든 참가자에게 1승을 부여하고, 진 팀의 모든 참가자에게 1패를 부여한다. 득점과 실점도 같은 팀의 모든 참가자에게 동일하게 반영한다.
 
-## Ranking Views
+## 순위표 화면
 
-### Group Ranking
+### 그룹별 순위
 
-This is the default ranking view when a tournament has multiple groups.
+대회가 여러 그룹으로 나뉘어 있으면 그룹별 순위가 기본 화면이다.
 
-Each group shows:
+각 그룹별 순위표에는 다음 항목을 표시한다.
 
-- Rank
-- Name
-- Wins
-- Losses
-- Points scored
-- Points conceded
-- Score difference
+- 순위.
+- 이름.
+- 승.
+- 패.
+- 득점.
+- 실점.
+- 득실차.
 
-### Overall Ranking
+### 전체 통합 순위
 
-The user can also view one combined ranking across all groups.
+회원은 전체 통합 순위도 볼 수 있다.
 
-Overall ranking uses the same calculation rules. Because different groups may play different numbers of matches, this view is useful as a reference ranking, while group ranking remains the primary view.
+전체 통합 순위는 그룹별 순위와 같은 계산 기준을 사용한다. 다만 그룹마다 경기 수가 다를 수 있으므로, 전체 통합 순위는 참고용 성격이고 기본 기준은 그룹별 순위다.
 
-Each overall ranking row should include the group name.
+전체 통합 순위에는 각 선수의 그룹명도 함께 표시한다.
 
-## Admin Screens
+## 관리자 화면
 
-### Admin Password Screen
+### 관리자 비밀번호 화면
 
-Purpose: enter admin mode quickly.
+목적: 빠르게 관리자 모드에 들어간다.
 
-UI:
+화면 구성:
 
-- Large password input.
-- Large confirm button.
-- Minimal text.
+- 큰 비밀번호 입력칸.
+- 큰 확인 버튼.
+- 최소한의 안내 문구.
 
-### Admin Home
+### 관리자 홈
 
-Purpose: choose what to manage.
+목적: 관리할 항목을 선택한다.
 
-Main actions:
+주요 기능:
 
-- Current tournament.
-- Create tournament.
-- Member management.
+- 현재 대회.
+- 대회 생성.
+- 회원 관리.
 
-### Member Management
+### 회원 관리
 
-Purpose: maintain the player list.
+목적: 선수 명단을 관리한다.
 
-Fields:
+입력 항목:
 
-- Name.
-- Level.
-- Notes.
+- 이름.
+- 레벨.
+- 메모.
 
-Optional later fields:
+나중에 추가할 수 있는 항목:
 
-- Phone number.
-- Gender.
-- Active/inactive status.
+- 전화번호.
+- 성별.
+- 활동 여부.
 
-### Tournament Setup
+### 대회 설정
 
-Purpose: create a tournament and choose participants.
+목적: 대회를 만들고 참가자를 선택한다.
 
-Fields:
+입력 항목:
 
-- Tournament name.
-- Date.
-- Participant list.
+- 대회명.
+- 날짜.
+- 참가자 목록.
 
-### Group Assignment
+### 그룹 편성
 
-Purpose: manually place participants into groups.
+목적: 참가자를 직접 그룹에 배정한다.
 
-UI:
+화면 구성:
 
-- Selected participants list.
-- Group list.
-- Add group button.
-- Add/remove participant from group controls.
-- Clear indication if a selected participant has not been assigned.
+- 선택된 참가자 목록.
+- 그룹 목록.
+- 그룹 추가 버튼.
+- 그룹에 참가자를 넣고 빼는 조작.
+- 아직 그룹에 들어가지 않은 참가자 표시.
 
-### Schedule Generation
+### 대진표 생성
 
-Purpose: create an initial match list for each group.
+목적: 각 그룹의 초기 경기 목록을 만든다.
 
-Controls:
+조작:
 
-- Schedule format selector per group.
-- Generate schedule button.
+- 그룹별 대진표 방식 선택.
+- 대진표 생성 버튼.
 
-### Schedule Editor
+### 대진표 편집
 
-Purpose: handle real tournament changes.
+목적: 실제 대회 중 발생하는 변경을 처리한다.
 
-Actions:
+가능한 작업:
 
-- Add match.
-- Delete match.
-- Move match up/down.
-- Change participants.
-- Enter or edit score.
+- 경기 추가.
+- 경기 삭제.
+- 경기 위/아래 이동.
+- 참가자 변경.
+- 점수 입력 또는 수정.
 
-The editor should use large touch targets and avoid dense spreadsheet-style editing on mobile.
+모바일에서 쓰기 쉽게 큰 터치 영역을 사용하고, 너무 빽빽한 엑셀식 셀 편집은 피한다.
 
-### Result Entry
+### 결과 입력
 
-Purpose: quickly enter scores during the event.
+목적: 대회 중 빠르게 점수를 입력한다.
 
-UI:
+화면 구성:
 
-- Match cards.
-- Big score fields.
-- Save button.
-- Clear completed/incomplete state.
+- 경기 카드.
+- 큰 점수 입력칸.
+- 저장 버튼.
+- 완료/미완료 상태가 명확하게 보이는 표시.
 
-## Member Screens
+## 회원 화면
 
-### Public Tournament View
+### 공개 대회 화면
 
-Purpose: give members a simple read-only page.
+목적: 회원에게 단순한 읽기 전용 화면을 제공한다.
 
-Tabs:
+탭:
 
-- Schedule.
-- Group ranking.
-- Overall ranking.
+- 대진표.
+- 그룹별 순위.
+- 전체 순위.
 
-The shared link should open directly to the current tournament or a specific tournament.
+공유 링크는 현재 대회 또는 특정 대회 화면으로 바로 열려야 한다.
 
-### Schedule View
+### 대진표 화면
 
-Purpose: show who plays when.
+목적: 누가 언제 경기하는지 보여준다.
 
-Display:
+표시 항목:
 
-- Group sections.
-- Match number.
-- Participants.
-- Score if entered.
+- 그룹 구분.
+- 경기 번호.
+- 참가자.
+- 입력된 점수.
 
-### Ranking View
+### 순위표 화면
 
-Purpose: show current standings.
+목적: 현재 순위를 보여준다.
 
-Display:
+표시 항목:
 
-- Large readable rows.
-- Rank and name emphasized.
-- Wins, score difference, points scored, points conceded.
+- 읽기 쉬운 큰 행.
+- 순위와 이름 강조.
+- 승, 득실차, 득점, 실점.
 
-## Design Direction
+## 디자인 방향
 
-The users include older club members, so the design should be simple and direct.
+사용자 중 고연령층이 많으므로 디자인은 단순하고 직관적이어야 한다.
 
-Principles:
+원칙:
 
-- Mobile-first.
-- Large fonts.
-- Large buttons.
-- High contrast.
-- Few navigation choices.
-- Clear labels.
-- Avoid decorative layouts.
-- Avoid tiny spreadsheet cells for mobile interaction.
+- 모바일 우선.
+- 큰 글씨.
+- 큰 버튼.
+- 높은 대비.
+- 적은 메뉴 수.
+- 명확한 문구.
+- 장식적인 화면보다 운영에 필요한 정보 우선.
+- 모바일에서 작은 엑셀 셀을 누르는 듯한 조작은 피한다.
 
-The public member view should be even simpler than the admin view.
+회원용 공개 화면은 관리자 화면보다 더 단순해야 한다.
 
-## Data Model
+## 데이터 구조
 
-### Member
+### 회원
 
 - `id`
 - `name`
 - `level`
 - `notes`
 
-### Tournament
+### 대회
 
 - `id`
 - `name`
@@ -352,12 +354,12 @@ The public member view should be even simpler than the admin view.
 - `publicSlug`
 - `status`
 
-### TournamentParticipant
+### 대회 참가자
 
 - `tournamentId`
 - `memberId`
 
-### Group
+### 그룹
 
 - `id`
 - `tournamentId`
@@ -365,13 +367,13 @@ The public member view should be even simpler than the admin view.
 - `scheduleFormat`
 - `sortOrder`
 
-### GroupParticipant
+### 그룹 참가자
 
 - `groupId`
 - `memberId`
 - `sortOrder`
 
-### Match
+### 경기
 
 - `id`
 - `tournamentId`
@@ -384,54 +386,54 @@ The public member view should be even simpler than the admin view.
 - `status`
 - `sortOrder`
 
-## Data Flow
+## 데이터 흐름
 
-1. Admin creates or edits data.
-2. Data is saved locally in the app database.
-3. Public pages read the same tournament data.
-4. Ranking is recalculated from completed matches whenever scores change.
+1. 관리자가 데이터를 생성하거나 수정한다.
+2. 데이터는 앱의 로컬 데이터베이스에 저장된다.
+3. 회원용 공개 화면은 같은 대회 데이터를 읽는다.
+4. 점수가 바뀌면 완료 경기 기준으로 순위가 다시 계산된다.
 
-For the local prototype, automatic refresh or manual refresh is enough. Later deployment can add stronger real-time updates.
+로컬 프로토타입에서는 자동 새로고침 또는 수동 새로고침 정도면 충분하다. 나중에 실제 배포 단계에서 더 강한 실시간 동기화를 추가할 수 있다.
 
-## Recommended Technical Approach
+## 권장 기술 방향
 
-Use a web app structure that can start locally and later be deployed.
+로컬에서 시작하고 나중에 배포 가능한 웹앱 구조로 만든다.
 
-Recommended stack:
+권장 스택:
 
-- Next.js or React-based app.
-- Local database for prototype, such as SQLite.
-- Later deployment path to a hosted database.
+- Next.js 또는 React 기반 앱.
+- 프로토타입용 로컬 데이터베이스, 예: SQLite.
+- 나중에 호스팅용 데이터베이스로 확장 가능한 구조.
 
-Reasoning:
+이유:
 
-- Good mobile web support.
-- Easy admin and public page routing.
-- Can run locally for review.
-- Can later be deployed without rewriting the whole app.
+- 모바일 웹 지원이 좋다.
+- 관리자 화면과 공개 화면 라우팅이 쉽다.
+- 로컬에서 실행해 검토하기 쉽다.
+- 나중에 전체를 다시 만들지 않고 배포 구조로 확장할 수 있다.
 
-## Testing Strategy
+## 테스트 전략
 
-Test the core logic separately from the UI.
+핵심 로직은 UI와 분리해서 테스트한다.
 
-Important tests:
+중요 테스트:
 
-- Ranking calculation.
-- Match add/delete affects ranking.
-- Score edit updates ranking.
-- Group ranking and overall ranking.
-- Generated schedule creates valid editable matches.
-- Participant swap updates match display and ranking.
+- 순위 계산.
+- 경기 추가/삭제가 순위에 반영되는지.
+- 점수 수정이 순위에 반영되는지.
+- 그룹별 순위와 전체 통합 순위.
+- 생성된 대진표가 수정 가능한 경기 목록으로 만들어지는지.
+- 선수 교체가 대진표와 순위에 반영되는지.
 
-Manual browser checks:
+브라우저 수동 확인:
 
-- Admin flow works on mobile width.
-- Public schedule is readable on mobile.
-- Public rankings are readable on mobile.
-- Large buttons are easy to tap.
+- 관리자 흐름이 모바일 폭에서 동작하는지.
+- 회원용 대진표가 모바일에서 읽기 쉬운지.
+- 회원용 순위표가 모바일에서 읽기 쉬운지.
+- 버튼이 크고 누르기 쉬운지.
 
-## Open Implementation Notes
+## 구현 시 참고 사항
 
-The exact Hanul AA and KDK-V2010 pairing tables should be transcribed into schedule generator data during implementation. The uploaded images are the source references for the first version.
+한울AA와 KDK-V2010의 정확한 선수 배정표는 구현 단계에서 참고 이미지를 보며 데이터로 옮긴다. 프로젝트 폴더에 있는 이미지가 1차 기준 자료다.
 
-If any image pattern is ambiguous, the app should allow manual correction through the schedule editor rather than blocking tournament operation.
+이미지에서 일부 패턴이 애매한 경우, 대회 운영이 막히지 않도록 대진표 편집 기능으로 관리자가 직접 수정할 수 있게 한다.
