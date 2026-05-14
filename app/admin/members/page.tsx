@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PhoneCall, Plus, Search } from "lucide-react";
+import { Mars, PhoneCall, Plus, Search, Venus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { loadTournamentState, type TournamentState } from "@/lib/store/tournament-store";
@@ -14,15 +14,14 @@ function maskPhone(phone?: string) {
 export default function MemberManagementPage() {
   const [state] = useState<TournamentState>(() => loadTournamentState());
   const [query, setQuery] = useState("");
-  const [showHidden, setShowHidden] = useState(false);
 
   const visibleMembers = useMemo(() => {
     const keyword = query.trim();
     return state.members
-      .filter((member) => showHidden || member.active !== false)
+      .filter((member) => !member.deleted)
       .filter((member) => member.name.includes(keyword))
-      .sort((left, right) => Number(left.active === false) - Number(right.active === false) || left.name.localeCompare(right.name, "ko"));
-  }, [query, showHidden, state.members]);
+      .sort((left, right) => left.name.localeCompare(right.name, "ko"));
+  }, [query, state.members]);
 
   return (
     <AppShell title="회원관리" subtitle="회원 목록을 먼저 확인합니다" active="members">
@@ -37,9 +36,6 @@ export default function MemberManagementPage() {
         <section className="section-card">
           <div className="today-card-top">
             <strong className="section-head" style={{ marginBottom: 0 }}>회원 목록</strong>
-            <button className={`small-filter-button ${showHidden ? "active" : ""}`} onClick={() => setShowHidden((current) => !current)} type="button">
-              숨김 포함
-            </button>
           </div>
           <Link className="member-create-button" href="/admin/members/new">
             <Plus size={20} />
@@ -50,7 +46,9 @@ export default function MemberManagementPage() {
               <div className={`member-card member-row-card ${member.active === false ? "inactive" : ""}`} key={member.id}>
                 <Link className="member-row-link" href={`/admin/members/edit/${member.id}`}>
                   <div className="member-name-block">
-                    <span className="member-level-dot">{member.name.slice(0, 1)}</span>
+                    <span className={`member-gender-dot ${member.gender === "female" ? "female" : "male"}`}>
+                      {member.gender === "female" ? <Venus size={20} /> : <Mars size={20} />}
+                    </span>
                     <div>
                       <strong className="member-name">{member.name}</strong>
                       <span className="member-phone">{maskPhone(member.phone)}</span>

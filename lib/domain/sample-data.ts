@@ -3,16 +3,16 @@ import { withDateStatus } from "./tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "./types";
 
 export const sampleMembers: Member[] = [
-  { id: "m1", name: "김철수", notes: "", phone: "010-1234-1001", active: true },
-  { id: "m2", name: "박영희", notes: "", phone: "010-1234-1002", active: true },
-  { id: "m3", name: "이민수", notes: "", phone: "010-1234-1003", active: true },
-  { id: "m4", name: "최은정", notes: "", phone: "010-1234-1004", active: true },
-  { id: "m5", name: "정우진", notes: "", phone: "010-1234-1005", active: true },
-  { id: "m6", name: "한미라", notes: "", phone: "010-1234-1006", active: true },
-  { id: "m7", name: "오세훈", notes: "", phone: "010-1234-1007", active: true },
-  { id: "m8", name: "강지연", notes: "", phone: "010-1234-1008", active: true },
-  { id: "m9", name: "윤도현", notes: "", phone: "010-1234-1009", active: true },
-  { id: "m10", name: "서민재", notes: "", phone: "010-1234-1010", active: true }
+  { id: "m1", name: "김철수", gender: "male", notes: "", phone: "010-1234-1001" },
+  { id: "m2", name: "박영희", gender: "female", notes: "", phone: "010-1234-1002" },
+  { id: "m3", name: "이민수", gender: "male", notes: "", phone: "010-1234-1003" },
+  { id: "m4", name: "최은정", gender: "female", notes: "", phone: "010-1234-1004" },
+  { id: "m5", name: "정우진", gender: "male", notes: "", phone: "010-1234-1005" },
+  { id: "m6", name: "한미라", gender: "female", notes: "", phone: "010-1234-1006" },
+  { id: "m7", name: "오세훈", gender: "male", notes: "", phone: "010-1234-1007" },
+  { id: "m8", name: "강지연", gender: "female", notes: "", phone: "010-1234-1008" },
+  { id: "m9", name: "윤도현", gender: "male", notes: "", phone: "010-1234-1009" },
+  { id: "m10", name: "서민재", gender: "female", notes: "", phone: "010-1234-1010" }
 ];
 
 export const sampleTournament: Tournament = withDateStatus({

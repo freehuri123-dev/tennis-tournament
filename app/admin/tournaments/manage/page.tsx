@@ -8,6 +8,7 @@ import { RankingTable } from "@/components/RankingTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { calculateRankings } from "@/lib/domain/ranking";
 import { generateInitialMatches, getHanulSeedCount, validateScheduleParticipants } from "@/lib/domain/schedule";
+import { normalizeMatchScore } from "@/lib/domain/score";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, TournamentGroup } from "@/lib/domain/types";
 import { loadTournamentState, saveTournamentState, type TournamentState } from "@/lib/store/tournament-store";
@@ -170,6 +171,10 @@ export default function TournamentManagePage() {
     if (isCompleted) return;
     const invalid = state.groups.find((group) => groupValidation(group));
     if (invalid) return;
+    const message = state.matches.length > 0
+      ? "기존 경기결과는 초기화되고 새로운 대진표가 만들어집니다. 계속할까요?"
+      : "대진표를 생성할까요?";
+    if (!window.confirm(message)) return;
 
     const generated = state.groups.flatMap((group) =>
       generateInitialMatches({
@@ -251,7 +256,7 @@ export default function TournamentManagePage() {
 
   function selectableMembersForGroup(groupId: string) {
     const selectedIds = state.groupMemberIds[groupId] ?? [];
-    return state.members.filter((member) => member.active !== false || selectedIds.includes(member.id));
+    return state.members.filter((member) => !member.deleted || selectedIds.includes(member.id));
   }
 
   function renderGroupTabs(activeGroupId: string | undefined, onChange: (groupId: string) => void) {
@@ -377,11 +382,11 @@ export default function TournamentManagePage() {
                 );
               })}
               {state.matches.length > 0 && (
-                <p className="notice-text">전체 대진표 생성을 다시 누르면 기존 경기결과는 초기화되고 새로운 대진표가 만들어집니다.</p>
+                <p className="notice-text">대진표 생성을 다시 누르면 기존 경기결과는 초기화되고 새로운 대진표가 만들어집니다.</p>
               )}
               <button className="primary-button" disabled={isCompleted || state.groups.length === 0 || hasInvalidGroup} onClick={generateAllSchedules} type="button">
                 <ClipboardList size={18} />
-                전체 대진표 생성
+                대진표 생성
               </button>
             </section>
           </>
@@ -409,28 +414,34 @@ export default function TournamentManagePage() {
                       <div className="score-panel vertical">
                         <label>
                           <span>{teamLabel(match.sideAPlayerIds)} 점수</span>
-                          <input className="score-input" disabled={isCompleted} inputMode="numeric" onChange={(event) => updateMatch(match.id, { sideAScore: Number(event.target.value), status: "completed" })} placeholder="0" value={match.sideAScore ?? ""} />
+                          <input className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
                         </label>
                         <div className="score-vs-label">VS</div>
                         <label>
                           <span>{teamLabel(match.sideBPlayerIds)} 점수</span>
-                          <input className="score-input" disabled={isCompleted} inputMode="numeric" onChange={(event) => updateMatch(match.id, { sideBScore: Number(event.target.value), status: "completed" })} placeholder="0" value={match.sideBScore ?? ""} />
+                          <input className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
                         </label>
                       </div>
-                      <div className="score-input-grid">
-                        {(["A", "A", "B", "B"] as const).map((side, index) => {
-                          const sideIndex = index % 2;
-                          const selected = side === "A" ? match.sideAPlayerIds[sideIndex] : match.sideBPlayerIds[sideIndex];
-                          return (
-                            <select className="select-input" disabled={isCompleted} key={`${side}-${sideIndex}`} onChange={(event) => replacePlayer(match.id, side, sideIndex, event.target.value)} value={selected ?? ""}>
-                              <option value="">{side === "A" ? "위쪽" : "아래쪽"} 선수 {sideIndex + 1}</option>
-                              {availableMembersForMatch(match, selected).map((member) => (
-                                <option key={member.id} value={member.id}>{member.name}</option>
-                              ))}
-                            </select>
-                          );
-                        })}
-                      </div>
+                      <details className="player-edit-box">
+                        <summary>선수 변경</summary>
+                        <div className="score-input-grid compact">
+                          {(["A", "A", "B", "B"] as const).map((side, index) => {
+                            const sideIndex = index % 2;
+                            const selected = side === "A" ? match.sideAPlayerIds[sideIndex] : match.sideBPlayerIds[sideIndex];
+                            return (
+                              <label className="mini-select-field" key={`${side}-${sideIndex}`}>
+                                <span>{side === "A" ? "위쪽" : "아래쪽"} {sideIndex + 1}</span>
+                                <select className="select-input" disabled={isCompleted} onChange={(event) => replacePlayer(match.id, side, sideIndex, event.target.value)} value={selected ?? ""}>
+                                  <option value="">선택</option>
+                                  {availableMembersForMatch(match, selected).map((member) => (
+                                    <option key={member.id} value={member.id}>{member.name}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </details>
                       <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
                         <Trash2 size={18} />
                         경기 삭제

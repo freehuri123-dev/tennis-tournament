@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import type { Member } from "@/lib/domain/types";
@@ -10,14 +10,16 @@ type MemberFormProps = {
   memberId?: string;
 };
 
+type MemberGender = NonNullable<Member["gender"]>;
+
 export function MemberForm({ memberId }: MemberFormProps) {
   const [state, setState] = useState<TournamentState>(() => loadTournamentState());
   const editingMember = useMemo(() => state.members.find((member) => member.id === memberId), [memberId, state.members]);
   const [form, setForm] = useState(() => ({
     name: editingMember?.name ?? "",
+    gender: editingMember?.gender ?? "male",
     phone: editingMember?.phone ?? "",
-    notes: editingMember?.notes ?? "",
-    active: editingMember?.active ?? true
+    notes: editingMember?.notes ?? ""
   }));
 
   function persistMembers(members: Member[]) {
@@ -34,9 +36,9 @@ export function MemberForm({ memberId }: MemberFormProps) {
     const nextMember: Member = {
       id: editingMember?.id ?? `member-${Date.now()}`,
       name,
+      gender: form.gender as Member["gender"],
       phone: form.phone.trim(),
-      notes: form.notes.trim(),
-      active: form.active
+      notes: form.notes.trim()
     };
 
     const exists = state.members.some((member) => member.id === nextMember.id);
@@ -48,7 +50,7 @@ export function MemberForm({ memberId }: MemberFormProps) {
 
   function hideMember() {
     if (!editingMember) return;
-    persistMembers(state.members.map((member) => (member.id === editingMember.id ? { ...member, active: false } : member)));
+    persistMembers(state.members.map((member) => (member.id === editingMember.id ? { ...member, deleted: true } : member)));
   }
 
   return (
@@ -60,6 +62,13 @@ export function MemberForm({ memberId }: MemberFormProps) {
             <input onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
           </label>
           <label className="field boxed-field">
+            <span>성별</span>
+            <select onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value as MemberGender }))} value={form.gender}>
+              <option value="male">남</option>
+              <option value="female">여</option>
+            </select>
+          </label>
+          <label className="field boxed-field">
             <span>연락처</span>
             <input onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="010-0000-0000" value={form.phone} />
           </label>
@@ -67,10 +76,6 @@ export function MemberForm({ memberId }: MemberFormProps) {
             <span>메모</span>
             <textarea onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} rows={4} value={form.notes} />
           </label>
-          <button className={`visibility-button ${form.active ? "active" : ""}`} onClick={() => setForm((current) => ({ ...current, active: !current.active }))} type="button">
-            {form.active ? <Eye size={20} /> : <EyeOff size={20} />}
-            {form.active ? "대회 선택 명단에 표시" : "대회 선택 명단에서 숨김"}
-          </button>
           {editingMember && (
             <button className="danger-button" onClick={hideMember} type="button">
               <Trash2 size={18} />

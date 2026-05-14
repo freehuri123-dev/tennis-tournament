@@ -1,10 +1,12 @@
 export type Member = {
   id: string;
   name: string;
+  gender?: "male" | "female";
   level?: string;
   notes: string;
   phone?: string;
   active?: boolean;
+  deleted?: boolean;
 };
 
 export type Tournament = {

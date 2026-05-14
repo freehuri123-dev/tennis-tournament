@@ -534,7 +534,8 @@ textarea:focus-visible {
   min-width: 0;
 }
 
-.member-level-dot {
+.member-level-dot,
+.member-gender-dot {
   min-width: 38px;
   height: 38px;
   border-radius: 14px;
@@ -545,6 +546,16 @@ textarea:focus-visible {
   color: var(--green-deep);
   font-size: 14px;
   font-weight: 900;
+}
+
+.member-gender-dot.male {
+  background: #eaf3ff;
+  color: #2865ad;
+}
+
+.member-gender-dot.female {
+  background: #fff0f5;
+  color: #bd4774;
 }
 
 .member-name {
@@ -862,6 +873,54 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+.score-input-grid.compact {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.player-edit-box {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.player-edit-box summary {
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  color: var(--green-deep);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.player-edit-box[open] {
+  padding-bottom: 10px;
+}
+
+.player-edit-box .score-input-grid {
+  padding: 0 10px;
+}
+
+.mini-select-field {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-select-field span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mini-select-field .select-input {
+  min-height: 44px;
+  border-radius: 12px;
+}
+
 .score-input,
 .select-input {
   padding: 0 12px;
@@ -881,6 +940,33 @@ textarea:focus-visible {
   gap: 12px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fcf7 100%);
   box-shadow: var(--shadow);
+}
+
+.ranking-card.rank-1 {
+  border-color: rgba(213, 155, 20, 0.28);
+  background: linear-gradient(180deg, #fff9e7 0%, #ffffff 100%);
+}
+
+.ranking-card.rank-2 {
+  border-color: rgba(118, 132, 145, 0.28);
+  background: linear-gradient(180deg, #f4f7fa 0%, #ffffff 100%);
+}
+
+.ranking-card.rank-3 {
+  border-color: rgba(174, 101, 48, 0.26);
+  background: linear-gradient(180deg, #fff2e8 0%, #ffffff 100%);
+}
+
+.ranking-card.rank-1 .ranking-badge {
+  background: #d59b14;
+}
+
+.ranking-card.rank-2 .ranking-badge {
+  background: #768491;
+}
+
+.ranking-card.rank-3 .ranking-badge {
+  background: #ae6530;
 }
 
 .ranking-card-main {

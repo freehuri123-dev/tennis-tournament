@@ -8,7 +8,7 @@ export function RankingTable({ rows }: RankingTableProps) {
   return (
     <div className="ranking-card-list">
       {rows.map((row) => (
-        <article key={`${row.memberId}-${row.groupName ?? "group"}`} className="ranking-card">
+        <article key={`${row.memberId}-${row.groupName ?? "group"}`} className={`ranking-card rank-${row.rank <= 3 ? row.rank : "normal"}`}>
           <div className="ranking-card-main">
             <span className="ranking-badge">{row.rank}위</span>
             <div>
