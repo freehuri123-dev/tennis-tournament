@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #18211f;
+  background: #f7f8f6;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, "Malgun Gothic", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
