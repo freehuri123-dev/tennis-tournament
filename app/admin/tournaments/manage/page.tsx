@@ -362,18 +362,17 @@ export default function TournamentManagePage() {
                       <strong>{displayGroupName(group)}</strong>
                       <span className="group-chip">{participants.length}명</span>
                     </div>
-                    <div className="field-label-row">
-                      <strong>대진방식 선택</strong>
-                      <span>도움말 버튼으로 예시 이미지를 볼 수 있습니다.</span>
-                    </div>
-                    <div className="format-row">
+                    <div className="format-field">
+                      <span>대진방식 선택</span>
+                      <div className="format-row">
                       <select className="select-input" disabled={isCompleted} onChange={(event) => updateGroupFormat(group.id, event.target.value as TournamentGroup["scheduleFormat"])} value={group.scheduleFormat}>
-                        <option value="kdk-v2010">KDK-V2010</option>
-                        <option value="hanul-aa">한울AA방식 KDK</option>
+                        <option value="kdk-v2010">KDK-V2010 방식</option>
+                        <option value="hanul-aa">한울AA KDK 방식</option>
                       </select>
                       <button className="icon-help-button" aria-label="대진방식 보기" onClick={() => setHelpImage(group.scheduleFormat)} type="button">
                         <HelpCircle size={20} />
                       </button>
+                      </div>
                     </div>
                     {validation && <p className="notice-text">{validation}</p>}
                     <div className="field-label-row">

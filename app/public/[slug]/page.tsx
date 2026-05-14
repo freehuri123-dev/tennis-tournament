@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { PublicShell } from "@/components/AppShell";
 import { MatchCard } from "@/components/MatchCard";
 import { RankingTable } from "@/components/RankingTable";
@@ -104,8 +105,12 @@ export default function PublicTournamentPage() {
   }
 
   return (
-    <PublicShell title={displayTournament.name} subtitle={`${displayTournament.date} · 공유용 조회 화면`}>
+    <PublicShell title={displayTournament.name} subtitle={displayTournament.date}>
       <div className="page">
+        <button className="refresh-button" onClick={() => window.location.reload()} type="button">
+          <RefreshCw size={20} />
+          새로고침
+        </button>
         <section className="section-card">
           <div className="tab-row">
             {[
