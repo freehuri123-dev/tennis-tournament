@@ -193,6 +193,10 @@ textarea:focus-visible {
   animation: page-in 220ms ease both;
 }
 
+.tab-panel {
+  animation: tab-panel-in 220ms ease both;
+}
+
 @keyframes page-in {
   from {
     opacity: 0;
@@ -201,6 +205,17 @@ textarea:focus-visible {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes tab-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -299,6 +314,12 @@ textarea:focus-visible {
   border: 1px solid rgba(182, 63, 63, 0.18);
   background: #fff4f4;
   color: var(--danger);
+}
+
+.danger-button.compact-danger {
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
 }
 
 .ghost-button.compact {
@@ -599,6 +620,31 @@ textarea:focus-visible {
   background: #f6f7f5;
 }
 
+.danger-zone {
+  padding: 14px;
+  border: 1px solid rgba(182, 63, 63, 0.18);
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  background: #fff9f9;
+}
+
+.danger-zone strong {
+  display: block;
+  color: var(--danger);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.danger-zone p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .visibility-button {
   min-height: 56px;
   border: 1px solid var(--line);
@@ -839,6 +885,20 @@ textarea:focus-visible {
 .score-panel.vertical .score-input {
   min-height: 56px;
   font-size: 24px;
+}
+
+.score-entry {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-entry small {
+  color: var(--green-deep);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
 }
 
 .score-vs-label {

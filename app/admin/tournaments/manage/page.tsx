@@ -70,6 +70,27 @@ export default function TournamentManagePage() {
     return ids.map(memberName).join(", ") || "선수 미정";
   }
 
+  async function shareTournament() {
+    const url = `${window.location.origin}/public/${tournament.publicSlug}`;
+    const shareData = {
+      title: tournament.name,
+      text: `${tournament.name} 대진표와 순위표를 확인하세요.`,
+      url
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        return;
+      }
+    }
+
+    await navigator.clipboard.writeText(url);
+    window.alert("공유 링크를 복사했습니다. 카카오톡에 붙여넣어 공유해주세요.");
+  }
+
   function groupValidation(group: TournamentGroup) {
     const participants = groupParticipants(group.id);
     const rangeMessage = validateScheduleParticipants(group.scheduleFormat, participants.length);
@@ -285,7 +306,7 @@ export default function TournamentManagePage() {
           <p className="lead">{tournament.date} · {state.groups.length}개 그룹 · {state.matches.length}경기</p>
           <div className="today-card-top" style={{ marginTop: 12 }}>
             <StatusBadge status={tournament.status} />
-            <button className="ghost-button" onClick={() => window.location.assign("/public/monthly-demo")} type="button">
+            <button className="ghost-button" onClick={shareTournament} type="button">
               <Share2 size={18} />
               공유하기
             </button>
@@ -308,7 +329,7 @@ export default function TournamentManagePage() {
         </section>
 
         {activeTab === "setup" && (
-          <>
+          <div className="tab-panel stack" key="setup">
             <section className="section-card stack">
               <strong className="section-head">대회 기본정보</strong>
               <label className="field boxed-field">
@@ -389,11 +410,11 @@ export default function TournamentManagePage() {
                 대진표 생성
               </button>
             </section>
-          </>
+          </div>
         )}
 
         {activeTab === "draw" && (
-          <section className="section-card stack" id="draw">
+          <section className="section-card stack tab-panel" id="draw" key="draw">
             <strong className="section-head">대진표 관리</strong>
             {renderGroupTabs(drawGroupId, setActiveDrawGroupId)}
             {visibleDrawGroups.map((group) => (
@@ -413,13 +434,19 @@ export default function TournamentManagePage() {
                       <MatchCard match={match} members={state.members} />
                       <div className="score-panel vertical">
                         <label>
-                          <span>{teamLabel(match.sideAPlayerIds)} 점수</span>
-                          <input className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
+                          <span>{teamLabel(match.sideAPlayerIds)}</span>
+                          <div className="score-entry">
+                            <small>점수</small>
+                            <input aria-label="위쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
+                          </div>
                         </label>
                         <div className="score-vs-label">VS</div>
                         <label>
-                          <span>{teamLabel(match.sideBPlayerIds)} 점수</span>
-                          <input className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
+                          <span>{teamLabel(match.sideBPlayerIds)}</span>
+                          <div className="score-entry">
+                            <small>점수</small>
+                            <input aria-label="아래쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
+                          </div>
                         </label>
                       </div>
                       <details className="player-edit-box">
@@ -454,7 +481,7 @@ export default function TournamentManagePage() {
         )}
 
         {activeTab === "ranking" && (
-          <section className="section-card stack">
+          <section className="section-card stack tab-panel" key="ranking">
             <strong className="section-head">순위</strong>
             {renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
             {visibleRankingGroups.map(({ group, rows }) => (

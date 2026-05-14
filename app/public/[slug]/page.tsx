@@ -93,7 +93,7 @@ export default function PublicTournamentPage() {
         </section>
 
         {activeTab === "schedule" && (
-          <section className="section-card stack">
+          <section className="section-card stack tab-panel" key="schedule">
             <strong className="section-head">오늘의 대진표</strong>
             {renderGroupTabs(scheduleGroupId, setActiveScheduleGroupId)}
             {visibleScheduleGroups.map((group) => (
@@ -114,7 +114,7 @@ export default function PublicTournamentPage() {
         )}
 
         {activeTab === "group" && (
-          <section className="section-card stack">
+          <section className="section-card stack tab-panel" key="group">
             <strong className="section-head">그룹별 순위</strong>
             {renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
             {visibleRankingGroups.map(({ group, rows }) => (
@@ -127,7 +127,7 @@ export default function PublicTournamentPage() {
         )}
 
         {activeTab === "overall" && (
-          <section className="section-card stack">
+          <section className="section-card stack tab-panel" key="overall">
             <strong className="section-head">전체 통합 순위</strong>
             <RankingTable rows={overallRanking} />
           </section>

@@ -50,6 +50,7 @@ export function MemberForm({ memberId }: MemberFormProps) {
 
   function hideMember() {
     if (!editingMember) return;
+    if (!window.confirm(`${editingMember.name} 회원을 삭제할까요?`)) return;
     persistMembers(state.members.map((member) => (member.id === editingMember.id ? { ...member, deleted: true } : member)));
   }
 
@@ -76,13 +77,20 @@ export function MemberForm({ memberId }: MemberFormProps) {
             <span>메모</span>
             <textarea onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} rows={4} value={form.notes} />
           </label>
-          {editingMember && (
-            <button className="danger-button" onClick={hideMember} type="button">
-              <Trash2 size={18} />
-              회원 삭제
-            </button>
-          )}
         </section>
+
+        {editingMember && (
+          <section className="danger-zone">
+            <div>
+              <strong>회원 삭제</strong>
+              <p>목록과 참가자 선택에서 보이지 않게 됩니다.</p>
+            </div>
+            <button className="danger-button compact-danger" onClick={hideMember} type="button">
+              <Trash2 size={18} />
+              삭제
+            </button>
+          </section>
+        )}
 
         <div className="sticky-footer">
           <button className="ghost-button" onClick={() => window.location.assign("/admin/members")} type="button">
