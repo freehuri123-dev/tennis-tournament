@@ -6,9 +6,6 @@ export default function HomePage() {
   return (
     <PublicShell title="STC 월례대회" subtitle="테니스 클럽 대회 운영">
       <div className="page">
-        <section className="intro-card">
-          <img alt="테니스 월례대회 인트로" src="/intro.png" />
-        </section>
         <section className="section-card">
           <strong className="section-head">관리 메뉴</strong>
           <div className="quick-grid">

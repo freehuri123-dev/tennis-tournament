@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import Link from "next/link";
 import { CalendarDays, Users } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -15,10 +13,6 @@ export default function AdminHomePage() {
   return (
     <AppShell title="메인페이지" subtitle="회원관리와 대회관리를 선택하세요" active="home">
       <div className="page">
-        <section className="intro-card">
-          <img alt="테니스 월례대회 인트로" src="/intro.png" />
-        </section>
-
         <section className="section-card">
           <strong className="section-head">관리 메뉴</strong>
           <div className="quick-grid">

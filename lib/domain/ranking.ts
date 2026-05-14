@@ -10,7 +10,9 @@ export function calculateRankings(members: Member[], matches: Match[]): RankingR
       memberId: member.id,
       name: member.name,
       wins: 0,
+      draws: 0,
       losses: 0,
+      rankingPoints: 0,
       pointsFor: 0,
       pointsAgainst: 0,
       pointDiff: 0
@@ -22,9 +24,11 @@ export function calculateRankings(members: Member[], matches: Match[]): RankingR
       continue;
     }
 
-    const sideAWon = match.sideAScore > match.sideBScore;
-    applyResult(rows, match.sideAPlayerIds, match.sideAScore, match.sideBScore, sideAWon);
-    applyResult(rows, match.sideBPlayerIds, match.sideBScore, match.sideAScore, !sideAWon);
+    const sideAResult = match.sideAScore === match.sideBScore ? "draw" : match.sideAScore > match.sideBScore ? "win" : "loss";
+    const sideBResult = match.sideAScore === match.sideBScore ? "draw" : match.sideBScore > match.sideAScore ? "win" : "loss";
+
+    applyResult(rows, match.sideAPlayerIds, match.sideAScore, match.sideBScore, sideAResult);
+    applyResult(rows, match.sideBPlayerIds, match.sideBScore, match.sideAScore, sideBResult);
   }
 
   const sorted = [...rows.values()]
@@ -42,19 +46,35 @@ export function calculateRankings(members: Member[], matches: Match[]): RankingR
   });
 }
 
-function applyResult(rows: Map<string, MutableRanking>, playerIds: string[], pointsFor: number, pointsAgainst: number, won: boolean) {
+function applyResult(
+  rows: Map<string, MutableRanking>,
+  playerIds: string[],
+  pointsFor: number,
+  pointsAgainst: number,
+  result: "win" | "draw" | "loss"
+) {
   for (const playerId of playerIds) {
     const row = rows.get(playerId);
     if (!row) continue;
+
     row.pointsFor += pointsFor;
     row.pointsAgainst += pointsAgainst;
-    if (won) row.wins += 1;
-    else row.losses += 1;
+
+    if (result === "win") {
+      row.wins += 1;
+      row.rankingPoints += 3;
+    } else if (result === "draw") {
+      row.draws += 1;
+      row.rankingPoints += 1;
+    } else {
+      row.losses += 1;
+    }
   }
 }
 
 function compareRankingRows(a: MutableRanking, b: MutableRanking) {
   return (
+    b.rankingPoints - a.rankingPoints ||
     b.wins - a.wins ||
     b.pointDiff - a.pointDiff ||
     b.pointsFor - a.pointsFor ||
@@ -64,5 +84,11 @@ function compareRankingRows(a: MutableRanking, b: MutableRanking) {
 }
 
 function sameRankingValue(a: MutableRanking, b: MutableRanking) {
-  return a.wins === b.wins && a.pointDiff === b.pointDiff && a.pointsFor === b.pointsFor && a.pointsAgainst === b.pointsAgainst;
+  return (
+    a.rankingPoints === b.rankingPoints &&
+    a.wins === b.wins &&
+    a.pointDiff === b.pointDiff &&
+    a.pointsFor === b.pointsFor &&
+    a.pointsAgainst === b.pointsAgainst
+  );
 }

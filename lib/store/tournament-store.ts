@@ -17,7 +17,7 @@ export type TournamentState = {
 
 const STORAGE_KEY = "tennis-monthly-tournament-state";
 const ADMIN_PASSWORD = "1234";
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 
 export function createInitialState(): TournamentState {
   return {

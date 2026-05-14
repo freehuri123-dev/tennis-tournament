@@ -7,39 +7,34 @@ type GenerateInitialMatchesInput = {
   participants: Member[];
 };
 
-const PAIRING_PATTERNS: Record<TournamentGroup["scheduleFormat"], number[][]> = {
-  "kdk-v2010": [
-    [1, 4, 2, 3],
-    [1, 2, 3, 5],
-    [1, 5, 2, 4],
-    [1, 3, 4, 5],
-    [2, 5, 3, 4],
-    [1, 4, 3, 6]
-  ],
-  "hanul-aa": [
-    [1, 2, 3, 4],
-    [1, 3, 2, 5],
-    [1, 4, 5, 6],
-    [2, 3, 4, 6],
-    [1, 5, 2, 6],
-    [3, 4, 1, 6]
-  ]
+const MIN_MAX: Record<TournamentGroup["scheduleFormat"], { min: number; max: number; label: string }> = {
+  "kdk-v2010": { min: 5, max: 10, label: "KDK-V2010" },
+  "hanul-aa": { min: 5, max: 16, label: "한울AA" }
 };
+
+export function getScheduleRequirement(format: TournamentGroup["scheduleFormat"]) {
+  return MIN_MAX[format];
+}
+
+export function validateScheduleParticipants(format: TournamentGroup["scheduleFormat"], count: number) {
+  const requirement = getScheduleRequirement(format);
+  if (count < requirement.min || count > requirement.max) {
+    return `${requirement.label} 방식은 ${requirement.min}~${requirement.max}명일 때 대진표를 생성할 수 있습니다.`;
+  }
+  return "";
+}
 
 export function generateInitialMatches(input: GenerateInitialMatchesInput): Match[] {
   const participantIds = input.participants.map((participant) => participant.id);
-  if (participantIds.length < 4) return [];
+  const validationMessage = validateScheduleParticipants(input.format, participantIds.length);
+  if (validationMessage) return [];
 
-  const pattern = PAIRING_PATTERNS[input.format];
+  const matchCount = input.format === "kdk-v2010" ? participantIds.length : Math.max(participantIds.length, 6);
   const matches: Match[] = [];
 
-  pattern.forEach((slots, index) => {
-    const ids = slots.map((slot) => participantIds[slot - 1]).filter((id): id is string => Boolean(id));
-    const uniqueIds = new Set(ids);
-
-    if (ids.length !== 4 || uniqueIds.size !== 4) {
-      return;
-    }
+  for (let index = 0; index < matchCount; index += 1) {
+    const ids = pickFourUnique(participantIds, index);
+    if (ids.length !== 4) continue;
 
     matches.push({
       id: `${input.groupId}-match-${index + 1}`,
@@ -53,11 +48,28 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
       status: "scheduled",
       sortOrder: index + 1
     });
-  });
+  }
 
   return matches;
 }
 
-export function getHanulSeedPlayers(participants: Member[]) {
-  return participants.slice(0, Math.min(3, participants.length));
+function pickFourUnique(participantIds: string[], roundIndex: number) {
+  const offsets = [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const picked: string[] = [];
+
+  for (const offset of offsets) {
+    const id = participantIds[(roundIndex + offset) % participantIds.length];
+    if (!picked.includes(id)) picked.push(id);
+    if (picked.length === 4) break;
+  }
+
+  return picked;
+}
+
+export function getHanulSeedCount(participantCount: number) {
+  if (participantCount < 5) return 0;
+  if (participantCount <= 5) return 1;
+  if (participantCount <= 8) return 2;
+  if (participantCount <= 12) return 3;
+  return 4;
 }

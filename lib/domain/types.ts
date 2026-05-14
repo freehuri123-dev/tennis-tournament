@@ -21,6 +21,7 @@ export type TournamentGroup = {
   name: string;
   scheduleFormat: "hanul-aa" | "kdk-v2010";
   sortOrder: number;
+  seedPlayerIds?: string[];
 };
 
 export type MatchStatus = "scheduled" | "completed";
@@ -43,7 +44,9 @@ export type RankingRow = {
   name: string;
   rank: number;
   wins: number;
+  draws: number;
   losses: number;
+  rankingPoints: number;
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;

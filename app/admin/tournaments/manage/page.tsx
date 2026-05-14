@@ -7,7 +7,7 @@ import { MatchCard } from "@/components/MatchCard";
 import { RankingTable } from "@/components/RankingTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { calculateRankings } from "@/lib/domain/ranking";
-import { generateInitialMatches, getHanulSeedPlayers } from "@/lib/domain/schedule";
+import { generateInitialMatches, getHanulSeedCount, validateScheduleParticipants } from "@/lib/domain/schedule";
 import type { Match, TournamentGroup } from "@/lib/domain/types";
 import { loadTournamentState, saveTournamentState, type TournamentState } from "@/lib/store/tournament-store";
 
@@ -35,6 +35,15 @@ export default function TournamentManagePage() {
     return state.groups.length === 1 ? "전체" : group.name;
   }
 
+  function groupParticipants(groupId: string) {
+    const ids = state.groupMemberIds[groupId] ?? [];
+    return state.members.filter((member) => ids.includes(member.id));
+  }
+
+  function groupValidation(group: TournamentGroup) {
+    return validateScheduleParticipants(group.scheduleFormat, groupParticipants(group.id).length);
+  }
+
   function updateTournament(field: "name" | "date", value: string) {
     const tournament = { ...state.tournament, [field]: value };
     persist({
@@ -56,7 +65,8 @@ export default function TournamentManagePage() {
           tournamentId: state.tournament.id,
           name: `${String.fromCharCode(64 + nextGroupNumber)}조`,
           scheduleFormat: "kdk-v2010",
-          sortOrder: nextGroupNumber
+          sortOrder: nextGroupNumber,
+          seedPlayerIds: []
         }
       ],
       groupMemberIds: { ...state.groupMemberIds, [groupId]: [] }
@@ -64,12 +74,11 @@ export default function TournamentManagePage() {
   }
 
   function deleteGroup(groupId: string) {
-    const nextGroups = state.groups.filter((group) => group.id !== groupId);
     const nextGroupMemberIds = { ...state.groupMemberIds };
     delete nextGroupMemberIds[groupId];
     persist({
       ...state,
-      groups: nextGroups,
+      groups: state.groups.filter((group) => group.id !== groupId),
       groupMemberIds: nextGroupMemberIds,
       matches: state.matches.filter((match) => match.groupId !== groupId)
     });
@@ -78,7 +87,7 @@ export default function TournamentManagePage() {
   function updateGroupFormat(groupId: string, scheduleFormat: TournamentGroup["scheduleFormat"]) {
     persist({
       ...state,
-      groups: state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat } : group))
+      groups: state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat, seedPlayerIds: [] } : group))
     });
   }
 
@@ -92,27 +101,51 @@ export default function TournamentManagePage() {
     const nextIds = currentIds.includes(memberId) ? currentIds.filter((id) => id !== memberId) : [...currentIds, memberId];
     persist({
       ...state,
-      groupMemberIds: { ...state.groupMemberIds, [groupId]: nextIds }
+      groupMemberIds: { ...state.groupMemberIds, [groupId]: nextIds },
+      groups: state.groups.map((group) =>
+        group.id === groupId
+          ? { ...group, seedPlayerIds: (group.seedPlayerIds ?? []).filter((id) => nextIds.includes(id)) }
+          : group
+      )
     });
   }
 
-  function generateScheduleForGroup(groupId: string) {
+  function toggleSeed(groupId: string, memberId: string) {
     const group = state.groups.find((item) => item.id === groupId);
     if (!group) return;
-    const groupMemberIds = state.groupMemberIds[groupId] ?? [];
-    const participants = state.members.filter((member) => groupMemberIds.includes(member.id));
-    const generated = generateInitialMatches({
-      tournamentId: state.tournament.id,
-      groupId,
-      format: group.scheduleFormat,
-      participants
+    const seedCount = getHanulSeedCount(groupParticipants(groupId).length);
+    const current = group.seedPlayerIds ?? [];
+    const next = current.includes(memberId)
+      ? current.filter((id) => id !== memberId)
+      : current.length < seedCount
+        ? [...current, memberId]
+        : current;
+
+    persist({
+      ...state,
+      groups: state.groups.map((item) => (item.id === groupId ? { ...item, seedPlayerIds: next } : item))
     });
+  }
+
+  function generateAllSchedules() {
+    const invalid = state.groups.find((group) => groupValidation(group));
+    if (invalid) return;
+
+    const generated = state.groups.flatMap((group) =>
+      generateInitialMatches({
+        tournamentId: state.tournament.id,
+        groupId: group.id,
+        format: group.scheduleFormat,
+        participants: groupParticipants(group.id)
+      })
+    );
+
     const tournament = { ...state.tournament, status: "active" as const };
     persist({
       ...state,
       tournament,
       tournaments: state.tournaments.map((item) => (item.id === tournament.id ? tournament : item)),
-      matches: [...state.matches.filter((match) => match.groupId !== groupId), ...generated]
+      matches: generated
     });
     setActiveTab("draw");
   }
@@ -159,16 +192,18 @@ export default function TournamentManagePage() {
         if (match.id !== matchId) return match;
         const key = side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
         const nextIds = [...match[key]];
-        const usedByOtherSlot = [...match.sideAPlayerIds, ...match.sideBPlayerIds].some((id, usedIndex) => {
-          const flatIndex = side === "A" ? index : index + match.sideAPlayerIds.length;
-          return usedIndex !== flatIndex && id === memberId;
-        });
-        if (usedByOtherSlot) return match;
         nextIds[index] = memberId;
         return { ...match, [key]: nextIds };
       })
     });
   }
+
+  function availableMembersForMatch(match: Match, selected?: string) {
+    const used = new Set([...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => id !== selected));
+    return state.members.filter((member) => !used.has(member.id));
+  }
+
+  const hasInvalidGroup = state.groups.some((group) => groupValidation(group));
 
   return (
     <AppShell title="대회 상세관리" subtitle="참가자 편성, 대진표, 순위를 관리합니다" active="tournaments">
@@ -204,11 +239,11 @@ export default function TournamentManagePage() {
           <>
             <section className="section-card stack">
               <strong className="section-head">대회 기본정보</strong>
-              <label className="field">
+              <label className="field boxed-field">
                 <span>대회명</span>
                 <input onChange={(event) => updateTournament("name", event.target.value)} value={state.tournament.name} />
               </label>
-              <label className="field">
+              <label className="field boxed-field">
                 <span>날짜</span>
                 <input onChange={(event) => updateTournament("date", event.target.value)} type="date" value={state.tournament.date} />
               </label>
@@ -224,8 +259,9 @@ export default function TournamentManagePage() {
               </div>
 
               {state.groups.map((group) => {
-                const participants = state.members.filter((member) => (state.groupMemberIds[group.id] ?? []).includes(member.id));
-                const seeds = group.scheduleFormat === "hanul-aa" ? getHanulSeedPlayers(participants) : [];
+                const participants = groupParticipants(group.id);
+                const seedCount = group.scheduleFormat === "hanul-aa" ? getHanulSeedCount(participants.length) : 0;
+                const validation = groupValidation(group);
 
                 return (
                   <div className="tournament-card stack" key={group.id}>
@@ -237,42 +273,41 @@ export default function TournamentManagePage() {
                       <option value="kdk-v2010">KDK-V2010</option>
                       <option value="hanul-aa">한울AA</option>
                     </select>
-                    {seeds.length > 0 && (
-                      <div className="seed-box">
-                        <strong>시드 선수</strong>
-                        <span>{seeds.map((member) => member.name).join(", ")}</span>
-                      </div>
-                    )}
+                    {validation && <p className="notice-text">{validation}</p>}
                     <div className="chip-row">
                       {state.members.map((member) => {
                         const selected = (state.groupMemberIds[group.id] ?? []).includes(member.id);
                         const assignedElsewhere = isAssignedToOtherGroup(member.id, group.id);
                         return (
-                          <button
-                            className={`chip ${selected ? "active" : ""}`}
-                            disabled={assignedElsewhere}
-                            key={member.id}
-                            onClick={() => toggleGroupMember(group.id, member.id)}
-                            type="button"
-                          >
+                          <button className={`chip ${selected ? "active" : ""}`} disabled={assignedElsewhere} key={member.id} onClick={() => toggleGroupMember(group.id, member.id)} type="button">
                             {member.name}
                           </button>
                         );
                       })}
                     </div>
-                    <div className="sticky-footer">
-                      <button className="danger-button" onClick={() => deleteGroup(group.id)} type="button">
-                        <Trash2 size={18} />
-                        그룹 삭제
-                      </button>
-                      <button className="primary-button" onClick={() => generateScheduleForGroup(group.id)} type="button">
-                        <ClipboardList size={18} />
-                        대진표 생성
-                      </button>
-                    </div>
+                    {seedCount > 0 && (
+                      <div className="seed-box">
+                        <strong>시드 선수 {group.seedPlayerIds?.length ?? 0}/{seedCount}</strong>
+                        <div className="chip-row">
+                          {participants.map((member) => (
+                            <button className={`chip ${(group.seedPlayerIds ?? []).includes(member.id) ? "active" : ""}`} key={member.id} onClick={() => toggleSeed(group.id, member.id)} type="button">
+                              {member.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <button className="danger-button" onClick={() => deleteGroup(group.id)} type="button">
+                      <Trash2 size={18} />
+                      그룹 삭제
+                    </button>
                   </div>
                 );
               })}
+              <button className="primary-button" disabled={state.groups.length === 0 || hasInvalidGroup} onClick={generateAllSchedules} type="button">
+                <ClipboardList size={18} />
+                전체 대진표 생성
+              </button>
             </section>
           </>
         )}
@@ -295,20 +330,25 @@ export default function TournamentManagePage() {
                   .map((match) => (
                     <div className="stack" key={match.id}>
                       <MatchCard match={match} members={state.members} />
-                      <div className="score-input-grid">
-                        <input className="score-input" inputMode="numeric" onChange={(event) => updateMatch(match.id, { sideAScore: Number(event.target.value), status: "completed" })} placeholder="A팀 점수" value={match.sideAScore ?? ""} />
-                        <input className="score-input" inputMode="numeric" onChange={(event) => updateMatch(match.id, { sideBScore: Number(event.target.value), status: "completed" })} placeholder="B팀 점수" value={match.sideBScore ?? ""} />
+                      <div className="score-panel">
+                        <label>
+                          <span>A팀 점수</span>
+                          <input className="score-input" inputMode="numeric" onChange={(event) => updateMatch(match.id, { sideAScore: Number(event.target.value), status: "completed" })} value={match.sideAScore ?? ""} />
+                        </label>
+                        <label>
+                          <span>B팀 점수</span>
+                          <input className="score-input" inputMode="numeric" onChange={(event) => updateMatch(match.id, { sideBScore: Number(event.target.value), status: "completed" })} value={match.sideBScore ?? ""} />
+                        </label>
                       </div>
                       <div className="score-input-grid">
                         {(["A", "A", "B", "B"] as const).map((side, index) => {
                           const sideIndex = index % 2;
                           const selected = side === "A" ? match.sideAPlayerIds[sideIndex] : match.sideBPlayerIds[sideIndex];
-                          const used = new Set([...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => id !== selected));
                           return (
                             <select className="select-input" key={`${side}-${sideIndex}`} onChange={(event) => replacePlayer(match.id, side, sideIndex, event.target.value)} value={selected ?? ""}>
                               <option value="">{side}팀 {sideIndex + 1}</option>
-                              {state.members.map((member) => (
-                                <option disabled={used.has(member.id)} key={member.id} value={member.id}>{member.name}</option>
+                              {availableMembersForMatch(match, selected).map((member) => (
+                                <option key={member.id} value={member.id}>{member.name}</option>
                               ))}
                             </select>
                           );

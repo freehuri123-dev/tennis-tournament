@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CalendarDays, Home, Shield, Users } from "lucide-react";
+import { CalendarDays, Home, Users } from "lucide-react";
+import { SplashScreen } from "@/components/SplashScreen";
 
 type AppShellProps = {
   title: string;
@@ -17,6 +18,7 @@ const navItems = [
 export function AppShell({ title, subtitle = "월례대회 운영 관리", children, active = "home" }: AppShellProps) {
   return (
     <div className="app-shell">
+      <SplashScreen />
       <div className="mobile-frame">
         <header className="app-header">
           <span className="header-brand">STC 테니스 클럽</span>
@@ -43,6 +45,7 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
 export function PublicShell({ title, subtitle, children }: Omit<AppShellProps, "active">) {
   return (
     <div className="app-shell">
+      <SplashScreen />
       <div className="mobile-frame">
         <header className="app-header">
           <span className="header-brand">STC 테니스 클럽</span>

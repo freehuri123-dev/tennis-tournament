@@ -57,15 +57,12 @@ export default function TournamentListPage() {
     <AppShell title="대회관리" subtitle="진행 중인 대회와 완료된 대회를 따로 확인합니다" active="tournaments">
       <div className="page">
         <section className="section-card">
-          <div className="tab-row">
+          <div className="tab-row two-tabs">
             <button className={`tab-button ${tab === "current" ? "active" : ""}`} onClick={() => setTab("current")} type="button">
               현재 대회
             </button>
             <button className={`tab-button ${tab === "completed" ? "active" : ""}`} onClick={() => setTab("completed")} type="button">
               완료 대회
-            </button>
-            <button className="tab-button active" onClick={createTournament} type="button">
-              새 대회
             </button>
           </div>
         </section>
@@ -86,12 +83,17 @@ export default function TournamentListPage() {
               </button>
             ))}
             {visibleTournaments.length === 0 && (
-              <button className="primary-button" onClick={createTournament} type="button">
-                <CalendarPlus size={20} />새 대회 만들기
-              </button>
+              <p className="lead">표시할 대회가 없습니다.</p>
             )}
           </div>
         </section>
+
+        <div className="sticky-footer single">
+          <button className="primary-button" onClick={createTournament} type="button">
+            <CalendarPlus size={20} />
+            새 대회 만들기
+          </button>
+        </div>
       </div>
     </AppShell>
   );
