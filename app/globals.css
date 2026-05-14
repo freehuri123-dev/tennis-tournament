@@ -656,6 +656,31 @@ textarea:focus-visible {
   color: var(--green-deep);
 }
 
+.group-tab-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.group-tab {
+  min-width: 76px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.group-tab.active {
+  border-color: rgba(47, 125, 50, 0.24);
+  background: var(--green-deep);
+  color: #fff;
+}
+
 .format-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 54px;
@@ -777,6 +802,48 @@ textarea:focus-visible {
   font-size: 28px;
 }
 
+.score-panel.vertical {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.score-panel.vertical label {
+  grid-template-columns: minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 10px;
+}
+
+.score-panel.vertical span {
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.score-panel.vertical .score-input {
+  min-height: 56px;
+  font-size: 24px;
+}
+
+.score-vs-label {
+  justify-self: center;
+  min-width: 48px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .notice-text {
   margin: 0;
   padding: 10px 12px;
@@ -801,113 +868,77 @@ textarea:focus-visible {
   font-weight: 900;
 }
 
-.ranking-list {
+.ranking-card-list {
   display: grid;
   gap: 10px;
 }
 
-.ranking-table {
-  overflow: hidden;
+.ranking-card {
+  padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #fff;
-}
-
-.ranking-header,
-.ranking-line {
+  border-radius: 18px;
   display: grid;
-  grid-template-columns: 42px minmax(88px, 1fr) repeat(5, 42px);
+  gap: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fcf7 100%);
+  box-shadow: var(--shadow);
+}
+
+.ranking-card-main {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 10px 8px;
-  text-align: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.ranking-header {
-  background: var(--surface-lime);
-  color: var(--green-deep);
+.ranking-card-main strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.ranking-card-main small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 900;
-}
-
-.ranking-line {
-  border-top: 1px solid var(--line);
-  font-size: 14px;
   font-weight: 800;
 }
 
-.ranking-line > div {
-  text-align: left;
-  min-width: 0;
-}
-
-.ranking-line small {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.ranking-row-card {
-  padding: 12px 14px;
-  display: grid;
-  grid-template-columns: minmax(110px, 1fr) minmax(0, 2.1fr);
-  align-items: center;
-  gap: 12px;
-  box-shadow: none;
-}
-
-.ranking-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.ranking-rank {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+.ranking-badge {
+  min-width: 54px;
+  height: 54px;
+  border-radius: 18px;
   display: grid;
   place-items: center;
-  background: var(--surface-lime);
-  color: var(--green-deep);
+  background: var(--green-deep);
+  color: #fff;
   font-size: 16px;
   font-weight: 900;
 }
 
-.ranking-name {
-  font-size: 16px;
-  font-weight: 900;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ranking-stats {
+.ranking-stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 
-.ranking-stats span {
-  min-height: 38px;
+.ranking-stat-grid span {
+  min-height: 48px;
   padding: 6px 4px;
-  border-radius: 12px;
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  background: #f7faf7;
   border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  background: #fff;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
 }
 
-.ranking-stats strong {
+.ranking-stat-grid b {
   color: var(--text);
-  font-size: 15px;
-  font-weight: 900;
+  font-size: 16px;
   line-height: 1;
 }
 

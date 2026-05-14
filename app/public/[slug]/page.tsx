@@ -9,11 +9,16 @@ import { createInitialState, loadTournamentState, type TournamentState } from "@
 
 export default function PublicTournamentPage() {
   const [activeTab, setActiveTab] = useState<"schedule" | "group" | "overall">("schedule");
+  const [activeScheduleGroupId, setActiveScheduleGroupId] = useState<string | null>(null);
+  const [activeRankingGroupId, setActiveRankingGroupId] = useState<string | null>(null);
   const [state, setState] = useState<TournamentState>(() => createInitialState());
 
   useEffect(() => {
     setState(loadTournamentState());
   }, []);
+
+  const scheduleGroupId = activeScheduleGroupId && state.groups.some((group) => group.id === activeScheduleGroupId) ? activeScheduleGroupId : state.groups[0]?.id;
+  const rankingGroupId = activeRankingGroupId && state.groups.some((group) => group.id === activeRankingGroupId) ? activeRankingGroupId : state.groups[0]?.id;
 
   const groupRankings = useMemo(() => {
     return state.groups.map((group) => {
@@ -49,6 +54,22 @@ export default function PublicTournamentPage() {
     return state.groups.length === 1 ? "전체" : groupName;
   }
 
+  function renderGroupTabs(activeGroupId: string | undefined, onChange: (groupId: string) => void) {
+    if (state.groups.length <= 1) return null;
+    return (
+      <div className="group-tab-row" aria-label="그룹 선택">
+        {state.groups.map((group) => (
+          <button className={`group-tab ${activeGroupId === group.id ? "active" : ""}`} key={group.id} onClick={() => onChange(group.id)} type="button">
+            {group.name}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  const visibleScheduleGroups = state.groups.filter((group) => state.groups.length === 1 || group.id === scheduleGroupId);
+  const visibleRankingGroups = groupRankings.filter(({ group }) => state.groups.length === 1 || group.id === rankingGroupId);
+
   return (
     <PublicShell title={state.tournament.name} subtitle={`${state.tournament.date} · 공유용 조회 화면`}>
       <div className="page">
@@ -74,7 +95,8 @@ export default function PublicTournamentPage() {
         {activeTab === "schedule" && (
           <section className="section-card stack">
             <strong className="section-head">오늘의 대진표</strong>
-            {state.groups.map((group) => (
+            {renderGroupTabs(scheduleGroupId, setActiveScheduleGroupId)}
+            {visibleScheduleGroups.map((group) => (
               <div className="stack" key={group.id}>
                 <div className="today-card-top">
                   <strong>{displayGroupName(group.name)}</strong>
@@ -94,7 +116,8 @@ export default function PublicTournamentPage() {
         {activeTab === "group" && (
           <section className="section-card stack">
             <strong className="section-head">그룹별 순위</strong>
-            {groupRankings.map(({ group, rows }) => (
+            {renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
+            {visibleRankingGroups.map(({ group, rows }) => (
               <div className="stack" key={group.id}>
                 <strong>{displayGroupName(group.name)}</strong>
                 <RankingTable rows={rows} />
