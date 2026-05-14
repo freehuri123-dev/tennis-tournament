@@ -35,6 +35,7 @@ export default function PublicTournamentPage() {
     return rows
       .sort(
         (a, b) =>
+          b.rankingPoints - a.rankingPoints ||
           b.wins - a.wins ||
           b.pointDiff - a.pointDiff ||
           b.pointsFor - a.pointsFor ||

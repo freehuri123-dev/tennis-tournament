@@ -14,11 +14,15 @@ function maskPhone(phone?: string) {
 export default function MemberManagementPage() {
   const [state] = useState<TournamentState>(() => loadTournamentState());
   const [query, setQuery] = useState("");
+  const [showHidden, setShowHidden] = useState(false);
 
   const visibleMembers = useMemo(() => {
     const keyword = query.trim();
-    return state.members.filter((member) => member.name.includes(keyword));
-  }, [query, state.members]);
+    return state.members
+      .filter((member) => showHidden || member.active !== false)
+      .filter((member) => member.name.includes(keyword))
+      .sort((left, right) => Number(left.active === false) - Number(right.active === false) || left.name.localeCompare(right.name, "ko"));
+  }, [query, showHidden, state.members]);
 
   return (
     <AppShell title="회원관리" subtitle="회원 목록을 먼저 확인합니다" active="members">
@@ -33,14 +37,17 @@ export default function MemberManagementPage() {
         <section className="section-card">
           <div className="today-card-top">
             <strong className="section-head" style={{ marginBottom: 0 }}>회원 목록</strong>
-            <Link className="ghost-button" href="/admin/members/new">
-              <Plus size={18} />
-              회원등록
-            </Link>
+            <button className={`small-filter-button ${showHidden ? "active" : ""}`} onClick={() => setShowHidden((current) => !current)} type="button">
+              숨김 포함
+            </button>
           </div>
+          <Link className="member-create-button" href="/admin/members/new">
+            <Plus size={20} />
+            회원등록
+          </Link>
           <div className="list-stack" style={{ marginTop: 12 }}>
             {visibleMembers.map((member) => (
-              <div className="member-card member-row-card" key={member.id}>
+              <div className={`member-card member-row-card ${member.active === false ? "inactive" : ""}`} key={member.id}>
                 <Link className="member-row-link" href={`/admin/members/edit/${member.id}`}>
                   <div className="member-name-block">
                     <span className="member-level-dot">{member.name.slice(0, 1)}</span>

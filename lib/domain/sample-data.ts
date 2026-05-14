@@ -1,44 +1,47 @@
 import { generateInitialMatches } from "./schedule";
+import { withDateStatus } from "./tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "./types";
 
 export const sampleMembers: Member[] = [
-  { id: "m1", name: "김철수", level: "A", notes: "", phone: "010-1234-1001", active: true },
-  { id: "m2", name: "박영희", level: "A", notes: "", phone: "010-1234-1002", active: true },
-  { id: "m3", name: "이민수", level: "B", notes: "", phone: "010-1234-1003", active: true },
-  { id: "m4", name: "최은정", level: "B", notes: "", phone: "010-1234-1004", active: true },
-  { id: "m5", name: "정우진", level: "C", notes: "", phone: "010-1234-1005", active: true },
-  { id: "m6", name: "한미라", level: "C", notes: "", phone: "010-1234-1006", active: true },
-  { id: "m7", name: "오세훈", level: "B", notes: "", phone: "010-1234-1007", active: true },
-  { id: "m8", name: "강지연", level: "C", notes: "", phone: "010-1234-1008", active: true }
+  { id: "m1", name: "김철수", notes: "", phone: "010-1234-1001", active: true },
+  { id: "m2", name: "박영희", notes: "", phone: "010-1234-1002", active: true },
+  { id: "m3", name: "이민수", notes: "", phone: "010-1234-1003", active: true },
+  { id: "m4", name: "최은정", notes: "", phone: "010-1234-1004", active: true },
+  { id: "m5", name: "정우진", notes: "", phone: "010-1234-1005", active: true },
+  { id: "m6", name: "한미라", notes: "", phone: "010-1234-1006", active: true },
+  { id: "m7", name: "오세훈", notes: "", phone: "010-1234-1007", active: true },
+  { id: "m8", name: "강지연", notes: "", phone: "010-1234-1008", active: true },
+  { id: "m9", name: "윤도현", notes: "", phone: "010-1234-1009", active: true },
+  { id: "m10", name: "서민재", notes: "", phone: "010-1234-1010", active: true }
 ];
 
-export const sampleTournament: Tournament = {
+export const sampleTournament: Tournament = withDateStatus({
   id: "t1",
   name: "5월 월례대회",
   date: "2026-05-24",
   publicSlug: "monthly-demo",
-  status: "active"
-};
+  status: "draft"
+});
 
 export const sampleTournaments: Tournament[] = [
   sampleTournament,
-  {
+  withDateStatus({
     id: "t0",
     name: "4월 월례대회",
     date: "2026-04-20",
     publicSlug: "monthly-april",
     status: "completed"
-  }
+  })
 ];
 
 export const sampleGroups: TournamentGroup[] = [
-  { id: "g1", tournamentId: "t1", name: "A조", scheduleFormat: "hanul-aa", sortOrder: 1 },
-  { id: "g2", tournamentId: "t1", name: "B조", scheduleFormat: "kdk-v2010", sortOrder: 2 }
+  { id: "g1", tournamentId: "t1", name: "A조", scheduleFormat: "kdk-v2010", sortOrder: 1, seedPlayerIds: [] },
+  { id: "g2", tournamentId: "t1", name: "B조", scheduleFormat: "hanul-aa", sortOrder: 2, seedPlayerIds: [] }
 ];
 
 export const sampleGroupMemberIds: Record<string, string[]> = {
-  g1: ["m1", "m2", "m3", "m4"],
-  g2: ["m5", "m6", "m7", "m8"]
+  g1: ["m1", "m2", "m3", "m4", "m5"],
+  g2: ["m6", "m7", "m8", "m9", "m10"]
 };
 
 export function createSampleMatches(): Match[] {
@@ -47,6 +50,7 @@ export function createSampleMatches(): Match[] {
       tournamentId: sampleTournament.id,
       groupId: group.id,
       format: group.scheduleFormat,
+      seedPlayerIds: group.seedPlayerIds,
       participants: sampleMembers.filter((member) => sampleGroupMemberIds[group.id].includes(member.id))
     })
   );

@@ -10,7 +10,7 @@ type AppShellProps = {
 };
 
 const navItems = [
-  { key: "home", href: "/admin", label: "홈", icon: Home },
+  { key: "home", href: "/", label: "홈", icon: Home },
   { key: "members", href: "/admin/members", label: "회원", icon: Users },
   { key: "tournaments", href: "/admin/tournaments", label: "대회", icon: CalendarDays }
 ] as const;

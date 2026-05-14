@@ -280,6 +280,15 @@ textarea:focus-visible {
   box-shadow: none;
 }
 
+.ghost-button:disabled,
+.danger-button:disabled,
+.select-input:disabled,
+.score-input:disabled,
+.field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
 .ghost-button {
   border: 1px solid var(--line);
   background: #fff;
@@ -290,6 +299,12 @@ textarea:focus-visible {
   border: 1px solid rgba(182, 63, 63, 0.18);
   background: #fff4f4;
   color: var(--danger);
+}
+
+.ghost-button.compact {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
 }
 
 .quick-card,
@@ -379,6 +394,22 @@ textarea:focus-visible {
 .status-pill.completed {
   background: #edf2ff;
   color: #334ac0;
+}
+
+.small-filter-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.small-filter-button.active {
+  background: var(--surface-lime);
+  color: var(--green-deep);
 }
 
 .search-box,
@@ -537,6 +568,45 @@ textarea:focus-visible {
   border: 1px solid rgba(47, 125, 50, 0.14);
 }
 
+.member-create-button {
+  min-height: 54px;
+  margin-top: 12px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--green-deep);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: var(--shadow);
+}
+
+.member-row-card.inactive {
+  opacity: 0.58;
+  background: #f6f7f5;
+}
+
+.visibility-button {
+  min-height: 56px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f7faf7;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.visibility-button.active {
+  background: var(--surface-lime);
+  color: var(--green-deep);
+}
+
 .bottom-nav {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -584,6 +654,44 @@ textarea:focus-visible {
 .tab-button.active {
   background: var(--surface-lime);
   color: var(--green-deep);
+}
+
+.format-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  gap: 8px;
+}
+
+.icon-help-button,
+.icon-danger-button {
+  min-height: 54px;
+  width: 54px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  display: inline-grid;
+  place-items: center;
+  background: #fff;
+}
+
+.icon-help-button {
+  color: var(--green-deep);
+}
+
+.icon-danger-button {
+  color: var(--danger);
+  background: #fff4f4;
+}
+
+.tournament-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.tournament-list-row .tournament-card {
+  width: 100%;
+  text-align: left;
 }
 
 .match-card {
@@ -815,6 +923,36 @@ textarea:focus-visible {
 
 .sticky-footer.single {
   grid-template-columns: 1fr;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(12, 26, 16, 0.58);
+}
+
+.help-modal {
+  width: min(100%, 430px);
+  max-height: min(86dvh, 760px);
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--shadow-strong);
+}
+
+.help-modal img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
 @media (max-width: 390px) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ToggleLeft, ToggleRight } from "lucide-react";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import type { Member } from "@/lib/domain/types";
@@ -20,6 +20,13 @@ export function MemberForm({ memberId }: MemberFormProps) {
     active: editingMember?.active ?? true
   }));
 
+  function persistMembers(members: Member[]) {
+    const next = { ...state, members };
+    saveTournamentState(next);
+    setState(next);
+    window.location.assign("/admin/members");
+  }
+
   function saveMember() {
     const name = form.name.trim();
     if (!name) return;
@@ -33,16 +40,15 @@ export function MemberForm({ memberId }: MemberFormProps) {
     };
 
     const exists = state.members.some((member) => member.id === nextMember.id);
-    const next = {
-      ...state,
-      members: exists
-        ? state.members.map((member) => (member.id === nextMember.id ? nextMember : member))
-        : [...state.members, nextMember]
-    };
+    persistMembers(exists
+      ? state.members.map((member) => (member.id === nextMember.id ? nextMember : member))
+      : [...state.members, nextMember]
+    );
+  }
 
-    saveTournamentState(next);
-    setState(next);
-    window.location.assign("/admin/members");
+  function hideMember() {
+    if (!editingMember) return;
+    persistMembers(state.members.map((member) => (member.id === editingMember.id ? { ...member, active: false } : member)));
   }
 
   return (
@@ -61,10 +67,16 @@ export function MemberForm({ memberId }: MemberFormProps) {
             <span>메모</span>
             <textarea onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} rows={4} value={form.notes} />
           </label>
-          <button className="ghost-button" onClick={() => setForm((current) => ({ ...current, active: !current.active }))} type="button">
-            {form.active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-            {form.active ? "활동 회원" : "비활동 회원"}
+          <button className={`visibility-button ${form.active ? "active" : ""}`} onClick={() => setForm((current) => ({ ...current, active: !current.active }))} type="button">
+            {form.active ? <Eye size={20} /> : <EyeOff size={20} />}
+            {form.active ? "대회 선택 명단에 표시" : "대회 선택 명단에서 숨김"}
           </button>
+          {editingMember && (
+            <button className="danger-button" onClick={hideMember} type="button">
+              <Trash2 size={18} />
+              회원 삭제
+            </button>
+          )}
         </section>
 
         <div className="sticky-footer">

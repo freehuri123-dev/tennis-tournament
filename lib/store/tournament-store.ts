@@ -1,6 +1,7 @@
 "use client";
 
 import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "@/lib/domain/sample-data";
+import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "@/lib/domain/types";
 
 export type TournamentState = {
@@ -17,16 +18,16 @@ export type TournamentState = {
 
 const STORAGE_KEY = "tennis-monthly-tournament-state";
 const ADMIN_PASSWORD = "1234";
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 
 export function createInitialState(): TournamentState {
   return {
     version: STORAGE_VERSION,
     adminUnlocked: false,
     members: sampleMembers,
-    tournaments: sampleTournaments,
+    tournaments: sampleTournaments.map((tournament) => withDateStatus(tournament)),
     currentTournamentId: sampleTournament.id,
-    tournament: sampleTournament,
+    tournament: withDateStatus(sampleTournament),
     groups: sampleGroups,
     groupMemberIds: sampleGroupMemberIds,
     matches: createSampleMatches()
@@ -44,12 +45,16 @@ export function loadTournamentState(): TournamentState {
   const parsed = JSON.parse(saved) as Partial<TournamentState>;
   const initial = createInitialState();
   if (parsed.version !== STORAGE_VERSION) return initial;
+  const tournaments = (parsed.tournaments ?? [parsed.tournament ?? initial.tournament, ...initial.tournaments.filter((item) => item.id !== (parsed.tournament ?? initial.tournament).id)]).map((tournament) => withDateStatus(tournament));
+  const currentTournamentId = parsed.currentTournamentId ?? (parsed.tournament ?? initial.tournament).id;
+  const tournament = withDateStatus(parsed.tournament ?? tournaments.find((item) => item.id === currentTournamentId) ?? initial.tournament);
+
   return {
     ...initial,
     ...parsed,
-    tournaments: parsed.tournaments ?? [parsed.tournament ?? initial.tournament, ...initial.tournaments.filter((item) => item.id !== (parsed.tournament ?? initial.tournament).id)],
-    currentTournamentId: parsed.currentTournamentId ?? (parsed.tournament ?? initial.tournament).id,
-    tournament: parsed.tournament ?? initial.tournament,
+    tournaments,
+    currentTournamentId,
+    tournament,
     groups: parsed.groups ?? initial.groups,
     groupMemberIds: parsed.groupMemberIds ?? initial.groupMemberIds,
     matches: parsed.matches ?? initial.matches,

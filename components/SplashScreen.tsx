@@ -26,7 +26,7 @@ export function SplashScreen() {
 
   return (
     <div className={`splash-screen ${leaving ? "leaving" : ""}`}>
-      <img alt="테니스 월례대회 시작 화면" src="/intro.png" />
+      <img alt="테니스 월례대회 시작 화면" src="/inrto2.png" />
     </div>
   );
 }
