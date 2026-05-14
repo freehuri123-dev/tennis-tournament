@@ -1,20 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PublicShell } from "@/components/AppShell";
 import { MatchCard } from "@/components/MatchCard";
 import { RankingTable } from "@/components/RankingTable";
-import { Tabs } from "@/components/Tabs";
 import { calculateRankings } from "@/lib/domain/ranking";
 import { createInitialState, loadTournamentState, type TournamentState } from "@/lib/store/tournament-store";
 
-const tabs = [
-  { id: "schedule", label: "대진표" },
-  { id: "group", label: "그룹 순위" },
-  { id: "overall", label: "전체 순위" }
-];
-
 export default function PublicTournamentPage() {
-  const [activeTab, setActiveTab] = useState("schedule");
+  const [activeTab, setActiveTab] = useState<"schedule" | "group" | "overall">("schedule");
   const [state, setState] = useState<TournamentState>(() => createInitialState());
 
   useEffect(() => {
@@ -38,55 +32,79 @@ export default function PublicTournamentPage() {
       return calculateRankings(members, matches).map((row) => ({ ...row, groupName: group.name }));
     });
 
-    return rows.sort(
-      (a, b) =>
-        b.wins - a.wins ||
-        b.pointDiff - a.pointDiff ||
-        b.pointsFor - a.pointsFor ||
-        a.pointsAgainst - b.pointsAgainst ||
-        a.name.localeCompare(b.name, "ko")
-    );
+    return rows
+      .sort(
+        (a, b) =>
+          b.wins - a.wins ||
+          b.pointDiff - a.pointDiff ||
+          b.pointsFor - a.pointsFor ||
+          a.pointsAgainst - b.pointsAgainst ||
+          a.name.localeCompare(b.name, "ko")
+      )
+      .map((row, index) => ({ ...row, rank: index + 1 }));
   }, [state]);
 
   return (
-    <main className="mx-auto max-w-md px-4 py-5">
-      <h1 className="text-3xl font-bold">{state.tournament.name}</h1>
-      <p className="mb-4 mt-1 text-lg text-slate-700">{state.tournament.date}</p>
-      <Tabs activeId={activeTab} onChange={setActiveTab} tabs={tabs} />
-
-      {activeTab === "schedule" && (
-        <div className="mt-5 space-y-6">
-          {state.groups.map((group) => (
-            <section className="space-y-3" key={group.id}>
-              <h2 className="text-2xl font-bold">{group.name}</h2>
-              {state.matches
-                .filter((match) => match.groupId === group.id)
-                .sort((a, b) => a.sortOrder - b.sortOrder)
-                .map((match) => (
-                  <MatchCard key={match.id} match={match} members={state.members} />
-                ))}
-            </section>
-          ))}
-        </div>
-      )}
-
-      {activeTab === "group" && (
-        <div className="mt-5 space-y-6">
-          {groupRankings.map(({ group, rows }) => (
-            <section className="space-y-3" key={group.id}>
-              <h2 className="text-2xl font-bold">{group.name}</h2>
-              <RankingTable rows={rows} />
-            </section>
-          ))}
-        </div>
-      )}
-
-      {activeTab === "overall" && (
-        <section className="mt-5 space-y-3">
-          <h2 className="text-2xl font-bold">전체 순위</h2>
-          <RankingTable rows={overallRanking.map((row, index) => ({ ...row, rank: index + 1 }))} />
+    <PublicShell title={state.tournament.name} subtitle={`${state.tournament.date} · 공유용 조회 화면`}>
+      <div className="page">
+        <section className="section-card">
+          <div className="tab-row">
+            {[
+              ["schedule", "대진표"],
+              ["group", "그룹 순위"],
+              ["overall", "전체 순위"]
+            ].map(([id, label]) => (
+              <button
+                className={`tab-button ${activeTab === id ? "active" : ""}`}
+                key={id}
+                onClick={() => setActiveTab(id as typeof activeTab)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </section>
-      )}
-    </main>
+
+        {activeTab === "schedule" && (
+          <section className="section-card stack">
+            <strong className="section-head">오늘의 대진표</strong>
+            {state.groups.map((group) => (
+              <div className="stack" key={group.id}>
+                <div className="today-card-top">
+                  <strong>{group.name}</strong>
+                  <span className="group-chip">{state.matches.filter((match) => match.groupId === group.id).length}경기</span>
+                </div>
+                {state.matches
+                  .filter((match) => match.groupId === group.id)
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((match) => (
+                    <MatchCard key={match.id} match={match} members={state.members} />
+                  ))}
+              </div>
+            ))}
+          </section>
+        )}
+
+        {activeTab === "group" && (
+          <section className="section-card stack">
+            <strong className="section-head">그룹별 순위</strong>
+            {groupRankings.map(({ group, rows }) => (
+              <div className="stack" key={group.id}>
+                <strong>{group.name}</strong>
+                <RankingTable rows={rows} />
+              </div>
+            ))}
+          </section>
+        )}
+
+        {activeTab === "overall" && (
+          <section className="section-card stack">
+            <strong className="section-head">전체 통합 순위</strong>
+            <RankingTable rows={overallRanking} />
+          </section>
+        )}
+      </div>
+    </PublicShell>
   );
 }

@@ -2,14 +2,14 @@ import { generateInitialMatches } from "./schedule";
 import type { Match, Member, Tournament, TournamentGroup } from "./types";
 
 export const sampleMembers: Member[] = [
-  { id: "m1", name: "김철수", level: "A", notes: "" },
-  { id: "m2", name: "박영희", level: "A", notes: "" },
-  { id: "m3", name: "이민수", level: "B", notes: "" },
-  { id: "m4", name: "최은정", level: "B", notes: "" },
-  { id: "m5", name: "정우진", level: "C", notes: "" },
-  { id: "m6", name: "한미라", level: "C", notes: "" },
-  { id: "m7", name: "오세훈", level: "B", notes: "" },
-  { id: "m8", name: "강지연", level: "C", notes: "" }
+  { id: "m1", name: "김철수", level: "A", notes: "", phone: "010-1234-1001", active: true },
+  { id: "m2", name: "박영희", level: "A", notes: "", phone: "010-1234-1002", active: true },
+  { id: "m3", name: "이민수", level: "B", notes: "", phone: "010-1234-1003", active: true },
+  { id: "m4", name: "최은정", level: "B", notes: "", phone: "010-1234-1004", active: true },
+  { id: "m5", name: "정우진", level: "C", notes: "", phone: "010-1234-1005", active: true },
+  { id: "m6", name: "한미라", level: "C", notes: "", phone: "010-1234-1006", active: true },
+  { id: "m7", name: "오세훈", level: "B", notes: "", phone: "010-1234-1007", active: true },
+  { id: "m8", name: "강지연", level: "C", notes: "", phone: "010-1234-1008", active: true }
 ];
 
 export const sampleTournament: Tournament = {

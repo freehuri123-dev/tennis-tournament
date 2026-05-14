@@ -3,6 +3,8 @@ export type Member = {
   name: string;
   level: string;
   notes: string;
+  phone?: string;
+  active?: boolean;
 };
 
 export type Tournament = {
