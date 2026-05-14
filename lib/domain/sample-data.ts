@@ -20,6 +20,17 @@ export const sampleTournament: Tournament = {
   status: "active"
 };
 
+export const sampleTournaments: Tournament[] = [
+  sampleTournament,
+  {
+    id: "t0",
+    name: "4월 월례대회",
+    date: "2026-04-20",
+    publicSlug: "monthly-april",
+    status: "completed"
+  }
+];
+
 export const sampleGroups: TournamentGroup[] = [
   { id: "g1", tournamentId: "t1", name: "A조", scheduleFormat: "hanul-aa", sortOrder: 1 },
   { id: "g2", tournamentId: "t1", name: "B조", scheduleFormat: "kdk-v2010", sortOrder: 2 }

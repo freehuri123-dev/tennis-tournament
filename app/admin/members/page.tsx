@@ -9,7 +9,6 @@ import { loadTournamentState, saveTournamentState, type TournamentState } from "
 type MemberForm = {
   id?: string;
   name: string;
-  level: string;
   phone: string;
   notes: string;
   active: boolean;
@@ -17,7 +16,6 @@ type MemberForm = {
 
 const emptyForm: MemberForm = {
   name: "",
-  level: "B",
   phone: "",
   notes: "",
   active: true
@@ -35,7 +33,7 @@ export default function MemberManagementPage() {
 
   const visibleMembers = useMemo(() => {
     const keyword = query.trim();
-    return state.members.filter((member) => member.name.includes(keyword) || member.level.includes(keyword));
+    return state.members.filter((member) => member.name.includes(keyword));
   }, [query, state.members]);
 
   function persist(next: TournamentState) {
@@ -47,7 +45,6 @@ export default function MemberManagementPage() {
     setForm({
       id: member.id,
       name: member.name,
-      level: member.level,
       phone: member.phone ?? "",
       notes: member.notes,
       active: member.active ?? true
@@ -61,7 +58,6 @@ export default function MemberManagementPage() {
     const nextMember: Member = {
       id: form.id ?? `member-${Date.now()}`,
       name,
-      level: form.level.trim() || "B",
       phone: form.phone.trim(),
       notes: form.notes.trim(),
       active: form.active
@@ -78,23 +74,12 @@ export default function MemberManagementPage() {
   }
 
   return (
-    <AppShell title="회원 관리" subtitle="이름으로 검색하고 바로 등록/수정합니다" active="members">
+    <AppShell title="회원관리" subtitle="회원 이름과 연락처만 간단히 관리합니다" active="members">
       <div className="page">
-        <section className="hero-card">
-          <span className="badge">회원 관리</span>
-          <h1>클럽 회원 확인</h1>
-          <p className="lead">월례대회 참가자를 빠르게 찾고, 이름과 레벨을 현장에서 바로 수정할 수 있습니다.</p>
-        </section>
-
         <section className="section-card">
           <div className="search-box">
             <Search size={18} />
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="이름 또는 레벨로 검색"
-              type="search"
-              value={query}
-            />
+            <input onChange={(event) => setQuery(event.target.value)} placeholder="이름으로 검색" type="search" value={query} />
           </div>
         </section>
 
@@ -105,21 +90,6 @@ export default function MemberManagementPage() {
             <input onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
           </label>
           <label className="field">
-            <span>레벨</span>
-            <div className="chip-row">
-              {["A", "B", "C", "초급"].map((level) => (
-                <button
-                  className={`chip ${form.level === level ? "active" : ""}`}
-                  key={level}
-                  onClick={() => setForm((current) => ({ ...current, level }))}
-                  type="button"
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </label>
-          <label className="field">
             <span>연락처</span>
             <input onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="010-0000-0000" value={form.phone} />
           </label>
@@ -127,11 +97,7 @@ export default function MemberManagementPage() {
             <span>메모</span>
             <textarea onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} rows={3} value={form.notes} />
           </label>
-          <button
-            className={`ghost-button ${form.active ? "active" : ""}`}
-            onClick={() => setForm((current) => ({ ...current, active: !current.active }))}
-            type="button"
-          >
+          <button className="ghost-button" onClick={() => setForm((current) => ({ ...current, active: !current.active }))} type="button">
             {form.active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
             {form.active ? "활동 회원" : "비활동 회원"}
           </button>
@@ -153,7 +119,7 @@ export default function MemberManagementPage() {
               <button className="member-card" key={member.id} onClick={() => editMember(member)} type="button">
                 <div className="member-card-top">
                   <div className="member-name-block">
-                    <span className="member-level-dot">{member.level}</span>
+                    <span className="member-level-dot">{member.name.slice(0, 1)}</span>
                     <div>
                       <strong className="member-name">{member.name}</strong>
                       <span className="member-phone">{maskPhone(member.phone)}</span>

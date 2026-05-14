@@ -1,7 +1,7 @@
 export type Member = {
   id: string;
   name: string;
-  level: string;
+  level?: string;
   notes: string;
   phone?: string;
   active?: boolean;

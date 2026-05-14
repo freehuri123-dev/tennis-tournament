@@ -159,6 +159,21 @@ textarea:focus-visible {
   letter-spacing: -0.04em;
 }
 
+.intro-card {
+  overflow: hidden;
+  min-height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: var(--shadow-strong);
+}
+
+.intro-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .lead {
   margin: 0;
   color: var(--muted);
@@ -395,6 +410,31 @@ textarea:focus-visible {
   border-color: rgba(47, 125, 50, 0.2);
   background: var(--surface-lime);
   color: var(--green-deep);
+}
+
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.seed-box {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(47, 125, 50, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffbe8 0%, #fffdf5 100%);
+}
+
+.seed-box strong {
+  color: #8a5b00;
+  font-size: 14px;
+}
+
+.seed-box span {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .member-name-block {

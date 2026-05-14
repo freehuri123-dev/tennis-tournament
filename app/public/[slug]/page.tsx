@@ -29,7 +29,7 @@ export default function PublicTournamentPage() {
       const groupMemberIds = state.groupMemberIds[group.id] ?? [];
       const members = state.members.filter((member) => groupMemberIds.includes(member.id));
       const matches = state.matches.filter((match) => match.groupId === group.id);
-      return calculateRankings(members, matches).map((row) => ({ ...row, groupName: group.name }));
+      return calculateRankings(members, matches).map((row) => ({ ...row, groupName: state.groups.length === 1 ? undefined : group.name }));
     });
 
     return rows
@@ -43,6 +43,10 @@ export default function PublicTournamentPage() {
       )
       .map((row, index) => ({ ...row, rank: index + 1 }));
   }, [state]);
+
+  function displayGroupName(groupName: string) {
+    return state.groups.length === 1 ? "전체" : groupName;
+  }
 
   return (
     <PublicShell title={state.tournament.name} subtitle={`${state.tournament.date} · 공유용 조회 화면`}>
@@ -72,7 +76,7 @@ export default function PublicTournamentPage() {
             {state.groups.map((group) => (
               <div className="stack" key={group.id}>
                 <div className="today-card-top">
-                  <strong>{group.name}</strong>
+                  <strong>{displayGroupName(group.name)}</strong>
                   <span className="group-chip">{state.matches.filter((match) => match.groupId === group.id).length}경기</span>
                 </div>
                 {state.matches
@@ -91,7 +95,7 @@ export default function PublicTournamentPage() {
             <strong className="section-head">그룹별 순위</strong>
             {groupRankings.map(({ group, rows }) => (
               <div className="stack" key={group.id}>
-                <strong>{group.name}</strong>
+                <strong>{displayGroupName(group.name)}</strong>
                 <RankingTable rows={rows} />
               </div>
             ))}
