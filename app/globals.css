@@ -17,3 +17,20 @@ input,
 select {
   font: inherit;
 }
+
+a,
+button,
+input,
+select {
+  touch-action: manipulation;
+}
+
+main {
+  width: 100%;
+}
+
+@media (max-width: 380px) {
+  body {
+    font-size: 15px;
+  }
+}
