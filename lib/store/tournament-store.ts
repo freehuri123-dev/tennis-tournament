@@ -14,11 +14,12 @@ export type TournamentState = {
   groups: TournamentGroup[];
   groupMemberIds: Record<string, string[]>;
   matches: Match[];
+  deletedPublicSlugs: string[];
 };
 
 const STORAGE_KEY = "tennis-monthly-tournament-state";
 const ADMIN_PASSWORD = "1234";
-const STORAGE_VERSION = 5;
+const STORAGE_VERSION = 6;
 
 export function createInitialState(): TournamentState {
   return {
@@ -30,7 +31,8 @@ export function createInitialState(): TournamentState {
     tournament: withDateStatus(sampleTournament),
     groups: sampleGroups,
     groupMemberIds: sampleGroupMemberIds,
-    matches: createSampleMatches()
+    matches: createSampleMatches(),
+    deletedPublicSlugs: []
   };
 }
 
@@ -58,7 +60,8 @@ export function loadTournamentState(): TournamentState {
     groups: parsed.groups ?? initial.groups,
     groupMemberIds: parsed.groupMemberIds ?? initial.groupMemberIds,
     matches: parsed.matches ?? initial.matches,
-    members: parsed.members ?? initial.members
+    members: parsed.members ?? initial.members,
+    deletedPublicSlugs: parsed.deletedPublicSlugs ?? []
   };
 }
 

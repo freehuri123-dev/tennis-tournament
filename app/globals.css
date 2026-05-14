@@ -744,6 +744,95 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+.field-label-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.field-label-row strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.field-label-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.participant-list {
+  display: grid;
+  gap: 8px;
+}
+
+.participant-option {
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: var(--text);
+  text-align: left;
+}
+
+.participant-option .check-mark {
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(47, 125, 50, 0.2);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.participant-option strong {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.participant-option small {
+  min-width: 52px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: #f5f7f4;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.participant-option.active {
+  border-color: rgba(47, 125, 50, 0.28);
+  background: #f5fff0;
+}
+
+.participant-option.active .check-mark {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.participant-option.active small {
+  background: var(--surface-lime);
+  color: var(--green-deep);
+}
+
+.participant-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
 .icon-help-button,
 .icon-danger-button {
   min-height: 54px;
@@ -1130,6 +1219,32 @@ textarea:focus-visible {
   height: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
+}
+
+.status-message-card {
+  min-height: 220px;
+  padding: 24px 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  background: #fff;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.status-message-card strong {
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.status-message-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 @media (max-width: 390px) {

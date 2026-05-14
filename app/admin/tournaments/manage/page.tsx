@@ -362,6 +362,10 @@ export default function TournamentManagePage() {
                       <strong>{displayGroupName(group)}</strong>
                       <span className="group-chip">{participants.length}명</span>
                     </div>
+                    <div className="field-label-row">
+                      <strong>대진방식 선택</strong>
+                      <span>도움말 버튼으로 예시 이미지를 볼 수 있습니다.</span>
+                    </div>
                     <div className="format-row">
                       <select className="select-input" disabled={isCompleted} onChange={(event) => updateGroupFormat(group.id, event.target.value as TournamentGroup["scheduleFormat"])} value={group.scheduleFormat}>
                         <option value="kdk-v2010">KDK-V2010</option>
@@ -372,13 +376,19 @@ export default function TournamentManagePage() {
                       </button>
                     </div>
                     {validation && <p className="notice-text">{validation}</p>}
-                    <div className="chip-row">
+                    <div className="field-label-row">
+                      <strong>참여자 선택</strong>
+                      <span>선택됨 {participants.length}명</span>
+                    </div>
+                    <div className="participant-list">
                       {selectableMembersForGroup(group.id).map((member) => {
                         const selected = (state.groupMemberIds[group.id] ?? []).includes(member.id);
                         const assignedElsewhere = isAssignedToOtherGroup(member.id, group.id);
                         return (
-                          <button className={`chip ${selected ? "active" : ""}`} disabled={isCompleted || assignedElsewhere} key={member.id} onClick={() => toggleGroupMember(group.id, member.id)} type="button">
-                            {member.name}
+                          <button className={`participant-option ${selected ? "active" : ""}`} disabled={isCompleted || assignedElsewhere} key={member.id} onClick={() => toggleGroupMember(group.id, member.id)} type="button">
+                            <span className="check-mark">{selected ? "✓" : ""}</span>
+                            <strong>{member.name}</strong>
+                            <small>{assignedElsewhere ? "다른 그룹 선택됨" : selected ? "참여" : "선택"}</small>
                           </button>
                         );
                       })}

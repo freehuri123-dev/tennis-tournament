@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { PublicShell } from "@/components/AppShell";
 import { MatchCard } from "@/components/MatchCard";
 import { RankingTable } from "@/components/RankingTable";
 import { calculateRankings } from "@/lib/domain/ranking";
+import { getPublicTournamentAccess } from "@/lib/domain/public-access";
 import { createInitialState, loadTournamentState, type TournamentState } from "@/lib/store/tournament-store";
 
 export default function PublicTournamentPage() {
+  const params = useParams<{ slug: string }>();
   const [activeTab, setActiveTab] = useState<"schedule" | "group" | "overall">("schedule");
   const [activeScheduleGroupId, setActiveScheduleGroupId] = useState<string | null>(null);
   const [activeRankingGroupId, setActiveRankingGroupId] = useState<string | null>(null);
@@ -16,6 +19,10 @@ export default function PublicTournamentPage() {
   useEffect(() => {
     setState(loadTournamentState());
   }, []);
+
+  const slug = params.slug;
+  const access = useMemo(() => getPublicTournamentAccess(slug, state.tournaments, state.deletedPublicSlugs), [slug, state.deletedPublicSlugs, state.tournaments]);
+  const displayTournament = access.type === "live" ? access.tournament : state.tournament;
 
   const scheduleGroupId = activeScheduleGroupId && state.groups.some((group) => group.id === activeScheduleGroupId) ? activeScheduleGroupId : state.groups[0]?.id;
   const rankingGroupId = activeRankingGroupId && state.groups.some((group) => group.id === activeRankingGroupId) ? activeRankingGroupId : state.groups[0]?.id;
@@ -70,8 +77,34 @@ export default function PublicTournamentPage() {
   const visibleScheduleGroups = state.groups.filter((group) => state.groups.length === 1 || group.id === scheduleGroupId);
   const visibleRankingGroups = groupRankings.filter(({ group }) => state.groups.length === 1 || group.id === rankingGroupId);
 
+  if (access.type === "deleted") {
+    return (
+      <PublicShell title="삭제된 대회입니다" subtitle="공유 링크를 다시 확인해주세요">
+        <div className="page">
+          <section className="status-message-card">
+            <strong>삭제된 대회입니다</strong>
+            <p>관리자가 이 대회를 삭제해서 대진표와 순위표를 볼 수 없습니다.</p>
+          </section>
+        </div>
+      </PublicShell>
+    );
+  }
+
+  if (access.type === "completed") {
+    return (
+      <PublicShell title="완료된 대회입니다" subtitle={access.tournament.date}>
+        <div className="page">
+          <section className="status-message-card">
+            <strong>완료된 대회입니다</strong>
+            <p>대회 날짜가 지나 공유용 실시간 화면은 종료되었습니다.</p>
+          </section>
+        </div>
+      </PublicShell>
+    );
+  }
+
   return (
-    <PublicShell title={state.tournament.name} subtitle={`${state.tournament.date} · 공유용 조회 화면`}>
+    <PublicShell title={displayTournament.name} subtitle={`${displayTournament.date} · 공유용 조회 화면`}>
       <div className="page">
         <section className="section-card">
           <div className="tab-row">

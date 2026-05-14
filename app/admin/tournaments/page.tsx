@@ -4,6 +4,7 @@ import { CalendarPlus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
+import { createTournamentSlug } from "@/lib/domain/public-access";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Tournament } from "@/lib/domain/types";
 import { loadTournamentState, saveTournamentState, type TournamentState } from "@/lib/store/tournament-store";
@@ -26,11 +27,12 @@ export default function TournamentListPage() {
 
   function createTournament() {
     const today = new Date().toISOString().slice(0, 10);
+    const id = `tournament-${Date.now()}`;
     const tournament: Tournament = withDateStatus({
-      id: `tournament-${Date.now()}`,
+      id,
       name: "새 월례대회",
       date: today,
-      publicSlug: "monthly-demo",
+      publicSlug: createTournamentSlug(id),
       status: "draft"
     });
 
@@ -65,6 +67,7 @@ export default function TournamentListPage() {
       tournaments: nextTournaments,
       currentTournamentId: fallback.id,
       tournament: fallback,
+      deletedPublicSlugs: Array.from(new Set([...(state.deletedPublicSlugs ?? []), tournament.publicSlug])),
       ...(tournament.id === state.tournament.id ? { groups: [], groupMemberIds: {}, matches: [] } : {})
     });
   }
