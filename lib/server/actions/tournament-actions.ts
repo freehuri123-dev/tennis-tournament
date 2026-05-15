@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createTournamentSlug } from "../../domain/public-access";
 import { requireAdmin } from "../auth/admin-session";
 import { upsertTournament } from "../repositories/tournament-repository";
-import { tournamentInputSchema } from "../validation";
+import { clubSlugSchema, tournamentInputSchema } from "../validation";
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -26,4 +28,21 @@ export async function saveTournamentAction(formData: FormData) {
   revalidatePath(`/${input.clubSlug}/tournaments/manage`);
   revalidatePath(`/public/${input.clubSlug}/${input.publicSlug}`);
   return { ok: true as const, tournament };
+}
+
+export async function createTournamentAction(formData: FormData) {
+  await requireAdmin();
+
+  const clubSlug = clubSlugSchema.parse(formString(formData, "clubSlug"));
+  const idSeed = `tournament-${Date.now()}`;
+  const input = tournamentInputSchema.parse({
+    clubSlug,
+    name: "새 월례대회",
+    date: new Date().toISOString().slice(0, 10),
+    publicSlug: createTournamentSlug(idSeed)
+  });
+
+  await upsertTournament(input);
+  revalidatePath(`/${clubSlug}/tournaments`);
+  redirect(`/${clubSlug}/tournaments`);
 }

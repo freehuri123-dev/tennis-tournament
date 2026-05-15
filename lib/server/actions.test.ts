@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { deleteMemberAction } from "./actions/member-actions";
+import { createTournamentAction } from "./actions/tournament-actions";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
-const { redirect, revalidatePath, requireAdmin, softDeleteMember } = vi.hoisted(() => ({
+const { redirect, revalidatePath, requireAdmin, softDeleteMember, upsertTournament } = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
   revalidatePath: vi.fn(),
   requireAdmin: vi.fn(),
-  softDeleteMember: vi.fn()
+  softDeleteMember: vi.fn(),
+  upsertTournament: vi.fn()
 }));
 
 vi.mock("next/navigation", () => ({ redirect }));
@@ -16,7 +18,8 @@ vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("./auth/admin-session", () => ({ requireAdmin }));
 vi.mock("./repositories/tournament-repository", () => ({
   softDeleteMember,
-  upsertMember: vi.fn()
+  upsertMember: vi.fn(),
+  upsertTournament
 }));
 
 describe("server action validation", () => {
@@ -80,5 +83,32 @@ describe("server action validation", () => {
     expect(requireAdmin).toHaveBeenCalledOnce();
     expect(softDeleteMember).toHaveBeenCalledWith("stc", "member-1");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/members");
+  });
+
+  it("creates a default tournament for the requested club", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-15T09:30:00.000Z"));
+    upsertTournament.mockResolvedValue({
+      id: "tournament-1",
+      name: "새 월례대회",
+      date: "2026-05-15",
+      publicSlug: "tournament-generated",
+      status: "draft"
+    });
+    const formData = new FormData();
+    formData.set("clubSlug", "otc");
+
+    await expect(createTournamentAction(formData)).rejects.toThrow("redirect:/otc/tournaments");
+
+    expect(requireAdmin).toHaveBeenCalled();
+    expect(upsertTournament).toHaveBeenCalledWith({
+      clubSlug: "otc",
+      name: "새 월례대회",
+      date: "2026-05-15",
+      publicSlug: expect.stringMatching(/^tournament-[a-z0-9-]+$/)
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments");
+
+    vi.useRealTimers();
   });
 });

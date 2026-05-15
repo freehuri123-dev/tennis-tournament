@@ -1,29 +1,20 @@
 import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { InvalidClubPage } from "@/components/InvalidClubPage";
 import { StatusBadge } from "@/components/StatusBadge";
-import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
+import { buildClubPath, isKnownClubSlug, type ClubSlug } from "@/lib/domain/club";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import { createTournamentAction } from "@/lib/server/actions/tournament-actions";
-import { requireAdmin } from "@/lib/server/auth/admin-session";
 import { listTournamentsByClub } from "@/lib/server/repositories/tournament-repository";
 
 type TournamentTab = "current" | "completed";
-
-type TournamentListPageProps = {
-  clubSlug?: ClubSlug;
-  tab?: TournamentTab;
-};
-
-type AdminTournamentsPageProps = {
-  searchParams?: Promise<{ tab?: string }>;
-};
 
 function normalizeTournamentTab(tab?: string): TournamentTab {
   return tab === "completed" ? "completed" : "current";
 }
 
-async function TournamentListPage({ clubSlug = "stc", tab = "current" }: TournamentListPageProps) {
+async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: TournamentTab }) {
   const tournaments = (await listTournamentsByClub(clubSlug)).map((tournament) => withDateStatus(tournament));
   const visibleTournaments = tournaments.filter((tournament) =>
     tab === "completed" ? tournament.status === "completed" : tournament.status !== "completed"
@@ -78,8 +69,16 @@ async function TournamentListPage({ clubSlug = "stc", tab = "current" }: Tournam
   );
 }
 
-export default async function AdminTournamentsPage({ searchParams }: AdminTournamentsPageProps) {
-  await requireAdmin();
-  const params = await searchParams;
-  return <TournamentListPage clubSlug="stc" tab={normalizeTournamentTab(params?.tab)} />;
+export default async function ClubTournamentsPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ clubSlug: string }>;
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const { clubSlug } = await params;
+  if (!isKnownClubSlug(clubSlug)) return <InvalidClubPage />;
+
+  const query = await searchParams;
+  return <TournamentListPage clubSlug={clubSlug} tab={normalizeTournamentTab(query?.tab)} />;
 }
