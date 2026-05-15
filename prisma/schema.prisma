@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum TournamentStatus {
+  draft
+  active
+  completed
+}
+
+enum ScheduleFormat {
+  hanul_aa
+  kdk_v2010
+  random
+}
+
+enum MatchStatus {
+  scheduled
+  completed
+}
+
+model Club {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  name        String
+  shortName   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  members     Member[]
+  tournaments Tournament[]
+}
+
+model Member {
+  id                     String                  @id @default(cuid())
+  clubId                 String
+  name                   String
+  gender                 Gender?
+  level                  String?
+  notes                  String                  @default("")
+  phone                  String?
+  active                 Boolean                 @default(true)
+  deleted                Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  club                   Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  tournamentParticipants TournamentParticipant[]
+  groupMembers           TournamentGroupMember[]
+
+  @@index([clubId, deleted, name])
+}
+
+model Tournament {
+  id         String                  @id @default(cuid())
+  clubId     String
+  name       String
+  date       DateTime                @db.Date
+  publicSlug String
+  status     TournamentStatus        @default(draft)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  club       Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  participants TournamentParticipant[]
+  groups     TournamentGroup[]
+  matches    Match[]
+
+  @@unique([clubId, publicSlug])
+  @@index([clubId, date])
+}
+
+model TournamentParticipant {
+  id           String     @id @default(cuid())
+  tournamentId String
+  memberId     String
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  member       Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, memberId])
+  @@index([memberId])
+}
+
+model TournamentGroup {
+  id             String                  @id @default(cuid())
+  tournamentId   String
+  name           String
+  scheduleFormat ScheduleFormat
+  sortOrder      Int
+  seedPlayerIds  String[]                @default([])
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  tournament     Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  members        TournamentGroupMember[]
+  matches        Match[]
+
+  @@index([tournamentId, sortOrder])
+}
+
+model TournamentGroupMember {
+  id        String          @id @default(cuid())
+  groupId   String
+  memberId  String
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  group     TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member    Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, memberId])
+  @@index([memberId])
+}
+
+model Match {
+  id             String          @id @default(cuid())
+  tournamentId   String
+  groupId        String
+  matchNumber    Int
+  sideAPlayerIds String[]
+  sideBPlayerIds String[]
+  sideAScore     Int?
+  sideBScore     Int?
+  status         MatchStatus     @default(scheduled)
+  sortOrder      Int
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tournament     Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  group          TournamentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+  @@index([groupId, sortOrder])
+}
