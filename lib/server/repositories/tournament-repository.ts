@@ -4,7 +4,7 @@ import type { ClubSlug } from "../../domain/club";
 import { withDateStatus } from "../../domain/tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "../../domain/types";
 import type { TournamentState } from "../../store/tournament-store";
-import type { matchScoreInputSchema, memberInputSchema } from "../validation";
+import type { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "../validation";
 
 function assertNever(value: never): never {
   throw new Error(`Unexpected schedule format: ${value}`);
@@ -194,6 +194,7 @@ async function getPrisma() {
 
 type MemberInput = z.infer<typeof memberInputSchema>;
 type MatchScoreInput = z.infer<typeof matchScoreInputSchema>;
+type TournamentInput = z.infer<typeof tournamentInputSchema>;
 
 export async function getClubOrThrow(clubSlug: ClubSlug) {
   const prisma = await getPrisma();
@@ -237,6 +238,40 @@ export async function upsertMember(input: MemberInput): Promise<Member> {
 
   return toDomainMember(
     await prisma.member.update({
+      where: { id: input.id },
+      data
+    })
+  );
+}
+
+export async function upsertTournament(input: TournamentInput): Promise<Tournament> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(input.clubSlug);
+  const data = {
+    name: input.name,
+    date: toDbDate(input.date),
+    publicSlug: input.publicSlug
+  };
+
+  if (!input.id) {
+    return toDomainTournament(
+      await prisma.tournament.create({
+        data: {
+          clubId: club.id,
+          ...data,
+          status: "draft"
+        }
+      })
+    );
+  }
+
+  const existing = await prisma.tournament.findFirst({
+    where: { id: input.id, clubId: club.id }
+  });
+  if (!existing) throw new Error(`Tournament not found: ${input.id}`);
+
+  return toDomainTournament(
+    await prisma.tournament.update({
       where: { id: input.id },
       data
     })

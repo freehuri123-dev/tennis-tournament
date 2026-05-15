@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../auth/admin-session";
+import { upsertTournament } from "../repositories/tournament-repository";
 import { tournamentInputSchema } from "../validation";
 
 function formString(formData: FormData, key: string) {
@@ -20,6 +21,9 @@ export async function saveTournamentAction(formData: FormData) {
     publicSlug: formString(formData, "publicSlug")
   });
 
+  const tournament = await upsertTournament(input);
+  revalidatePath(`/${input.clubSlug}/tournaments`);
   revalidatePath(`/${input.clubSlug}/tournaments/manage`);
-  return { ok: false as const, reason: "Tournament mutations are not implemented in this task." };
+  revalidatePath(`/public/${input.clubSlug}/${input.publicSlug}`);
+  return { ok: true as const, tournament };
 }

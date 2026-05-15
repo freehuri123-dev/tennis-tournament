@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchScoreInputSchema, memberInputSchema } from "./validation";
+import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
 describe("server action validation", () => {
   it("rejects member input with an empty trimmed name", () => {
@@ -23,5 +23,32 @@ describe("server action validation", () => {
       sideAScore: 6,
       sideBScore: null
     });
+  });
+
+  it("accepts valid tournament input", () => {
+    expect(
+      tournamentInputSchema.parse({
+        clubSlug: "stc",
+        name: "Spring Tournament",
+        date: "2026-05-24",
+        publicSlug: "Spring-Open"
+      })
+    ).toEqual({
+      clubSlug: "stc",
+      name: "Spring Tournament",
+      date: "2026-05-24",
+      publicSlug: "spring-open"
+    });
+  });
+
+  it("rejects invalid tournament public slugs", () => {
+    const result = tournamentInputSchema.safeParse({
+      clubSlug: "stc",
+      name: "Spring Tournament",
+      date: "2026-05-24",
+      publicSlug: "spring_open"
+    });
+
+    expect(result.success).toBe(false);
   });
 });
