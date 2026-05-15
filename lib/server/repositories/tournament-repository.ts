@@ -287,12 +287,15 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
   );
 }
 
-export async function softDeleteMember(memberId: string): Promise<void> {
+export async function softDeleteMember(clubSlug: ClubSlug, memberId: string): Promise<void> {
   const prisma = await getPrisma();
-  await prisma.member.update({
-    where: { id: memberId },
+  const club = await getClubOrThrow(clubSlug);
+  const result = await prisma.member.updateMany({
+    where: { id: memberId, clubId: club.id },
     data: { active: false, deleted: true }
   });
+
+  if (result.count !== 1) throw new Error(`Member not found: ${memberId}`);
 }
 
 export async function updateMatchScore(input: MatchScoreInput): Promise<Match> {

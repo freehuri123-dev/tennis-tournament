@@ -1,5 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { deleteMemberAction } from "./actions/member-actions";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
+
+const { redirect, revalidatePath, requireAdmin, softDeleteMember } = vi.hoisted(() => ({
+  redirect: vi.fn((path: string) => {
+    throw new Error(`redirect:${path}`);
+  }),
+  revalidatePath: vi.fn(),
+  requireAdmin: vi.fn(),
+  softDeleteMember: vi.fn()
+}));
+
+vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/cache", () => ({ revalidatePath }));
+vi.mock("./auth/admin-session", () => ({ requireAdmin }));
+vi.mock("./repositories/tournament-repository", () => ({
+  softDeleteMember,
+  upsertMember: vi.fn()
+}));
 
 describe("server action validation", () => {
   it("rejects member input with an empty trimmed name", () => {
@@ -50,5 +68,17 @@ describe("server action validation", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("passes club scope when deleting a member", async () => {
+    const formData = new FormData();
+    formData.set("clubSlug", "stc");
+    formData.set("id", "member-1");
+
+    await expect(deleteMemberAction(formData)).rejects.toThrow("redirect:/stc/members");
+
+    expect(requireAdmin).toHaveBeenCalledOnce();
+    expect(softDeleteMember).toHaveBeenCalledWith("stc", "member-1");
+    expect(revalidatePath).toHaveBeenCalledWith("/stc/members");
   });
 });

@@ -52,7 +52,7 @@ export async function deleteMemberAction(formData: FormData) {
     clubSlug: formString(formData, "clubSlug")
   });
 
-  await softDeleteMember(input.id);
+  await softDeleteMember(input.clubSlug, input.id);
   revalidatePath(`/${input.clubSlug}/members`);
   redirect(`/${input.clubSlug}/members`);
 }
