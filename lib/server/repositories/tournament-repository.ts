@@ -1,16 +1,34 @@
 import type { ScheduleFormat } from "@prisma/client";
 import type { TournamentGroup } from "@/lib/domain/types";
 
+function assertNever(value: never): never {
+  throw new Error(`Unexpected schedule format: ${value}`);
+}
+
 export function toDbScheduleFormat(value: TournamentGroup["scheduleFormat"]): ScheduleFormat {
-  if (value === "hanul-aa") return "hanul_aa";
-  if (value === "kdk-v2010") return "kdk_v2010";
-  return "random";
+  switch (value) {
+    case "hanul-aa":
+      return "hanul_aa";
+    case "kdk-v2010":
+      return "kdk_v2010";
+    case "random":
+      return "random";
+    default:
+      return assertNever(value);
+  }
 }
 
 export function fromDbScheduleFormat(value: ScheduleFormat): TournamentGroup["scheduleFormat"] {
-  if (value === "hanul_aa") return "hanul-aa";
-  if (value === "kdk_v2010") return "kdk-v2010";
-  return "random";
+  switch (value) {
+    case "hanul_aa":
+      return "hanul-aa";
+    case "kdk_v2010":
+      return "kdk-v2010";
+    case "random":
+      return "random";
+    default:
+      return assertNever(value);
+  }
 }
 
 export function toDomainDate(value: Date): string {
