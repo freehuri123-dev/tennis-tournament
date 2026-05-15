@@ -13,6 +13,13 @@ function formString(formData: FormData, key: string) {
   return typeof value === "string" ? value : undefined;
 }
 
+function revalidateTournamentAdminPaths(clubSlug: string) {
+  revalidatePath(`/${clubSlug}/tournaments/manage`);
+  revalidatePath(`/${clubSlug}/tournaments`);
+  revalidatePath("/admin/tournaments/manage");
+  revalidatePath("/admin/tournaments");
+}
+
 export async function saveTournamentAction(formData: FormData) {
   await requireAdmin();
 
@@ -25,8 +32,7 @@ export async function saveTournamentAction(formData: FormData) {
   });
 
   const tournament = await upsertTournament(input);
-  revalidatePath(`/${input.clubSlug}/tournaments`);
-  revalidatePath(`/${input.clubSlug}/tournaments/manage`);
+  revalidateTournamentAdminPaths(input.clubSlug);
   revalidatePath(`/public/${input.clubSlug}/${input.publicSlug}`);
   return { ok: true as const, tournament };
 }
@@ -36,8 +42,7 @@ export async function persistTournamentStateAction(clubSlug: unknown, state: Tou
 
   const parsedClubSlug = clubSlugSchema.parse(clubSlug);
   await replaceTournamentState(parsedClubSlug, state);
-  revalidatePath(`/${parsedClubSlug}/tournaments/manage`);
-  revalidatePath(`/${parsedClubSlug}/tournaments`);
+  revalidateTournamentAdminPaths(parsedClubSlug);
   revalidatePath(`/public/${parsedClubSlug}/${state.tournament.publicSlug}`);
 
   return { ok: true as const };
@@ -56,6 +61,6 @@ export async function createTournamentAction(formData: FormData) {
   });
 
   await upsertTournament(input);
-  revalidatePath(`/${clubSlug}/tournaments`);
+  revalidateTournamentAdminPaths(clubSlug);
   redirect(`/${clubSlug}/tournaments`);
 }

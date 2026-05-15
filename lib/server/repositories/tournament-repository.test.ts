@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fromDbScheduleFormat, loadPublicTournamentState, toDbScheduleFormat, toDomainDate } from "./tournament-repository";
+import type { TournamentState } from "../../store/tournament-store";
+import { fromDbScheduleFormat, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
+    $transaction: vi.fn(),
     club: { findUnique: vi.fn() },
     member: { findMany: vi.fn() },
-    tournament: { findMany: vi.fn(), findUnique: vi.fn() }
+    match: { createMany: vi.fn(), deleteMany: vi.fn() },
+    tournament: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    tournamentGroup: { createMany: vi.fn(), deleteMany: vi.fn() },
+    tournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
+    tournamentParticipant: { createMany: vi.fn(), deleteMany: vi.fn() }
   }
 }));
 
@@ -14,6 +20,7 @@ vi.mock("../db", () => ({ prisma }));
 describe("tournament repository mapping", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prisma.$transaction.mockImplementation((callback) => callback(prisma));
   });
 
   it("maps schedule formats between domain and Prisma enum values", () => {
@@ -134,5 +141,61 @@ describe("tournament repository mapping", () => {
     ]);
     expect(state?.currentTournamentId).toBe("tournament-1");
     expect(state?.tournament.publicSlug).toBe("public-slug");
+  });
+
+  it("rejects crafted nested state before deleting existing tournament rows", async () => {
+    const state: TournamentState = {
+      version: 8,
+      adminUnlocked: false,
+      members: [],
+      tournaments: [],
+      currentTournamentId: "tournament-1",
+      tournament: {
+        id: "tournament-1",
+        name: "Spring Tournament",
+        date: "2026-05-24",
+        publicSlug: "spring-tournament",
+        status: "active"
+      },
+      groups: [
+        {
+          id: "group-1",
+          tournamentId: "tournament-1",
+          name: "A",
+          scheduleFormat: "random",
+          sortOrder: 1,
+          seedPlayerIds: ["member-2"]
+        }
+      ],
+      tournamentParticipantIds: { "tournament-1": ["member-1"] },
+      groupMemberIds: { "group-1": ["member-1"] },
+      matches: [
+        {
+          id: "match-1",
+          tournamentId: "tournament-1",
+          groupId: "group-1",
+          matchNumber: 1,
+          sideAPlayerIds: ["member-1", "member-2"],
+          sideBPlayerIds: ["", ""],
+          sideAScore: null,
+          sideBScore: null,
+          status: "scheduled",
+          sortOrder: 1
+        }
+      ],
+      deletedPublicSlugs: []
+    };
+
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "tournament-1" });
+    prisma.member.findMany.mockResolvedValue([{ id: "member-1" }, { id: "member-2" }]);
+
+    await expect(replaceTournamentState("stc", state)).rejects.toThrow("Seed player is not assigned to group: member-2");
+
+    expect(prisma.tournament.update).not.toHaveBeenCalled();
+    expect(prisma.match.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.tournamentGroupMember.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.tournamentGroup.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.tournamentParticipant.deleteMany).not.toHaveBeenCalled();
   });
 });

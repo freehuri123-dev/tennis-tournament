@@ -39,6 +39,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [activeRankingGroupId, setActiveRankingGroupId] = useState<string | null>(null);
   const [openPlayerEditMatchId, setOpenPlayerEditMatchId] = useState<string | null>(null);
   const pendingScrollMatchId = useRef<string | null>(null);
+  const saveQueueRef = useRef(Promise.resolve());
 
   const tournament = withDateStatus(state.tournament);
   const isCompleted = tournament.status === "completed";
@@ -81,9 +82,14 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     };
     setState(normalized);
     startTransition(() => {
-      void persistTournamentStateAction(clubSlug, normalized).catch(() => {
-        window.alert("Failed to save tournament changes. Please refresh and try again.");
-      });
+      saveQueueRef.current = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await persistTournamentStateAction(clubSlug, normalized);
+        })
+        .catch(() => {
+          window.alert("Failed to save tournament changes. Please refresh and try again.");
+        });
     });
   }
 

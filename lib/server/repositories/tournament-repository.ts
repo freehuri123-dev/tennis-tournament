@@ -196,6 +196,16 @@ type MemberInput = z.infer<typeof memberInputSchema>;
 type MatchScoreInput = z.infer<typeof matchScoreInputSchema>;
 type TournamentInput = z.infer<typeof tournamentInputSchema>;
 
+function assertAllowedIds(ids: string[], allowedIds: Set<string>, message: string) {
+  for (const id of ids) {
+    if (!allowedIds.has(id)) throw new Error(`${message}: ${id}`);
+  }
+}
+
+function matchPlayerIds(match: Match) {
+  return [...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => id !== "");
+}
+
 export async function getClubOrThrow(clubSlug: ClubSlug) {
   const prisma = await getPrisma();
   const club = await prisma.club.findUnique({ where: { slug: clubSlug } });
@@ -392,6 +402,41 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
     });
     if (!existing) throw new Error(`Tournament not found: ${tournament.id}`);
 
+    const clubMembers = await tx.member.findMany({
+      where: { clubId: club.id, deleted: false },
+      select: { id: true }
+    });
+    const clubMemberIds = new Set(clubMembers.map((member) => member.id));
+    const participantIds = state.tournamentParticipantIds[tournament.id] ?? [];
+    const participantIdSet = new Set(participantIds);
+
+    for (const ids of Object.values(state.tournamentParticipantIds)) {
+      assertAllowedIds(ids, clubMemberIds, "Tournament participant is not an active club member");
+    }
+
+    const groups = state.groups;
+    const groupIds = new Set(groups.map((group) => group.id));
+    for (const group of groups) {
+      if (group.tournamentId !== tournament.id) throw new Error(`Group does not belong to tournament: ${group.id}`);
+      const groupMemberIds = state.groupMemberIds[group.id] ?? [];
+      assertAllowedIds(groupMemberIds, clubMemberIds, "Group member is not an active club member");
+      assertAllowedIds(groupMemberIds, participantIdSet, "Group member is not a tournament participant");
+      assertAllowedIds(group.seedPlayerIds ?? [], new Set(groupMemberIds), "Seed player is not assigned to group");
+    }
+
+    for (const [groupId, memberIds] of Object.entries(state.groupMemberIds)) {
+      if (memberIds.length > 0 && !groupIds.has(groupId)) throw new Error(`Group members reference unknown group: ${groupId}`);
+    }
+
+    for (const match of state.matches) {
+      if (match.tournamentId !== tournament.id) throw new Error(`Match does not belong to tournament: ${match.id}`);
+      if (!groupIds.has(match.groupId)) throw new Error(`Match references unknown group: ${match.id}`);
+      const groupMemberIds = new Set(state.groupMemberIds[match.groupId] ?? []);
+      const playerIds = matchPlayerIds(match);
+      assertAllowedIds(playerIds, clubMemberIds, "Match player is not an active club member");
+      assertAllowedIds(playerIds, groupMemberIds, "Match player is not assigned to group");
+    }
+
     await tx.tournament.update({
       where: { id: tournament.id },
       data: {
@@ -409,7 +454,6 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
     await tx.tournamentGroup.deleteMany({ where: { tournamentId: tournament.id } });
     await tx.tournamentParticipant.deleteMany({ where: { tournamentId: tournament.id } });
 
-    const participantIds = state.tournamentParticipantIds[tournament.id] ?? [];
     if (participantIds.length > 0) {
       await tx.tournamentParticipant.createMany({
         data: participantIds.map((memberId, index) => ({
@@ -420,7 +464,6 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
       });
     }
 
-    const groups = state.groups.filter((group) => group.tournamentId === tournament.id);
     if (groups.length > 0) {
       await tx.tournamentGroup.createMany({
         data: groups.map((group, index) => ({
@@ -445,7 +488,7 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
       await tx.tournamentGroupMember.createMany({ data: groupMembers });
     }
 
-    const matches = state.matches.filter((match) => match.tournamentId === tournament.id);
+    const matches = state.matches;
     if (matches.length > 0) {
       await tx.match.createMany({
         data: matches.map((match, index) => ({

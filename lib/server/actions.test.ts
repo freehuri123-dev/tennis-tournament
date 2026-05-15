@@ -142,6 +142,8 @@ describe("server action validation", () => {
     expect(replaceTournamentState).toHaveBeenCalledWith("stc", state);
     expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments/manage");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments");
     expect(revalidatePath).toHaveBeenCalledWith("/public/stc/spring-tournament");
   });
 });
