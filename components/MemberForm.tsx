@@ -1,105 +1,74 @@
-"use client";
-
+import Link from "next/link";
 import { Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
 import type { Member } from "@/lib/domain/types";
-import { loadTournamentState, saveTournamentState, type TournamentState } from "@/lib/store/tournament-store";
+import { deleteMemberAction, saveMemberAction } from "@/lib/server/actions/member-actions";
 
 type MemberFormProps = {
-  memberId?: string;
+  member?: Member;
+  clubSlug?: ClubSlug;
 };
 
-type MemberGender = NonNullable<Member["gender"]>;
-
-export function MemberForm({ memberId }: MemberFormProps) {
-  const [state, setState] = useState<TournamentState>(() => loadTournamentState());
-  const editingMember = useMemo(() => state.members.find((member) => member.id === memberId), [memberId, state.members]);
-  const [form, setForm] = useState(() => ({
-    name: editingMember?.name ?? "",
-    gender: editingMember?.gender ?? "male",
-    phone: editingMember?.phone ?? "",
-    notes: editingMember?.notes ?? ""
-  }));
-
-  function persistMembers(members: Member[]) {
-    const next = { ...state, members };
-    saveTournamentState(next);
-    setState(next);
-    window.location.assign("/admin/members");
-  }
-
-  function saveMember() {
-    const name = form.name.trim();
-    if (!name) return;
-
-    const nextMember: Member = {
-      id: editingMember?.id ?? `member-${Date.now()}`,
-      name,
-      gender: form.gender as Member["gender"],
-      phone: form.phone.trim(),
-      notes: form.notes.trim()
-    };
-
-    const exists = state.members.some((member) => member.id === nextMember.id);
-    persistMembers(exists
-      ? state.members.map((member) => (member.id === nextMember.id ? nextMember : member))
-      : [...state.members, nextMember]
-    );
-  }
-
-  function hideMember() {
-    if (!editingMember) return;
-    if (!window.confirm(`${editingMember.name} 회원을 삭제할까요?`)) return;
-    persistMembers(state.members.map((member) => (member.id === editingMember.id ? { ...member, deleted: true } : member)));
-  }
+export function MemberForm({ member, clubSlug = "stc" }: MemberFormProps) {
+  const isEditing = Boolean(member);
 
   return (
-    <AppShell title={editingMember ? "회원수정" : "회원등록"} subtitle="회원 정보 입력" active="members">
+    <AppShell title={isEditing ? "회원수정" : "회원등록"} subtitle="회원 정보 입력" active="members" clubSlug={clubSlug}>
       <div className="page">
-        <section className="section-card form-card">
-          <label className="field boxed-field">
-            <span>이름</span>
-            <input onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
-          </label>
-          <label className="field boxed-field">
-            <span>성별</span>
-            <select onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value as MemberGender }))} value={form.gender}>
-              <option value="male">남</option>
-              <option value="female">여</option>
-            </select>
-          </label>
-          <label className="field boxed-field">
-            <span>연락처</span>
-            <input onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="010-0000-0000" value={form.phone} />
-          </label>
-          <label className="field boxed-field">
-            <span>메모</span>
-            <textarea onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} rows={4} value={form.notes} />
-          </label>
-        </section>
+        <form action={saveMemberAction}>
+          <input name="clubSlug" type="hidden" value={clubSlug} />
+          {member ? <input name="id" type="hidden" value={member.id} /> : null}
+          <input name="active" type="hidden" value={String(member?.active ?? true)} />
 
-        {editingMember && (
+          <section className="section-card form-card">
+            <label className="field boxed-field">
+              <span>이름</span>
+              <input defaultValue={member?.name ?? ""} name="name" required />
+            </label>
+            <label className="field boxed-field">
+              <span>성별</span>
+              <select defaultValue={member?.gender ?? "male"} name="gender">
+                <option value="male">남성</option>
+                <option value="female">여성</option>
+              </select>
+            </label>
+            <label className="field boxed-field">
+              <span>연락처</span>
+              <input defaultValue={member?.phone ?? ""} name="phone" placeholder="010-0000-0000" />
+            </label>
+            <label className="field boxed-field">
+              <span>메모</span>
+              <textarea defaultValue={member?.notes ?? ""} name="notes" rows={4} />
+            </label>
+          </section>
+
+          <div className="sticky-footer">
+            <Link className="ghost-button" href={buildClubPath(clubSlug, "members")}>
+              취소
+            </Link>
+            <button className="primary-button" type="submit">
+              저장
+            </button>
+          </div>
+        </form>
+
+        {member ? (
           <section className="danger-zone">
             <div>
               <strong>회원 삭제</strong>
-              <p>목록과 참가자 선택에서 보이지 않게 됩니다.</p>
+              <p>회원 목록과 참가자 선택에서 보이지 않게 합니다.</p>
             </div>
-            <button className="danger-button compact-danger" onClick={hideMember} type="button">
-              <Trash2 size={18} />
-              삭제
-            </button>
+            <form action={deleteMemberAction}>
+              <input name="clubSlug" type="hidden" value={clubSlug} />
+              <input name="id" type="hidden" value={member.id} />
+              <button className="danger-button compact-danger" type="submit">
+                <Trash2 size={18} />
+                삭제
+              </button>
+            </form>
           </section>
-        )}
-
-        <div className="sticky-footer">
-          <button className="ghost-button" onClick={() => window.location.assign("/admin/members")} type="button">
-            취소
-          </button>
-          <button className="primary-button" onClick={saveMember} type="button">
-            저장
-          </button>
-        </div>
+        ) : null}
       </div>
     </AppShell>
   );

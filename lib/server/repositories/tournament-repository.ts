@@ -213,6 +213,15 @@ export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
   return members.map(toDomainMember);
 }
 
+export async function getMemberById(clubSlug: ClubSlug, memberId: string): Promise<Member | null> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, clubId: club.id, deleted: false }
+  });
+  return member ? toDomainMember(member) : null;
+}
+
 export async function upsertMember(input: MemberInput): Promise<Member> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(input.clubSlug);

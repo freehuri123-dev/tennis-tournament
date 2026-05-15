@@ -1,24 +1,27 @@
 import Link from "next/link";
 import { Mars, PhoneCall, Plus, Search, Venus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
+import { InvalidClubPage } from "@/components/InvalidClubPage";
+import { buildClubPath, isKnownClubSlug } from "@/lib/domain/club";
 import { listMembersByClub } from "@/lib/server/repositories/tournament-repository";
-
-type MemberManagementPageProps = {
-  clubSlug?: ClubSlug;
-  query?: string;
-};
-
-type AdminMembersPageProps = {
-  searchParams?: Promise<{ q?: string }>;
-};
 
 function maskPhone(phone?: string) {
   if (!phone) return "연락처 없음";
   return phone.replace(/(\d{3})-?(\d{4})-?(\d{4})/, "$1-****-$3");
 }
 
-async function MemberManagementPage({ clubSlug = "stc", query = "" }: MemberManagementPageProps) {
+export default async function ClubMembersPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ clubSlug: string }>;
+  searchParams?: Promise<{ q?: string }>;
+}) {
+  const { clubSlug } = await params;
+  if (!isKnownClubSlug(clubSlug)) return <InvalidClubPage />;
+
+  const queryParams = await searchParams;
+  const query = queryParams?.q ?? "";
   const keyword = query.trim();
   const members = await listMembersByClub(clubSlug);
   const visibleMembers = keyword
@@ -75,9 +78,4 @@ async function MemberManagementPage({ clubSlug = "stc", query = "" }: MemberMana
       </div>
     </AppShell>
   );
-}
-
-export default async function AdminMembersPage({ searchParams }: AdminMembersPageProps) {
-  const params = await searchParams;
-  return <MemberManagementPage clubSlug="stc" query={params?.q} />;
 }
