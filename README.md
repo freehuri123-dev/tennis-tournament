@@ -10,6 +10,17 @@ Required variables:
 
 Do not commit real secrets or `.env.local`.
 
+## Vercel deployment checklist
+
+1. Connect the Git repository to Vercel.
+2. Set the project root to the Next.js app directory.
+3. Create a Postgres database from Vercel Marketplace or Prisma Postgres.
+4. Add `DATABASE_URL`, `ADMIN_PASSWORD`, and `SESSION_SECRET` to Preview and Production environments.
+5. Run `npm run db:deploy` against the target database after migrations are reviewed.
+6. Deploy Preview.
+7. Run the smoke test in `docs/deployment-smoke-test.md`.
+8. Promote to Production after data persistence and public sharing are verified.
+
 Production migration deployment:
 
 ```sh
