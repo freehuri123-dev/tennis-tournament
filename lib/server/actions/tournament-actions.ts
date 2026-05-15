@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createTournamentSlug } from "../../domain/public-access";
+import type { TournamentState } from "../../store/tournament-store";
 import { requireAdmin } from "../auth/admin-session";
-import { upsertTournament } from "../repositories/tournament-repository";
+import { replaceTournamentState, upsertTournament } from "../repositories/tournament-repository";
 import { clubSlugSchema, tournamentInputSchema } from "../validation";
 
 function formString(formData: FormData, key: string) {
@@ -28,6 +29,18 @@ export async function saveTournamentAction(formData: FormData) {
   revalidatePath(`/${input.clubSlug}/tournaments/manage`);
   revalidatePath(`/public/${input.clubSlug}/${input.publicSlug}`);
   return { ok: true as const, tournament };
+}
+
+export async function persistTournamentStateAction(clubSlug: unknown, state: TournamentState) {
+  await requireAdmin();
+
+  const parsedClubSlug = clubSlugSchema.parse(clubSlug);
+  await replaceTournamentState(parsedClubSlug, state);
+  revalidatePath(`/${parsedClubSlug}/tournaments/manage`);
+  revalidatePath(`/${parsedClubSlug}/tournaments`);
+  revalidatePath(`/public/${parsedClubSlug}/${state.tournament.publicSlug}`);
+
+  return { ok: true as const };
 }
 
 export async function createTournamentAction(formData: FormData) {

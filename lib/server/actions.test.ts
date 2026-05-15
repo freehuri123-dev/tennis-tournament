@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { deleteMemberAction } from "./actions/member-actions";
-import { createTournamentAction } from "./actions/tournament-actions";
+import { createTournamentAction, persistTournamentStateAction } from "./actions/tournament-actions";
+import type { TournamentState } from "../store/tournament-store";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
-const { redirect, revalidatePath, requireAdmin, softDeleteMember, upsertTournament } = vi.hoisted(() => ({
+const { redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, upsertTournament } = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
   revalidatePath: vi.fn(),
   requireAdmin: vi.fn(),
+  replaceTournamentState: vi.fn(),
   softDeleteMember: vi.fn(),
   upsertTournament: vi.fn()
 }));
@@ -17,6 +19,7 @@ vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("./auth/admin-session", () => ({ requireAdmin }));
 vi.mock("./repositories/tournament-repository", () => ({
+  replaceTournamentState,
   softDeleteMember,
   upsertMember: vi.fn(),
   upsertTournament
@@ -110,5 +113,35 @@ describe("server action validation", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments");
 
     vi.useRealTimers();
+  });
+
+  it("persists tournament manage state and revalidates club paths", async () => {
+    const state: TournamentState = {
+      version: 8,
+      adminUnlocked: false,
+      members: [],
+      tournaments: [],
+      currentTournamentId: "tournament-1",
+      tournament: {
+        id: "tournament-1",
+        name: "Spring Tournament",
+        date: "2026-05-24",
+        publicSlug: "spring-tournament",
+        status: "active"
+      },
+      groups: [],
+      tournamentParticipantIds: { "tournament-1": [] },
+      groupMemberIds: {},
+      matches: [],
+      deletedPublicSlugs: []
+    };
+
+    await expect(persistTournamentStateAction("stc", state)).resolves.toEqual({ ok: true });
+
+    expect(requireAdmin).toHaveBeenCalled();
+    expect(replaceTournamentState).toHaveBeenCalledWith("stc", state);
+    expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments/manage");
+    expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments");
+    expect(revalidatePath).toHaveBeenCalledWith("/public/stc/spring-tournament");
   });
 });

@@ -378,6 +378,93 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
   };
 }
 
+export async function replaceTournamentState(clubSlug: ClubSlug, state: TournamentState): Promise<void> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const tournament = withDateStatus(state.tournament);
+
+  if (!tournament.id) throw new Error("Tournament id is required");
+
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.tournament.findFirst({
+      where: { id: tournament.id, clubId: club.id },
+      select: { id: true }
+    });
+    if (!existing) throw new Error(`Tournament not found: ${tournament.id}`);
+
+    await tx.tournament.update({
+      where: { id: tournament.id },
+      data: {
+        name: tournament.name,
+        date: toDbDate(tournament.date),
+        publicSlug: tournament.publicSlug,
+        status: tournament.status
+      }
+    });
+
+    await tx.match.deleteMany({ where: { tournamentId: tournament.id } });
+    await tx.tournamentGroupMember.deleteMany({
+      where: { group: { tournamentId: tournament.id } }
+    });
+    await tx.tournamentGroup.deleteMany({ where: { tournamentId: tournament.id } });
+    await tx.tournamentParticipant.deleteMany({ where: { tournamentId: tournament.id } });
+
+    const participantIds = state.tournamentParticipantIds[tournament.id] ?? [];
+    if (participantIds.length > 0) {
+      await tx.tournamentParticipant.createMany({
+        data: participantIds.map((memberId, index) => ({
+          tournamentId: tournament.id,
+          memberId,
+          sortOrder: index + 1
+        }))
+      });
+    }
+
+    const groups = state.groups.filter((group) => group.tournamentId === tournament.id);
+    if (groups.length > 0) {
+      await tx.tournamentGroup.createMany({
+        data: groups.map((group, index) => ({
+          id: group.id,
+          tournamentId: tournament.id,
+          name: group.name,
+          scheduleFormat: toDbScheduleFormat(group.scheduleFormat),
+          sortOrder: group.sortOrder || index + 1,
+          seedPlayerIds: group.seedPlayerIds ?? []
+        }))
+      });
+    }
+
+    const groupMembers = groups.flatMap((group) =>
+      (state.groupMemberIds[group.id] ?? []).map((memberId, index) => ({
+        groupId: group.id,
+        memberId,
+        sortOrder: index + 1
+      }))
+    );
+    if (groupMembers.length > 0) {
+      await tx.tournamentGroupMember.createMany({ data: groupMembers });
+    }
+
+    const matches = state.matches.filter((match) => match.tournamentId === tournament.id);
+    if (matches.length > 0) {
+      await tx.match.createMany({
+        data: matches.map((match, index) => ({
+          id: match.id,
+          tournamentId: tournament.id,
+          groupId: match.groupId,
+          matchNumber: match.matchNumber,
+          sideAPlayerIds: match.sideAPlayerIds,
+          sideBPlayerIds: match.sideBPlayerIds,
+          sideAScore: match.sideAScore,
+          sideBScore: match.sideBScore,
+          status: match.status,
+          sortOrder: match.sortOrder || index + 1
+        }))
+      });
+    }
+  });
+}
+
 export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: string): Promise<TournamentState | null> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
