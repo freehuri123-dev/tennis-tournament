@@ -77,12 +77,11 @@ export function validateScheduleParticipants(format: ScheduleFormat, count: numb
 }
 
 export function getHanulSeedCount(participantCount: number) {
-  if (participantCount <= 5) return 0;
-  if (participantCount <= 8) return 2;
-  if (participantCount <= 10) return 3;
-  if (participantCount <= 14) return 4;
-  if (participantCount <= 16) return 6;
-  return 0;
+  return getHanulSeedSlots(participantCount).length;
+}
+
+export function getHanulSeedSlots(participantCount: number) {
+  return [...(HANUL_SEED_SLOTS[participantCount] ?? [])];
 }
 
 export function getScheduleFormatLabel(format: ScheduleFormat) {
@@ -95,9 +94,7 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   if (validationMessage) return [];
   if (input.format === "random") return generateRandomMatches(input);
 
-  const playerMap = input.format === "hanul-aa"
-    ? createHanulSeedMap(input.participants, input.seedPlayerIds ?? [])
-    : createDefaultSeedMap(input.participants);
+  const playerMap = createDefaultSeedMap(input.participants);
   const templates = input.format === "kdk-v2010" ? KDK_TEMPLATES[participantCount] : HANUL_TEMPLATES[participantCount];
 
   return templates.map((template, index) => {
@@ -162,33 +159,6 @@ function createDefaultSeedMap(participants: Member[]) {
     map[indexToSlot(index)] = member.id;
     return map;
   }, {});
-}
-
-function createHanulSeedMap(participants: Member[], seedPlayerIds: string[]) {
-  const seedSlots = HANUL_SEED_SLOTS[participants.length] ?? [];
-  const map: Record<string, string> = {};
-  const seedSet = new Set(seedPlayerIds);
-  const selectedSeeds = seedPlayerIds
-    .map((id) => participants.find((member) => member.id === id))
-    .filter((member): member is Member => Boolean(member))
-    .slice(0, seedSlots.length);
-  const regulars = participants.filter((member) => !seedSet.has(member.id));
-
-  seedSlots.forEach((slot, index) => {
-    const member = selectedSeeds[index];
-    if (member) map[slot] = member.id;
-  });
-
-  let regularIndex = 0;
-  for (let index = 0; index < participants.length; index += 1) {
-    const slot = indexToSlot(index);
-    if (map[slot]) continue;
-    const member = regulars[regularIndex] ?? selectedSeeds.find((seed) => !Object.values(map).includes(seed.id));
-    if (member) map[slot] = member.id;
-    regularIndex += 1;
-  }
-
-  return map;
 }
 
 function indexToSlot(index: number) {

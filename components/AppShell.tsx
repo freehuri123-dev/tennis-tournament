@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { CalendarDays, Home, Users } from "lucide-react";
 import { buildClubPath, getClubBySlug, type ClubSlug } from "../lib/domain/club";
+import { PendingLink } from "./PendingLink";
 import { SplashScreen } from "./SplashScreen";
 
 type AppShellProps = {
@@ -34,10 +34,10 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link className={`nav-item ${active === item.key ? "active" : ""}`} href={item.href} key={item.key}>
+              <PendingLink className={`nav-item ${active === item.key ? "active" : ""}`} href={item.href} key={item.key}>
                 <Icon size={18} />
                 <span>{item.label}</span>
-              </Link>
+              </PendingLink>
             );
           })}
         </nav>

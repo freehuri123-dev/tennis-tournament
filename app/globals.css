@@ -1005,6 +1005,36 @@ textarea:focus-visible {
   opacity: 0.46;
 }
 
+.sortable-participant {
+  cursor: grab;
+}
+
+.sortable-participant:active {
+  cursor: grabbing;
+}
+
+.sortable-participant.seed-slot {
+  border-color: rgba(213, 155, 20, 0.34);
+  background: linear-gradient(180deg, #fff9e7 0%, #fffef7 100%);
+}
+
+.sortable-participant.seed-slot small {
+  background: #fff0bf;
+  color: #8a5b00;
+}
+
+.order-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--green-deep);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .refresh-button {
   min-height: 58px;
   border: 0;

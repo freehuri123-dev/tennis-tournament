@@ -324,6 +324,34 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
   );
 }
 
+export async function updateTournamentDate(clubSlug: ClubSlug, tournamentId: string, date: string): Promise<Tournament> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const existing = await prisma.tournament.findFirst({
+    where: { id: tournamentId, clubId: club.id },
+    select: { id: true, name: true, publicSlug: true, status: true }
+  });
+  if (!existing) throw new Error(`Tournament not found: ${tournamentId}`);
+
+  const nextTournament = withDateStatus({
+    id: existing.id,
+    name: existing.name,
+    date,
+    publicSlug: existing.publicSlug,
+    status: existing.status
+  });
+
+  return toDomainTournament(
+    await prisma.tournament.update({
+      where: { id: tournamentId },
+      data: {
+        date: toDbDate(nextTournament.date),
+        status: nextTournament.status
+      }
+    })
+  );
+}
+
 export async function deleteTournament(clubSlug: ClubSlug, tournamentId: string): Promise<void> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);

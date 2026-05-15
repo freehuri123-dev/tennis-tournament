@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createTournamentSlug } from "../../domain/public-access";
 import type { TournamentState } from "../../store/tournament-store";
 import { requireAdmin } from "../auth/admin-session";
-import { deleteTournament, replaceTournamentState, upsertTournament } from "../repositories/tournament-repository";
+import { deleteTournament, replaceTournamentState, updateTournamentDate, upsertTournament } from "../repositories/tournament-repository";
 import { clubSlugSchema, tournamentInputSchema } from "../validation";
 
 function formString(formData: FormData, key: string) {
@@ -44,6 +44,19 @@ export async function persistTournamentStateAction(clubSlug: unknown, state: Tou
   revalidatePath(`/public/${parsedClubSlug}/${state.tournament.publicSlug}`);
 
   return { ok: true as const };
+}
+
+export async function updateTournamentDateAction(clubSlug: unknown, tournamentId: unknown, date: unknown) {
+  const parsedClubSlug = clubSlugSchema.parse(clubSlug);
+  if (typeof tournamentId !== "string" || tournamentId.trim() === "") throw new Error("Tournament id is required");
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Tournament date is invalid");
+
+  await requireAdmin(parsedClubSlug);
+  const tournament = await updateTournamentDate(parsedClubSlug, tournamentId, date);
+  revalidateTournamentAdminPaths(parsedClubSlug);
+  revalidatePath(`/public/${parsedClubSlug}/${tournament.publicSlug}`);
+
+  return { ok: true as const, tournament };
 }
 
 export async function createTournamentAction(formData: FormData) {

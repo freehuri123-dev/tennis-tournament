@@ -8,13 +8,13 @@ import { RankingTable } from "@/components/RankingTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { ClubSlug } from "@/lib/domain/club";
 import { calculateRankings } from "@/lib/domain/ranking";
-import { generateInitialMatches, getHanulSeedCount, getScheduleFormatLabel, validateScheduleParticipants } from "@/lib/domain/schedule";
+import { generateInitialMatches, getHanulSeedSlots, getScheduleFormatLabel, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
 import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, TournamentGroup } from "@/lib/domain/types";
-import { persistTournamentStateAction } from "@/lib/server/actions/tournament-actions";
+import { persistTournamentStateAction, updateTournamentDateAction } from "@/lib/server/actions/tournament-actions";
 import type { TournamentState } from "@/lib/store/tournament-store";
 
 type TabId = "setup" | "draw" | "ranking";
@@ -40,6 +40,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [activeDrawGroupId, setActiveDrawGroupId] = useState<string | null>(null);
   const [activeRankingGroupId, setActiveRankingGroupId] = useState<string | null>(null);
   const [openPlayerEditMatchId, setOpenPlayerEditMatchId] = useState<string | null>(null);
+  const [draggingMember, setDraggingMember] = useState<{ groupId: string; memberId: string } | null>(null);
   const pendingScrollMatchId = useRef<string | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
 
@@ -100,6 +101,24 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         })
         .catch(() => {
           window.alert("Failed to save tournament changes. Please refresh and try again.");
+        })
+        .finally(() => {
+          if (saveQueueRef.current === saveTask) setIsSaving(false);
+        });
+      saveQueueRef.current = saveTask;
+    });
+  }
+
+  function persistDate(tournamentId: string, date: string) {
+    startTransition(() => {
+      setIsSaving(true);
+      const saveTask = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await updateTournamentDateAction(clubSlug, tournamentId, date);
+        })
+        .catch(() => {
+          window.alert("Failed to save tournament date. Please refresh and try again.");
         })
         .finally(() => {
           if (saveQueueRef.current === saveTask) setIsSaving(false);
@@ -170,9 +189,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const rangeMessage = validateScheduleParticipants(group.scheduleFormat, participants.length);
     if (rangeMessage) return rangeMessage;
     if (group.scheduleFormat === "hanul-aa") {
-      const requiredSeeds = getHanulSeedCount(participants.length);
-      const selectedSeeds = group.seedPlayerIds?.length ?? 0;
-      if (selectedSeeds !== requiredSeeds) return `한울AA방식 KDK는 시드 선수를 ${requiredSeeds}명 선택해야 합니다.`;
+      const seedSlots = getHanulSeedSlots(participants.length);
+      if (seedSlots.length > 0 && participants.length > 0) return "";
     }
     return "";
   }
@@ -180,11 +198,12 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function updateTournament(field: "name" | "date", value: string) {
     if (isCompleted && field !== "date") return;
     const nextTournament = withDateStatus({ ...tournament, [field]: value });
-    persist({
+    updateLocal({
       ...state,
       tournament: nextTournament,
       tournaments: state.tournaments.map((item) => (item.id === nextTournament.id ? nextTournament : item))
     });
+    if (field === "date") persistDate(nextTournament.id, nextTournament.date);
   }
 
   function addGroup() {
@@ -249,21 +268,19 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     });
   }
 
-  function toggleSeed(groupId: string, memberId: string) {
-    if (isCompleted) return;
-    const group = state.groups.find((item) => item.id === groupId);
-    if (!group) return;
-    const seedCount = getHanulSeedCount(groupParticipants(groupId).length);
-    const current = group.seedPlayerIds ?? [];
-    const next = current.includes(memberId)
-      ? current.filter((id) => id !== memberId)
-      : current.length < seedCount
-        ? [...current, memberId]
-        : current;
-
+  function moveGroupMember(groupId: string, memberId: string, targetMemberId: string) {
+    if (isCompleted || memberId === targetMemberId) return;
+    const currentIds = state.groupMemberIds[groupId] ?? [];
+    const fromIndex = currentIds.indexOf(memberId);
+    const toIndex = currentIds.indexOf(targetMemberId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const nextIds = [...currentIds];
+    const [moved] = nextIds.splice(fromIndex, 1);
+    nextIds.splice(toIndex, 0, moved);
     updateLocal({
       ...state,
-      groups: state.groups.map((item) => (item.id === groupId ? { ...item, seedPlayerIds: next } : item))
+      groupMemberIds: { ...state.groupMemberIds, [groupId]: nextIds },
+      groups: state.groups.map((group) => (group.id === groupId ? { ...group, seedPlayerIds: [] } : group))
     });
   }
 
@@ -302,7 +319,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const matchId = `${groupId}-manual-${Date.now()}`;
     pendingScrollMatchId.current = `match-${matchId}`;
     setOpenPlayerEditMatchId(matchId);
-    persist({
+    updateLocal({
       ...state,
       matches: [
         ...state.matches,
@@ -324,7 +341,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function updateMatch(matchId: string, patch: Partial<Match>) {
     if (isCompleted) return;
-    persist({
+    updateLocal({
       ...state,
       matches: state.matches.map((match) => (match.id === matchId ? { ...match, ...patch } : match))
     });
@@ -333,12 +350,12 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function deleteMatch(matchId: string) {
     if (isCompleted) return;
     if (!window.confirm("경기를 삭제할까요? 입력된 점수도 함께 삭제됩니다.")) return;
-    persist({ ...state, matches: state.matches.filter((match) => match.id !== matchId) });
+    updateLocal({ ...state, matches: state.matches.filter((match) => match.id !== matchId) });
   }
 
   function replacePlayer(matchId: string, side: "A" | "B", index: number, memberId: string) {
     if (isCompleted) return;
-    persist({
+    updateLocal({
       ...state,
       matches: state.matches.map((match) => {
         if (match.id !== matchId) return match;
@@ -359,6 +376,15 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function selectableMembersForGroup(groupId: string) {
     const selectedIds = state.groupMemberIds[groupId] ?? [];
     return state.members.filter((member) => tournamentParticipantIds.includes(member.id) && (!member.deleted || selectedIds.includes(member.id)));
+  }
+
+  function orderSlotLabel(index: number) {
+    if (index < 9) return String(index + 1);
+    return String.fromCharCode(65 + index - 9);
+  }
+
+  function groupSeedSlots(group: TournamentGroup) {
+    return group.scheduleFormat === "hanul-aa" ? new Set(getHanulSeedSlots(groupParticipants(group.id).length)) : new Set<string>();
   }
 
   function renderGroupTabs(activeGroupId: string | undefined, onChange: (groupId: string) => void) {
@@ -446,15 +472,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       );
                     })}
                   </div>
-                  <button
-                    className="primary-button participant-done-button"
-                    disabled={isCompleted}
-                    onClick={() => {
-                      persist(state);
-                      setParticipantPanelOpen(false);
-                    }}
-                    type="button"
-                  >
+                  <button className="primary-button participant-done-button" disabled={isCompleted} onClick={() => setParticipantPanelOpen(false)} type="button">
                     참가자 선택완료
                   </button>
                 </div>
@@ -477,7 +495,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
               {state.groups.map((group) => {
                 const participants = groupParticipants(group.id);
-                const seedCount = group.scheduleFormat === "hanul-aa" ? getHanulSeedCount(participants.length) : 0;
+                const selectedIds = state.groupMemberIds[group.id] ?? [];
+                const selectedMembers = selectedIds.map((id) => state.members.find((member) => member.id === id)).filter((member): member is typeof state.members[number] => Boolean(member));
+                const unselectedMembers = selectableMembersForGroup(group.id).filter((member) => !selectedIds.includes(member.id));
+                const seedSlots = groupSeedSlots(group);
                 const validation = groupValidation(group);
 
                 return (
@@ -509,34 +530,50 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     </div>
                     {validation && <p className="notice-text">{validation}</p>}
                     <div className="field-label-row">
-                      <strong>참여자 선택</strong>
-                      <span>선택됨 {participants.length}명</span>
+                      <strong>참여자 순번</strong>
+                      <span>드래그해서 순서를 변경</span>
                     </div>
+                    {group.scheduleFormat === "hanul-aa" && seedSlots.size > 0 && (
+                      <p className="notice-text">한울AA 시드 자리: {[...seedSlots].join(", ")}번. 해당 순번 위치가 자동 시드자로 적용됩니다.</p>
+                    )}
                     <div className="participant-list">
-                      {selectableMembersForGroup(group.id).map((member) => {
-                        const selected = (state.groupMemberIds[group.id] ?? []).includes(member.id);
+                      {selectedMembers.map((member, index) => {
+                        const slot = orderSlotLabel(index);
+                        const isSeedSlot = seedSlots.has(slot);
+                        return (
+                          <button
+                            className={`participant-option sortable-participant ${isSeedSlot ? "seed-slot" : ""}`}
+                            disabled={isCompleted}
+                            draggable={!isCompleted}
+                            key={member.id}
+                            onClick={() => toggleGroupMember(group.id, member.id)}
+                            onDragEnd={() => setDraggingMember(null)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDragStart={() => setDraggingMember({ groupId: group.id, memberId: member.id })}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              if (draggingMember?.groupId === group.id) moveGroupMember(group.id, draggingMember.memberId, member.id);
+                              setDraggingMember(null);
+                            }}
+                            type="button"
+                          >
+                            <span className="order-badge">{slot}</span>
+                            <strong>{member.name}</strong>
+                            <small>{isSeedSlot ? "자동 시드" : "참여"}</small>
+                          </button>
+                        );
+                      })}
+                      {unselectedMembers.map((member) => {
                         const assignedElsewhere = isAssignedToOtherGroup(member.id, group.id);
                         return (
-                          <button className={`participant-option ${selected ? "active" : ""}`} disabled={isCompleted || assignedElsewhere} key={member.id} onClick={() => toggleGroupMember(group.id, member.id)} type="button">
-                            <span className="check-mark">{selected ? "✓" : ""}</span>
+                          <button className="participant-option" disabled={isCompleted || assignedElsewhere} key={member.id} onClick={() => toggleGroupMember(group.id, member.id)} type="button">
+                            <span className="check-mark" />
                             <strong>{member.name}</strong>
-                            <small>{assignedElsewhere ? "다른 그룹 선택됨" : selected ? "참여" : "선택"}</small>
+                            <small>{assignedElsewhere ? "다른 그룹 선택됨" : "추가"}</small>
                           </button>
                         );
                       })}
                     </div>
-                    {seedCount > 0 && (
-                      <div className="seed-box">
-                        <strong>시드 선수 {group.seedPlayerIds?.length ?? 0}/{seedCount}</strong>
-                        <div className="chip-row">
-                          {participants.map((member) => (
-                            <button className={`chip ${(group.seedPlayerIds ?? []).includes(member.id) ? "active" : ""}`} disabled={isCompleted} key={member.id} onClick={() => toggleSeed(group.id, member.id)} type="button">
-                              {member.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     <button className="danger-button" disabled={isCompleted} onClick={() => deleteGroup(group.id)} type="button">
                       <Trash2 size={18} />
                       그룹 삭제
@@ -618,6 +655,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   ))}
               </div>
             ))}
+            {state.matches.length > 0 && (
+              <button className="primary-button" disabled={isCompleted} onClick={() => persist(state)} type="button">
+                경기 결과 저장
+              </button>
+            )}
           </section>
         )}
 

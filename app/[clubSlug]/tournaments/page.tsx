@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { CalendarPlus, Trash2 } from "lucide-react";
 import { ConfirmActionForm, FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { InvalidClubPage } from "@/components/InvalidClubPage";
+import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildClubPath, isKnownClubSlug, type ClubSlug } from "@/lib/domain/club";
 import { withDateStatus } from "@/lib/domain/tournament-status";
@@ -30,15 +30,15 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
       <div className="page">
         <section className="section-card">
           <div className="tab-row two-tabs">
-            <Link className={`tab-button ${tab === "current" ? "active" : ""}`} href={buildClubPath(clubSlug, "tournaments")}>
+            <PendingLink className={`tab-button ${tab === "current" ? "active" : ""}`} href={buildClubPath(clubSlug, "tournaments")}>
               현재 대회
-            </Link>
-            <Link
+            </PendingLink>
+            <PendingLink
               className={`tab-button ${tab === "completed" ? "active" : ""}`}
               href={`${buildClubPath(clubSlug, "tournaments")}?tab=completed`}
             >
               완료 대회
-            </Link>
+            </PendingLink>
           </div>
         </section>
 
@@ -47,7 +47,7 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
           <div className="list-stack">
             {visibleTournaments.map((tournament) => (
               <div className="tournament-list-row" key={tournament.id}>
-                <Link className="tournament-card" href={tournamentManagePath(clubSlug, tournament.id)}>
+                <PendingLink className="tournament-card" href={tournamentManagePath(clubSlug, tournament.id)}>
                   <div className="list-card-top">
                     <strong>{tournament.name}</strong>
                     <StatusBadge status={tournament.status} />
@@ -56,7 +56,7 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
                     <span>{tournament.date}</span>
                     <span>{tournament.status === "completed" ? "결과 조회" : "상세 관리로 이동"}</span>
                   </div>
-                </Link>
+                </PendingLink>
                 <ConfirmActionForm action={deleteTournamentAction} confirmMessage="대회를 삭제하시겠습니까?" pendingLabel="대회 삭제 중...">
                   <input name="clubSlug" type="hidden" value={clubSlug} />
                   <input name="id" type="hidden" value={tournament.id} />

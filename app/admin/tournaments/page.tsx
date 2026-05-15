@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
 import { FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
+import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
 import { withDateStatus } from "@/lib/domain/tournament-status";
@@ -39,15 +39,15 @@ async function TournamentListPage({ clubSlug = "stc", tab = "current" }: Tournam
       <div className="page">
         <section className="section-card">
           <div className="tab-row two-tabs">
-            <Link className={`tab-button ${tab === "current" ? "active" : ""}`} href={buildClubPath(clubSlug, "tournaments")}>
+            <PendingLink className={`tab-button ${tab === "current" ? "active" : ""}`} href={buildClubPath(clubSlug, "tournaments")}>
               현재 대회
-            </Link>
-            <Link
+            </PendingLink>
+            <PendingLink
               className={`tab-button ${tab === "completed" ? "active" : ""}`}
               href={`${buildClubPath(clubSlug, "tournaments")}?tab=completed`}
             >
               완료 대회
-            </Link>
+            </PendingLink>
           </div>
         </section>
 
@@ -56,7 +56,7 @@ async function TournamentListPage({ clubSlug = "stc", tab = "current" }: Tournam
           <div className="list-stack">
             {visibleTournaments.map((tournament) => (
               <div className="tournament-list-row single-action" key={tournament.id}>
-                <Link className="tournament-card" href={tournamentManagePath(clubSlug, tournament.id)}>
+                <PendingLink className="tournament-card" href={tournamentManagePath(clubSlug, tournament.id)}>
                   <div className="list-card-top">
                     <strong>{tournament.name}</strong>
                     <StatusBadge status={tournament.status} />
@@ -65,7 +65,7 @@ async function TournamentListPage({ clubSlug = "stc", tab = "current" }: Tournam
                     <span>{tournament.date}</span>
                     <span>{tournament.status === "completed" ? "결과 조회" : "상세 관리로 이동"}</span>
                   </div>
-                </Link>
+                </PendingLink>
               </div>
             ))}
             {visibleTournaments.length === 0 && <p className="lead">표시할 대회가 없습니다.</p>}

@@ -2,10 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TournamentManageClient } from "./TournamentManageClient";
 import type { TournamentState } from "@/lib/store/tournament-store";
-import { persistTournamentStateAction } from "@/lib/server/actions/tournament-actions";
+import { persistTournamentStateAction, updateTournamentDateAction } from "@/lib/server/actions/tournament-actions";
 
 vi.mock("@/lib/server/actions/tournament-actions", () => ({
-  persistTournamentStateAction: vi.fn(() => Promise.resolve({ ok: true }))
+  persistTournamentStateAction: vi.fn(() => Promise.resolve({ ok: true })),
+  updateTournamentDateAction: vi.fn(() => Promise.resolve({ ok: true }))
 }));
 
 function makeState(): TournamentState {
@@ -39,13 +40,35 @@ function makeStateWithParticipants(): TournamentState {
   };
 }
 
+function makeStateWithMatch(): TournamentState {
+  const state = makeStateWithParticipants();
+  return {
+    ...state,
+    groupMemberIds: { g1: ["m1", "m2", "m3", "m4"] },
+    matches: [
+      {
+        id: "match-1",
+        tournamentId: "t1",
+        groupId: "g1",
+        matchNumber: 1,
+        sideAPlayerIds: ["m1", "m2"],
+        sideBPlayerIds: ["m3", "m4"],
+        sideAScore: null,
+        sideBScore: null,
+        status: "scheduled",
+        sortOrder: 1
+      }
+    ]
+  };
+}
+
 describe("TournamentManageClient save timing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
   });
 
-  it("does not save participant clicks until the done button is pressed", async () => {
+  it("keeps participant clicks local until schedules are generated", () => {
     render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: /참가자 수정/ }));
@@ -55,7 +78,20 @@ describe("TournamentManageClient save timing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "참가자 선택완료" }));
 
-    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
+  });
+
+  it("saves date changes immediately but keeps title changes local", async () => {
+    render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
+
+    fireEvent.change(screen.getByLabelText("대회명"), { target: { value: "새 이름" } });
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
+    expect(updateTournamentDateAction).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("날짜"), { target: { value: "2026-05-25" } });
+
+    await waitFor(() => expect(updateTournamentDateAction).toHaveBeenCalledWith("stc", "t1", "2026-05-25"));
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
   });
 
   it("does not save group assignment clicks until schedules are generated", async () => {
@@ -70,6 +106,19 @@ describe("TournamentManageClient save timing", () => {
     fireEvent.click(screen.getByRole("button", { name: /이민준/ }));
     fireEvent.click(screen.getByRole("button", { name: /최지은/ }));
     fireEvent.click(screen.getByRole("button", { name: "대진표 생성" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps score edits local until the result save button is pressed", async () => {
+    render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.change(screen.getByLabelText("위쪽 팀 점수"), { target: { value: "6" } });
+
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "경기 결과 저장" }));
 
     await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
   });

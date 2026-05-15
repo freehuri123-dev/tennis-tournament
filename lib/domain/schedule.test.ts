@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateInitialMatches, getHanulSeedCount, validateScheduleParticipants } from "./schedule";
+import { generateInitialMatches, getHanulSeedCount, getHanulSeedSlots, validateScheduleParticipants } from "./schedule";
 import type { Member } from "./types";
 
 function makeMembers(count: number): Member[] {
@@ -41,7 +41,7 @@ describe("generateInitialMatches", () => {
     expect(matches[15].sideBPlayerIds).toEqual(["m8", "m16"]);
   });
 
-  it("한울AA 선택 시드는 인원수별 시드 슬롯에 먼저 배정한다", () => {
+  it("한울AA는 별도 시드 선택 없이 순번의 시드 슬롯을 그대로 사용한다", () => {
     const matches = generateInitialMatches({
       tournamentId: "t1",
       groupId: "g1",
@@ -51,8 +51,13 @@ describe("generateInitialMatches", () => {
     });
 
     expect(getHanulSeedCount(6)).toBe(2);
-    expect(matches[0].sideAPlayerIds).toEqual(["m5", "m1"]);
-    expect(matches[0].sideBPlayerIds).toEqual(["m6", "m2"]);
+    expect(getHanulSeedSlots(6)).toEqual(["1", "3"]);
+    expect(matches[0].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(matches[0].sideBPlayerIds).toEqual(["m3", "m4"]);
+  });
+
+  it("한울AA 10명은 1, 8, A 순번을 자동 시드 슬롯으로 표시한다", () => {
+    expect(getHanulSeedSlots(10)).toEqual(["1", "8", "A"]);
   });
 
   it("지원하지 않는 인원수는 안내문구를 반환한다", () => {

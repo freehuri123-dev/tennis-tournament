@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { CalendarDays, Users } from "lucide-react";
+import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
 import type { Tournament } from "@/lib/domain/types";
@@ -18,14 +18,14 @@ export function HomeDashboard({ clubSlug = "stc", tournaments = [] }: { clubSlug
       <section className="section-card">
         <strong className="section-head">관리 메뉴</strong>
         <div className="quick-grid">
-          <Link className="quick-card" href={buildClubPath(clubSlug, "members")}>
+          <PendingLink className="quick-card" href={buildClubPath(clubSlug, "members")}>
             <Users size={24} />
             <strong>회원관리</strong>
-          </Link>
-          <Link className="quick-card" href={buildClubPath(clubSlug, "tournaments")}>
+          </PendingLink>
+          <PendingLink className="quick-card" href={buildClubPath(clubSlug, "tournaments")}>
             <CalendarDays size={24} />
             <strong>대회관리</strong>
-          </Link>
+          </PendingLink>
         </div>
       </section>
 
@@ -33,7 +33,7 @@ export function HomeDashboard({ clubSlug = "stc", tournaments = [] }: { clubSlug
         <strong className="section-head">최근 대회</strong>
         <div className="list-stack">
           {recentTournaments.map((tournament) => (
-            <Link className="list-card" href={tournamentManagePath(clubSlug, tournament.id)} key={tournament.id}>
+            <PendingLink className="list-card" href={tournamentManagePath(clubSlug, tournament.id)} key={tournament.id}>
               <div className="list-card-top">
                 <strong>{tournament.name}</strong>
                 <StatusBadge status={tournament.status} />
@@ -42,7 +42,7 @@ export function HomeDashboard({ clubSlug = "stc", tournaments = [] }: { clubSlug
                 <span>{tournament.date}</span>
                 <span>상세 관리로 이동</span>
               </div>
-            </Link>
+            </PendingLink>
           ))}
         </div>
       </section>
