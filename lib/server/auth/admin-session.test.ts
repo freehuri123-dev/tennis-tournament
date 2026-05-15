@@ -20,4 +20,8 @@ describe("admin session signing", () => {
     expect(verifyAdminSessionValue("not-a-session", "same-secret")).toBe(false);
     expect(verifyAdminSessionValue("1234.bad-signature.extra", "same-secret")).toBe(false);
   });
+
+  it("does not sign a session without a configured secret", () => {
+    expect(() => signAdminSessionValue("")).toThrow("SESSION_SECRET");
+  });
 });

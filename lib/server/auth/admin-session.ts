@@ -16,6 +16,7 @@ function signaturesMatch(left: string, right: string) {
 }
 
 export function signAdminSessionValue(secret = process.env.SESSION_SECRET ?? "") {
+  if (!secret) throw new Error("SESSION_SECRET is required to sign admin sessions.");
   const issuedAt = Date.now().toString();
   return `${issuedAt}.${signValue(issuedAt, secret)}`;
 }
@@ -50,15 +51,16 @@ export async function loginAdminAction(formData: FormData) {
   const [{ cookies }, { redirect }] = await Promise.all([import("next/headers"), import("next/navigation")]);
   const password = formData.get("password");
   const adminPassword = process.env.ADMIN_PASSWORD;
+  const sessionSecret = process.env.SESSION_SECRET;
 
-  if (!adminPassword || password !== adminPassword) {
+  if (!adminPassword || !sessionSecret || password !== adminPassword) {
     redirect("/admin/login?error=1");
   }
 
   const cookieStore = await cookies();
   cookieStore.set({
     name: COOKIE_NAME,
-    value: signAdminSessionValue(),
+    value: signAdminSessionValue(sessionSecret),
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
