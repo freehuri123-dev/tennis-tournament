@@ -1,8 +1,10 @@
 import type { ScheduleFormat } from "@prisma/client";
+import type { z } from "zod";
 import type { ClubSlug } from "../../domain/club";
 import { withDateStatus } from "../../domain/tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "../../domain/types";
 import type { TournamentState } from "../../store/tournament-store";
+import type { matchScoreInputSchema, memberInputSchema } from "../validation";
 
 function assertNever(value: never): never {
   throw new Error(`Unexpected schedule format: ${value}`);
@@ -190,6 +192,9 @@ async function getPrisma() {
   return prisma;
 }
 
+type MemberInput = z.infer<typeof memberInputSchema>;
+type MatchScoreInput = z.infer<typeof matchScoreInputSchema>;
+
 export async function getClubOrThrow(clubSlug: ClubSlug) {
   const prisma = await getPrisma();
   const club = await prisma.club.findUnique({ where: { slug: clubSlug } });
@@ -205,6 +210,60 @@ export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
     orderBy: [{ name: "asc" }, { id: "asc" }]
   });
   return members.map(toDomainMember);
+}
+
+export async function upsertMember(input: MemberInput): Promise<Member> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(input.clubSlug);
+  const data = {
+    clubId: club.id,
+    name: input.name,
+    gender: input.gender ?? null,
+    level: input.level ?? null,
+    phone: input.phone ?? null,
+    notes: input.notes,
+    active: input.active,
+    deleted: false
+  };
+
+  if (!input.id) {
+    return toDomainMember(await prisma.member.create({ data }));
+  }
+
+  const existing = await prisma.member.findFirst({
+    where: { id: input.id, clubId: club.id }
+  });
+  if (!existing) throw new Error(`Member not found: ${input.id}`);
+
+  return toDomainMember(
+    await prisma.member.update({
+      where: { id: input.id },
+      data
+    })
+  );
+}
+
+export async function softDeleteMember(memberId: string): Promise<void> {
+  const prisma = await getPrisma();
+  await prisma.member.update({
+    where: { id: memberId },
+    data: { active: false, deleted: true }
+  });
+}
+
+export async function updateMatchScore(input: MatchScoreInput): Promise<Match> {
+  const prisma = await getPrisma();
+  const status = input.sideAScore === null || input.sideBScore === null ? "scheduled" : "completed";
+  const match = await prisma.match.update({
+    where: { id: input.matchId },
+    data: {
+      sideAScore: input.sideAScore,
+      sideBScore: input.sideBScore,
+      status
+    }
+  });
+
+  return toDomainMatch(match);
 }
 
 export async function listTournamentsByClub(clubSlug: ClubSlug): Promise<Tournament[]> {
