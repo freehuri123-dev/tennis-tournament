@@ -1,13 +1,13 @@
 import { InvalidClubPage } from "@/components/InvalidClubPage";
 import { PublicTournamentView } from "@/components/PublicTournamentView";
 import { isKnownClubSlug } from "@/lib/domain/club";
-import { listTournamentsByClub, loadTournamentStateFromDb } from "@/lib/server/repositories/tournament-repository";
+import { loadPublicTournamentState } from "@/lib/server/repositories/tournament-repository";
+import { notFound } from "next/navigation";
 
 export default async function ClubPublicTournamentPage({ params }: { params: Promise<{ clubSlug: string; slug: string }> }) {
   const { clubSlug, slug } = await params;
   if (!isKnownClubSlug(clubSlug)) return <InvalidClubPage />;
-  const tournaments = await listTournamentsByClub(clubSlug);
-  const tournament = tournaments.find((item) => item.publicSlug === slug);
-  const state = await loadTournamentStateFromDb(clubSlug, tournament?.id);
+  const state = await loadPublicTournamentState(clubSlug, slug);
+  if (!state) notFound();
   return <PublicTournamentView state={state} slug={slug} clubSlug={clubSlug} />;
 }

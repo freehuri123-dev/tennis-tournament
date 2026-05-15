@@ -64,6 +64,25 @@ function toDomainMember(member: {
   };
 }
 
+function toPublicDomainMember(member: {
+  id: string;
+  name: string;
+  gender: "male" | "female" | null;
+  level: string | null;
+  active: boolean;
+  deleted: boolean;
+}): Member {
+  return {
+    id: member.id,
+    name: member.name,
+    gender: member.gender ?? undefined,
+    level: member.level ?? undefined,
+    notes: "",
+    active: member.active,
+    deleted: member.deleted
+  };
+}
+
 function toDomainTournament(tournament: {
   id: string;
   name: string;
@@ -96,6 +115,26 @@ function toDomainGroup(group: {
     sortOrder: group.sortOrder,
     seedPlayerIds: group.seedPlayerIds
   };
+}
+
+function collectPublicTournamentMemberIds(tournament: {
+  participants: { memberId: string }[];
+  groups: { seedPlayerIds: string[]; members: { memberId: string }[] }[];
+  matches: { sideAPlayerIds: string[]; sideBPlayerIds: string[] }[];
+}): string[] {
+  const memberIds = new Set<string>();
+
+  for (const participant of tournament.participants) memberIds.add(participant.memberId);
+  for (const group of tournament.groups) {
+    for (const member of group.members) memberIds.add(member.memberId);
+    for (const memberId of group.seedPlayerIds) memberIds.add(memberId);
+  }
+  for (const match of tournament.matches) {
+    for (const memberId of match.sideAPlayerIds) memberIds.add(memberId);
+    for (const memberId of match.sideBPlayerIds) memberIds.add(memberId);
+  }
+
+  return [...memberIds];
 }
 
 function toDomainMatch(match: {
@@ -223,6 +262,57 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
     adminUnlocked: false,
     members: domainMembers,
     tournaments: tournaments.map(toDomainTournament),
+    currentTournamentId: selectedTournament.id,
+    tournament,
+    groups,
+    tournamentParticipantIds,
+    groupMemberIds,
+    matches: selectedTournament.matches.map(toDomainMatch),
+    deletedPublicSlugs: []
+  };
+}
+
+export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: string): Promise<TournamentState | null> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const selectedTournament = await prisma.tournament.findUnique({
+    where: { clubId_publicSlug: { clubId: club.id, publicSlug } },
+    include: {
+      participants: { orderBy: [{ sortOrder: "asc" }, { memberId: "asc" }] },
+      groups: {
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+        include: {
+          members: { orderBy: [{ sortOrder: "asc" }, { memberId: "asc" }] }
+        }
+      },
+      matches: { orderBy: [{ sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }] }
+    }
+  });
+
+  if (!selectedTournament) return null;
+
+  const memberIds = collectPublicTournamentMemberIds(selectedTournament);
+  const members =
+    memberIds.length > 0
+      ? await prisma.member.findMany({
+          where: { clubId: club.id, deleted: false, id: { in: memberIds } },
+          orderBy: [{ name: "asc" }, { id: "asc" }]
+        })
+      : [];
+  const tournament = toDomainTournament(selectedTournament);
+  const groups = selectedTournament.groups.map(toDomainGroup);
+  const tournamentParticipantIds = {
+    [selectedTournament.id]: selectedTournament.participants.map((participant) => participant.memberId)
+  };
+  const groupMemberIds = Object.fromEntries(
+    selectedTournament.groups.map((group) => [group.id, group.members.map((member) => member.memberId)])
+  );
+
+  return {
+    version: 8,
+    adminUnlocked: false,
+    members: members.map(toPublicDomainMember),
+    tournaments: [tournament],
     currentTournamentId: selectedTournament.id,
     tournament,
     groups,
