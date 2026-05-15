@@ -16,9 +16,9 @@ describe("public tournament access", () => {
     expect(getPublicTournamentAccess("tournament-t1", tournaments, ["tournament-t1"])).toEqual({ type: "deleted" });
   });
 
-  it("지난 날짜의 공유 slug는 완료 상태로 반환한다", () => {
+  it("지난 날짜의 공유 slug도 조회 가능 상태로 반환한다", () => {
     const result = getPublicTournamentAccess("tournament-t0", tournaments.map((item) => ({ ...item, date: item.id === "t0" ? "2026-05-13" : item.date })), []);
-    expect(result.type).toBe("completed");
+    expect(result.type).toBe("live");
   });
 
   it("존재하는 진행 대회 공유 slug는 조회 가능 상태로 반환한다", () => {

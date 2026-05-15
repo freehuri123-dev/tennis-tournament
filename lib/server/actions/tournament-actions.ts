@@ -21,8 +21,6 @@ function revalidateTournamentAdminPaths(clubSlug: string) {
 }
 
 export async function saveTournamentAction(formData: FormData) {
-  await requireAdmin();
-
   const input = tournamentInputSchema.parse({
     id: formString(formData, "id"),
     clubSlug: formString(formData, "clubSlug"),
@@ -31,6 +29,7 @@ export async function saveTournamentAction(formData: FormData) {
     publicSlug: formString(formData, "publicSlug")
   });
 
+  await requireAdmin(input.clubSlug);
   const tournament = await upsertTournament(input);
   revalidateTournamentAdminPaths(input.clubSlug);
   revalidatePath(`/public/${input.clubSlug}/${input.publicSlug}`);
@@ -38,9 +37,8 @@ export async function saveTournamentAction(formData: FormData) {
 }
 
 export async function persistTournamentStateAction(clubSlug: unknown, state: TournamentState) {
-  await requireAdmin();
-
   const parsedClubSlug = clubSlugSchema.parse(clubSlug);
+  await requireAdmin(parsedClubSlug);
   await replaceTournamentState(parsedClubSlug, state);
   revalidateTournamentAdminPaths(parsedClubSlug);
   revalidatePath(`/public/${parsedClubSlug}/${state.tournament.publicSlug}`);
@@ -49,9 +47,8 @@ export async function persistTournamentStateAction(clubSlug: unknown, state: Tou
 }
 
 export async function createTournamentAction(formData: FormData) {
-  await requireAdmin();
-
   const clubSlug = clubSlugSchema.parse(formString(formData, "clubSlug"));
+  await requireAdmin(clubSlug);
   const idSeed = `tournament-${Date.now()}`;
   const input = tournamentInputSchema.parse({
     clubSlug,

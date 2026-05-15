@@ -12,16 +12,16 @@ export function MatchCard({ match, members }: { match: Match; members: Member[] 
       </div>
       <div className="match-team-grid">
         <div className="match-team match-team-a">
-          {match.sideAPlayerIds.map((id) => (
-            <span className="match-player" key={id}>
+          {match.sideAPlayerIds.map((id, index) => (
+            <span className="match-player" key={`${id || "empty"}-a-${index}`}>
               {nameOf(id)}
             </span>
           ))}
         </div>
         <div className="match-vs">{hasScore ? `${match.sideAScore}:${match.sideBScore}` : "VS"}</div>
         <div className="match-team match-team-b">
-          {match.sideBPlayerIds.map((id) => (
-            <span className="match-player" key={id}>
+          {match.sideBPlayerIds.map((id, index) => (
+            <span className="match-player" key={`${id || "empty"}-b-${index}`}>
               {nameOf(id)}
             </span>
           ))}

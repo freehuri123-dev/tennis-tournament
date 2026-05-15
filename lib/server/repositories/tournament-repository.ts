@@ -1,6 +1,7 @@
 import type { ScheduleFormat } from "@prisma/client";
 import type { z } from "zod";
 import type { ClubSlug } from "../../domain/club";
+import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "../../domain/sample-data";
 import { withDateStatus } from "../../domain/tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "../../domain/types";
 import type { TournamentState } from "../../store/tournament-store";
@@ -196,6 +197,26 @@ type MemberInput = z.infer<typeof memberInputSchema>;
 type MatchScoreInput = z.infer<typeof matchScoreInputSchema>;
 type TournamentInput = z.infer<typeof tournamentInputSchema>;
 
+function shouldUseLocalSampleData() {
+  return !process.env.DATABASE_URL && !process.env.VERCEL && process.env.VITEST !== "true";
+}
+
+function localSampleState(): TournamentState {
+  return {
+    version: 8,
+    adminUnlocked: false,
+    members: sampleMembers,
+    tournaments: sampleTournaments.map((tournament) => withDateStatus(tournament)),
+    currentTournamentId: sampleTournament.id,
+    tournament: withDateStatus(sampleTournament),
+    groups: sampleGroups,
+    tournamentParticipantIds: { [sampleTournament.id]: Array.from(new Set(Object.values(sampleGroupMemberIds).flat())) },
+    groupMemberIds: sampleGroupMemberIds,
+    matches: createSampleMatches(),
+    deletedPublicSlugs: []
+  };
+}
+
 function assertAllowedIds(ids: string[], allowedIds: Set<string>, message: string) {
   for (const id of ids) {
     if (!allowedIds.has(id)) throw new Error(`${message}: ${id}`);
@@ -214,6 +235,8 @@ export async function getClubOrThrow(clubSlug: ClubSlug) {
 }
 
 export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
+  if (shouldUseLocalSampleData()) return localSampleState().members;
+
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
   const members = await prisma.member.findMany({
@@ -224,6 +247,10 @@ export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
 }
 
 export async function getMemberById(clubSlug: ClubSlug, memberId: string): Promise<Member | null> {
+  if (shouldUseLocalSampleData()) {
+    return localSampleState().members.find((member) => member.id === memberId) ?? null;
+  }
+
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
   const member = await prisma.member.findFirst({
@@ -330,6 +357,8 @@ export async function updateMatchScore(clubSlug: ClubSlug, input: MatchScoreInpu
 }
 
 export async function listTournamentsByClub(clubSlug: ClubSlug): Promise<Tournament[]> {
+  if (shouldUseLocalSampleData()) return localSampleState().tournaments;
+
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
   const tournaments = await prisma.tournament.findMany({
@@ -340,6 +369,8 @@ export async function listTournamentsByClub(clubSlug: ClubSlug): Promise<Tournam
 }
 
 export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId?: string): Promise<TournamentState> {
+  if (shouldUseLocalSampleData()) return localSampleState();
+
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
   const [members, tournaments, selectedTournament] = await Promise.all([
@@ -515,6 +546,11 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
 }
 
 export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: string): Promise<TournamentState | null> {
+  if (shouldUseLocalSampleData()) {
+    const state = localSampleState();
+    return state.tournament.publicSlug === publicSlug ? state : null;
+  }
+
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
   const selectedTournament = await prisma.tournament.findUnique({

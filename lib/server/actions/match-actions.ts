@@ -7,7 +7,7 @@ import { updateMatchScore } from "../repositories/tournament-repository";
 import { matchScoreInputSchema } from "../validation";
 
 export async function updateMatchScoreAction(input: unknown, clubSlug: ClubSlug) {
-  await requireAdmin();
+  await requireAdmin(clubSlug);
 
   const scoreInput = matchScoreInputSchema.parse(input);
   await updateMatchScore(clubSlug, scoreInput);

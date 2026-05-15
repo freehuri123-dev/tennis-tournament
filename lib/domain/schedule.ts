@@ -12,12 +12,14 @@ type ScheduleFormat = TournamentGroup["scheduleFormat"];
 
 const FORMAT_LABELS: Record<ScheduleFormat, string> = {
   "kdk-v2010": "KDK-V2010",
-  "hanul-aa": "한울AA방식 KDK"
+  "hanul-aa": "한울AA방식 KDK",
+  random: "랜덤"
 };
 
 const MIN_MAX: Record<ScheduleFormat, { min: number; max: number }> = {
   "kdk-v2010": { min: 5, max: 10 },
-  "hanul-aa": { min: 5, max: 16 }
+  "hanul-aa": { min: 5, max: 16 },
+  random: { min: 4, max: Number.POSITIVE_INFINITY }
 };
 
 const KDK_TEMPLATES: Record<number, string[]> = {
@@ -65,6 +67,9 @@ export function getScheduleRequirement(format: ScheduleFormat) {
 
 export function validateScheduleParticipants(format: ScheduleFormat, count: number) {
   const requirement = getScheduleRequirement(format);
+  if (format === "random") {
+    return count < requirement.min ? `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.` : "";
+  }
   if (count < requirement.min || count > requirement.max) {
     return `${requirement.label} 방식은 ${requirement.min}~${requirement.max}명일 때 대진표를 생성할 수 있습니다.`;
   }
@@ -88,6 +93,7 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   const participantCount = input.participants.length;
   const validationMessage = validateScheduleParticipants(input.format, participantCount);
   if (validationMessage) return [];
+  if (input.format === "random") return generateRandomMatches(input);
 
   const playerMap = input.format === "hanul-aa"
     ? createHanulSeedMap(input.participants, input.seedPlayerIds ?? [])
@@ -109,6 +115,46 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
       sortOrder: index + 1
     };
   });
+}
+
+function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
+  const playCounts = new Map(input.participants.map((member) => [member.id, 0]));
+  const matches: Match[] = [];
+
+  while ([...playCounts.values()].some((count) => count < 4)) {
+    const selected = shuffle([...input.participants])
+      .sort((left, right) => (playCounts.get(left.id) ?? 0) - (playCounts.get(right.id) ?? 0))
+      .slice(0, 4);
+    const players = shuffle(selected).map((member) => member.id);
+
+    for (const playerId of players) {
+      playCounts.set(playerId, (playCounts.get(playerId) ?? 0) + 1);
+    }
+
+    matches.push({
+      id: `${input.groupId}-match-${matches.length + 1}`,
+      tournamentId: input.tournamentId,
+      groupId: input.groupId,
+      matchNumber: matches.length + 1,
+      sideAPlayerIds: players.slice(0, 2),
+      sideBPlayerIds: players.slice(2, 4),
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled",
+      sortOrder: matches.length + 1
+    });
+  }
+
+  return matches;
+}
+
+function shuffle<T>(items: T[]) {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1));
+    [next[index], next[target]] = [next[target], next[index]];
+  }
+  return next;
 }
 
 function createDefaultSeedMap(participants: Member[]) {

@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "crypto";
+import { buildClubPath, isKnownClubSlug, type ClubSlug } from "../../domain/club";
 
 export const COOKIE_NAME = "tennis-admin-session";
 
@@ -21,6 +22,18 @@ export function signAdminSessionValue(secret = process.env.SESSION_SECRET ?? "")
   return `${issuedAt}.${signValue(issuedAt, secret)}`;
 }
 
+export function getAdminSessionCookieName(clubSlug: ClubSlug) {
+  return `${COOKIE_NAME}:${clubSlug}`;
+}
+
+function getClubPassword(clubSlug: ClubSlug) {
+  return process.env[`ADMIN_PASSWORD_${clubSlug.toUpperCase()}`] ?? process.env.ADMIN_PASSWORD ?? "1234";
+}
+
+function getSessionSecret() {
+  return process.env.SESSION_SECRET ?? "local-development-session-secret";
+}
+
 export function verifyAdminSessionValue(value: string | undefined | null, secret = process.env.SESSION_SECRET ?? "") {
   if (!value || !secret) return false;
 
@@ -35,13 +48,13 @@ export function verifyAdminSessionValue(value: string | undefined | null, secret
   return signaturesMatch(signature, signValue(issuedAt, secret));
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(clubSlug: ClubSlug = "stc") {
   const [{ cookies }, { redirect }] = await Promise.all([import("next/headers"), import("next/navigation")]);
   const cookieStore = await cookies();
-  const sessionValue = cookieStore.get(COOKIE_NAME)?.value;
+  const sessionValue = cookieStore.get(getAdminSessionCookieName(clubSlug))?.value;
 
-  if (!verifyAdminSessionValue(sessionValue)) {
-    redirect("/admin/login");
+  if (!verifyAdminSessionValue(sessionValue, getSessionSecret())) {
+    redirect(buildClubPath(clubSlug, "login"));
   }
 }
 
@@ -49,17 +62,20 @@ export async function loginAdminAction(formData: FormData) {
   "use server";
 
   const [{ cookies }, { redirect }] = await Promise.all([import("next/headers"), import("next/navigation")]);
+  const rawClubSlug = formData.get("clubSlug");
+  const requestedClubSlug = typeof rawClubSlug === "string" ? rawClubSlug : undefined;
+  const clubSlug: ClubSlug = isKnownClubSlug(requestedClubSlug) ? requestedClubSlug : "stc";
   const password = formData.get("password");
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const sessionSecret = process.env.SESSION_SECRET;
+  const adminPassword = getClubPassword(clubSlug);
+  const sessionSecret = getSessionSecret();
 
-  if (!adminPassword || !sessionSecret || password !== adminPassword) {
-    redirect("/admin/login?error=1");
+  if (password !== adminPassword) {
+    redirect(`${buildClubPath(clubSlug, "login")}?error=1`);
   }
 
   const cookieStore = await cookies();
   cookieStore.set({
-    name: COOKIE_NAME,
+    name: getAdminSessionCookieName(clubSlug),
     value: signAdminSessionValue(sessionSecret),
     httpOnly: true,
     sameSite: "lax",
@@ -68,7 +84,7 @@ export async function loginAdminAction(formData: FormData) {
     maxAge: SESSION_MAX_AGE_SECONDS
   });
 
-  redirect("/admin");
+  redirect(buildClubPath(clubSlug));
 }
 
 export async function logoutAdminAction() {
@@ -76,6 +92,7 @@ export async function logoutAdminAction() {
 
   const [{ cookies }, { redirect }] = await Promise.all([import("next/headers"), import("next/navigation")]);
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
-  redirect("/admin/login");
+  cookieStore.delete(getAdminSessionCookieName("stc"));
+  cookieStore.delete(getAdminSessionCookieName("otc"));
+  redirect("/stc/login");
 }

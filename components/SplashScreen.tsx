@@ -1,18 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ClubSlug } from "@/lib/domain/club";
 
-export function SplashScreen() {
+const introImages: Record<ClubSlug, string> = {
+  stc: "/stc_intro.png",
+  otc: "/otc_intro.png"
+};
+
+export function SplashScreen({ clubSlug = "stc" }: { clubSlug?: ClubSlug }) {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    if (window.sessionStorage.getItem("splash-seen") === "yes") return;
+    const storageKey = `splash-seen:${clubSlug}`;
+    if (window.sessionStorage.getItem(storageKey) === "yes") return;
 
     setVisible(true);
     const leaveTimer = window.setTimeout(() => setLeaving(true), 1200);
     const hideTimer = window.setTimeout(() => {
-      window.sessionStorage.setItem("splash-seen", "yes");
+      window.sessionStorage.setItem(storageKey, "yes");
       setVisible(false);
     }, 1700);
 
@@ -20,13 +27,13 @@ export function SplashScreen() {
       window.clearTimeout(leaveTimer);
       window.clearTimeout(hideTimer);
     };
-  }, []);
+  }, [clubSlug]);
 
   if (!visible) return null;
 
   return (
     <div className={`splash-screen ${leaving ? "leaving" : ""}`}>
-      <img alt="테니스 월례대회 시작 화면" src="/inrto2.png" />
+      <img alt="테니스 월례대회 시작 화면" src={introImages[clubSlug]} />
     </div>
   );
 }

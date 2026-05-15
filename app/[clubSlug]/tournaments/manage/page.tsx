@@ -8,7 +8,7 @@ export default async function ClubTournamentManagePage({ params }: { params: Pro
   const { clubSlug } = await params;
   if (!isKnownClubSlug(clubSlug)) return <InvalidClubPage />;
 
-  await requireAdmin();
+  await requireAdmin(clubSlug);
   const state = await loadTournamentStateFromDb(clubSlug);
 
   return <TournamentManageClient initialState={state} clubSlug={clubSlug} />;

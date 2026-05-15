@@ -59,4 +59,25 @@ describe("generateInitialMatches", () => {
     expect(validateScheduleParticipants("kdk-v2010", 4)).toContain("5~10명");
     expect(validateScheduleParticipants("hanul-aa", 17)).toContain("5~16명");
   });
+
+  it("랜덤 방식은 4명으로도 모든 참가자가 최소 4경기를 하도록 대진을 만든다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "random",
+      participants: makeMembers(4)
+    });
+
+    const playCounts = new Map(makeMembers(4).map((member) => [member.id, 0]));
+    for (const match of matches) {
+      expect(match.sideAPlayerIds).toHaveLength(2);
+      expect(match.sideBPlayerIds).toHaveLength(2);
+      for (const playerId of [...match.sideAPlayerIds, ...match.sideBPlayerIds]) {
+        playCounts.set(playerId, (playCounts.get(playerId) ?? 0) + 1);
+      }
+    }
+
+    expect(matches.length).toBeGreaterThanOrEqual(4);
+    expect([...playCounts.values()].every((count) => count >= 4)).toBe(true);
+  });
 });

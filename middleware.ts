@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const COOKIE_NAME = "tennis-admin-session";
+const COOKIE_NAME = "tennis-admin-session:stc";
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
 function base64Url(bytes: ArrayBuffer) {
@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
   if (valid) return NextResponse.next();
 
   const loginUrl = request.nextUrl.clone();
-  loginUrl.pathname = "/admin/login";
+  loginUrl.pathname = "/stc/login";
   loginUrl.search = "";
   return NextResponse.redirect(loginUrl);
 }

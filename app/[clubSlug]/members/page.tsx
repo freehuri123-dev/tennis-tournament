@@ -18,9 +18,9 @@ export default async function ClubMembersPage({
   params: Promise<{ clubSlug: string }>;
   searchParams?: Promise<{ q?: string }>;
 }) {
-  await requireAdmin();
   const { clubSlug } = await params;
   if (!isKnownClubSlug(clubSlug)) return <InvalidClubPage />;
+  await requireAdmin(clubSlug);
 
   const queryParams = await searchParams;
   const query = queryParams?.q ?? "";

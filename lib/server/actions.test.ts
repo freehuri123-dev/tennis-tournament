@@ -86,7 +86,7 @@ describe("server action validation", () => {
 
     await expect(deleteMemberAction(formData)).rejects.toThrow("redirect:/stc/members");
 
-    expect(requireAdmin).toHaveBeenCalledOnce();
+    expect(requireAdmin).toHaveBeenCalledWith("stc");
     expect(softDeleteMember).toHaveBeenCalledWith("stc", "member-1");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/members");
   });
@@ -106,7 +106,7 @@ describe("server action validation", () => {
 
     await expect(createTournamentAction(formData)).rejects.toThrow("redirect:/otc/tournaments");
 
-    expect(requireAdmin).toHaveBeenCalled();
+    expect(requireAdmin).toHaveBeenCalledWith("otc");
     expect(upsertTournament).toHaveBeenCalledWith({
       clubSlug: "otc",
       name: "새 월례대회",
@@ -141,7 +141,7 @@ describe("server action validation", () => {
 
     await expect(persistTournamentStateAction("stc", state)).resolves.toEqual({ ok: true });
 
-    expect(requireAdmin).toHaveBeenCalled();
+    expect(requireAdmin).toHaveBeenCalledWith("stc");
     expect(replaceTournamentState).toHaveBeenCalledWith("stc", state);
     expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments/manage");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments");
@@ -162,7 +162,7 @@ describe("server action validation", () => {
       )
     ).resolves.toBeUndefined();
 
-    expect(requireAdmin).toHaveBeenCalled();
+    expect(requireAdmin).toHaveBeenCalledWith("otc");
     expect(updateMatchScore).toHaveBeenCalledWith("otc", {
       matchId: "match-1",
       sideAScore: 6,

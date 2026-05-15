@@ -17,6 +17,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
         </header>
         <main className="app-main">
           <form action={loginAdminAction} className="section-card stack">
+            <input name="clubSlug" type="hidden" value="stc" />
             <label className="field">
               <span>비밀번호</span>
               <div className="boxed-field">

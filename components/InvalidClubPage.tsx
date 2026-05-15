@@ -6,7 +6,7 @@ export function InvalidClubPage() {
       <div className="page">
         <section className="status-message-card">
           <strong>잘못된 접근입니다</strong>
-          <p>등록된 클럽 주소로만 접속할 수 있습니다.</p>
+          <p>STC 클럽은 /stc, OTC 클럽은 /otc 주소로 접속해주세요.</p>
         </section>
       </div>
     </PublicShell>

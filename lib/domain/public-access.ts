@@ -3,7 +3,6 @@ import type { Tournament } from "./types";
 
 export type PublicAccessResult =
   | { type: "live"; tournament: Tournament }
-  | { type: "completed"; tournament: Tournament }
   | { type: "deleted" };
 
 export function createTournamentSlug(id: string) {
@@ -15,6 +14,5 @@ export function getPublicTournamentAccess(slug: string, tournaments: Tournament[
 
   const tournament = tournaments.map((item) => withDateStatus(item)).find((item) => item.publicSlug === slug);
   if (!tournament) return { type: "deleted" };
-  if (tournament.status === "completed") return { type: "completed", tournament };
   return { type: "live", tournament };
 }

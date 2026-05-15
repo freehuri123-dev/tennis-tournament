@@ -26,8 +26,6 @@ function formBoolean(formData: FormData, key: string) {
 }
 
 export async function saveMemberAction(formData: FormData) {
-  await requireAdmin();
-
   const input = memberInputSchema.parse({
     id: formString(formData, "id"),
     clubSlug: formString(formData, "clubSlug"),
@@ -39,19 +37,19 @@ export async function saveMemberAction(formData: FormData) {
     active: formBoolean(formData, "active")
   });
 
+  await requireAdmin(input.clubSlug);
   await upsertMember(input);
   revalidatePath(`/${input.clubSlug}/members`);
   redirect(`/${input.clubSlug}/members`);
 }
 
 export async function deleteMemberAction(formData: FormData) {
-  await requireAdmin();
-
   const input = deleteMemberInputSchema.parse({
     id: formString(formData, "id"),
     clubSlug: formString(formData, "clubSlug")
   });
 
+  await requireAdmin(input.clubSlug);
   await softDeleteMember(input.clubSlug, input.id);
   revalidatePath(`/${input.clubSlug}/members`);
   redirect(`/${input.clubSlug}/members`);
