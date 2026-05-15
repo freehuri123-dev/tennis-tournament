@@ -19,4 +19,14 @@ describe("mobile app frame styles", () => {
   it("fills the splash screen image on phone-sized screens", () => {
     expect(css).toMatch(/@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.splash-screen\s+img\s*\{[^}]*width:\s*100vw;[^}]*height:\s*100dvh;[^}]*object-fit:\s*cover;/s);
   });
+
+  it("styles pending form progress feedback", () => {
+    expect(css).toMatch(/\.button-progress::after,\s*\.form-progress::after\s*\{[\s\S]*animation:\s*progress-slide\s+920ms\s+ease-in-out\s+infinite;/s);
+    expect(css).toMatch(/@keyframes\s+progress-slide/);
+  });
+
+  it("dims the screen for server loading states", () => {
+    expect(css).toMatch(/\.global-loading-overlay\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;[^}]*background:\s*rgba\(10,\s*22,\s*13,\s*0\.44\);/s);
+    expect(css).toMatch(/\.global-loading-bar::after\s*\{[\s\S]*animation:\s*progress-slide\s+920ms\s+ease-in-out\s+infinite;/s);
+  });
 });

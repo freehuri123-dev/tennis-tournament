@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { deleteMemberAction } from "./actions/member-actions";
 import { updateMatchScoreAction } from "./actions/match-actions";
-import { createTournamentAction, persistTournamentStateAction } from "./actions/tournament-actions";
+import { createTournamentAction, deleteTournamentAction, persistTournamentStateAction } from "./actions/tournament-actions";
 import type { TournamentState } from "../store/tournament-store";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
-const { redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, upsertTournament } = vi.hoisted(() => ({
+const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, upsertTournament } = vi.hoisted(() => ({
+  deleteTournament: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -21,6 +22,7 @@ vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("./auth/admin-session", () => ({ requireAdmin }));
 vi.mock("./repositories/tournament-repository", () => ({
+  deleteTournament,
   replaceTournamentState,
   softDeleteMember,
   updateMatchScore,
@@ -104,7 +106,7 @@ describe("server action validation", () => {
     const formData = new FormData();
     formData.set("clubSlug", "otc");
 
-    await expect(createTournamentAction(formData)).rejects.toThrow("redirect:/otc/tournaments");
+    await expect(createTournamentAction(formData)).rejects.toThrow("redirect:/otc/tournaments/manage?tournamentId=tournament-1");
 
     expect(requireAdmin).toHaveBeenCalledWith("otc");
     expect(upsertTournament).toHaveBeenCalledWith({
@@ -116,6 +118,19 @@ describe("server action validation", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments");
 
     vi.useRealTimers();
+  });
+
+  it("deletes a tournament inside the requested club and returns to the list", async () => {
+    const formData = new FormData();
+    formData.set("clubSlug", "stc");
+    formData.set("id", "tournament-1");
+
+    await expect(deleteTournamentAction(formData)).rejects.toThrow("redirect:/stc/tournaments");
+
+    expect(requireAdmin).toHaveBeenCalledWith("stc");
+    expect(deleteTournament).toHaveBeenCalledWith("stc", "tournament-1");
+    expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments");
+    expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments/manage");
   });
 
   it("persists tournament manage state and revalidates club paths", async () => {

@@ -1,3 +1,4 @@
+import { FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { loginAdminAction } from "@/lib/server/auth/admin-session";
 
 type LoginPageProps = {
@@ -16,7 +17,8 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
           <strong className="header-title">관리자 로그인</strong>
         </header>
         <main className="app-main">
-          <form action={loginAdminAction} className="section-card stack">
+          <form action={loginAdminAction} className="section-card stack action-form">
+            <FormPendingOverlay label="로그인 중..." />
             <input name="clubSlug" type="hidden" value="stc" />
             <label className="field">
               <span>비밀번호</span>
@@ -25,9 +27,9 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
               </div>
             </label>
             {hasError && <p className="notice-text">비밀번호를 확인해 주세요.</p>}
-            <button className="primary-button" type="submit">
+            <PendingButton className="primary-button" pendingLabel="로그인 중...">
               로그인
-            </button>
+            </PendingButton>
           </form>
         </main>
         <footer className="app-footer">Copyright &copy; JunHeePark. All Rights Reserved.</footer>

@@ -324,6 +324,18 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
   );
 }
 
+export async function deleteTournament(clubSlug: ClubSlug, tournamentId: string): Promise<void> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const existing = await prisma.tournament.findFirst({
+    where: { id: tournamentId, clubId: club.id },
+    select: { id: true }
+  });
+  if (!existing) throw new Error(`Tournament not found: ${tournamentId}`);
+
+  await prisma.tournament.delete({ where: { id: tournamentId } });
+}
+
 export async function softDeleteMember(clubSlug: ClubSlug, memberId: string): Promise<void> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);

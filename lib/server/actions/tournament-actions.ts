@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createTournamentSlug } from "../../domain/public-access";
 import type { TournamentState } from "../../store/tournament-store";
 import { requireAdmin } from "../auth/admin-session";
-import { replaceTournamentState, upsertTournament } from "../repositories/tournament-repository";
+import { deleteTournament, replaceTournamentState, upsertTournament } from "../repositories/tournament-repository";
 import { clubSlugSchema, tournamentInputSchema } from "../validation";
 
 function formString(formData: FormData, key: string) {
@@ -57,7 +57,18 @@ export async function createTournamentAction(formData: FormData) {
     publicSlug: createTournamentSlug(idSeed)
   });
 
-  await upsertTournament(input);
+  const tournament = await upsertTournament(input);
+  revalidateTournamentAdminPaths(clubSlug);
+  redirect(`/${clubSlug}/tournaments/manage?tournamentId=${tournament.id}`);
+}
+
+export async function deleteTournamentAction(formData: FormData) {
+  const clubSlug = clubSlugSchema.parse(formString(formData, "clubSlug"));
+  const id = formString(formData, "id");
+  if (!id) throw new Error("Tournament id is required");
+
+  await requireAdmin(clubSlug);
+  await deleteTournament(clubSlug, id);
   revalidateTournamentAdminPaths(clubSlug);
   redirect(`/${clubSlug}/tournaments`);
 }

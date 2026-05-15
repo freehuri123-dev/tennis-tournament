@@ -3,6 +3,7 @@
 import { ClipboardList, HelpCircle, Plus, Share2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AppShell } from "@/components/AppShell";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { RankingTable } from "@/components/RankingTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { ClubSlug } from "@/lib/domain/club";
@@ -32,6 +33,7 @@ type TournamentManageClientProps = {
 export function TournamentManageClient({ initialState, clubSlug }: TournamentManageClientProps) {
   const [state, setState] = useState(initialState);
   const [, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("setup");
   const [helpImage, setHelpImage] = useState<HelpImage>(null);
   const [participantPanelOpen, setParticipantPanelOpen] = useState(false);
@@ -73,23 +75,36 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     });
   }, [state]);
 
-  function persist(next: TournamentState) {
+  function normalizeState(next: TournamentState) {
     const nextTournament = withDateStatus(next.tournament);
-    const normalized = {
+    return {
       ...next,
       tournament: nextTournament,
       tournaments: next.tournaments.map((item) => withDateStatus(item.id === nextTournament.id ? nextTournament : item))
     };
+  }
+
+  function updateLocal(next: TournamentState) {
+    setState(normalizeState(next));
+  }
+
+  function persist(next: TournamentState) {
+    const normalized = normalizeState(next);
     setState(normalized);
     startTransition(() => {
-      saveQueueRef.current = saveQueueRef.current
+      setIsSaving(true);
+      const saveTask = saveQueueRef.current
         .catch(() => undefined)
         .then(async () => {
           await persistTournamentStateAction(clubSlug, normalized);
         })
         .catch(() => {
           window.alert("Failed to save tournament changes. Please refresh and try again.");
+        })
+        .finally(() => {
+          if (saveQueueRef.current === saveTask) setIsSaving(false);
         });
+      saveQueueRef.current = saveTask;
     });
   }
 
@@ -125,7 +140,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       groupMemberIds: state.groupMemberIds
     });
 
-    persist({
+    updateLocal({
       ...state,
       tournamentParticipantIds: { ...state.tournamentParticipantIds, [tournament.id]: nextSelection.participantIds },
       groups: synced.groups,
@@ -181,7 +196,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     }
     const groupId = `group-${Date.now()}`;
     const nextGroupNumber = state.groups.length + 1;
-    persist({
+    updateLocal({
       ...state,
       groups: [
         ...state.groups,
@@ -203,7 +218,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (!window.confirm("그룹을 삭제할까요? 이 그룹의 경기와 결과도 함께 삭제됩니다.")) return;
     const nextGroupMemberIds = { ...state.groupMemberIds };
     delete nextGroupMemberIds[groupId];
-    persist({
+    updateLocal({
       ...state,
       groups: state.groups.filter((group) => group.id !== groupId),
       groupMemberIds: nextGroupMemberIds,
@@ -213,7 +228,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function updateGroupFormat(groupId: string, scheduleFormat: TournamentGroup["scheduleFormat"]) {
     if (isCompleted) return;
-    persist({
+    updateLocal({
       ...state,
       groups: state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat, seedPlayerIds: [] } : group))
     });
@@ -227,7 +242,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (isCompleted || isAssignedToOtherGroup(memberId, groupId)) return;
     const currentIds = state.groupMemberIds[groupId] ?? [];
     const nextIds = currentIds.includes(memberId) ? currentIds.filter((id) => id !== memberId) : [...currentIds, memberId];
-    persist({
+    updateLocal({
       ...state,
       groupMemberIds: { ...state.groupMemberIds, [groupId]: nextIds },
       groups: state.groups.map((group) => (group.id === groupId ? { ...group, seedPlayerIds: [] } : group))
@@ -246,7 +261,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         ? [...current, memberId]
         : current;
 
-    persist({
+    updateLocal({
       ...state,
       groups: state.groups.map((item) => (item.id === groupId ? { ...item, seedPlayerIds: next } : item))
     });
@@ -365,6 +380,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   return (
     <AppShell title="대회 상세관리" subtitle="참가자 편성, 대진표, 순위를 관리합니다" active="tournaments" clubSlug={clubSlug}>
+      {isSaving ? <LoadingOverlay label="저장 중..." /> : null}
       <div className="page">
         <section className="hero-card">
           <span className="badge">{isCompleted ? "완료 대회" : "현재 대회"}</span>
@@ -430,7 +446,15 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       );
                     })}
                   </div>
-                  <button className="primary-button participant-done-button" disabled={isCompleted} onClick={() => setParticipantPanelOpen(false)} type="button">
+                  <button
+                    className="primary-button participant-done-button"
+                    disabled={isCompleted}
+                    onClick={() => {
+                      persist(state);
+                      setParticipantPanelOpen(false);
+                    }}
+                    type="button"
+                  >
                     참가자 선택완료
                   </button>
                 </div>

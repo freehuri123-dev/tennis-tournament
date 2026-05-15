@@ -1,3 +1,4 @@
+import { FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { InvalidClubPage } from "@/components/InvalidClubPage";
 import { getClubBySlug, isKnownClubSlug } from "@/lib/domain/club";
@@ -16,9 +17,10 @@ export default async function ClubLoginPage({ params, searchParams }: ClubLoginP
   const hasError = query?.error === "1";
 
   return (
-    <AppShell title="클럽 로그인" subtitle={`${club?.shortName ?? "Club"} 클럽 관리 페이지입니다`} clubSlug={clubSlug}>
+    <AppShell title="클럽 로그인" subtitle={`${club?.shortName ?? "Club"} 클럽 관리 페이지입니다.`} clubSlug={clubSlug}>
       <div className="page">
-        <form action={loginAdminAction} className="section-card stack">
+        <form action={loginAdminAction} className="section-card stack action-form">
+          <FormPendingOverlay label="로그인 중..." />
           <input name="clubSlug" type="hidden" value={clubSlug} />
           <label className="field">
             <span>비밀번호</span>
@@ -27,9 +29,9 @@ export default async function ClubLoginPage({ params, searchParams }: ClubLoginP
             </div>
           </label>
           {hasError && <p className="notice-text">비밀번호를 확인해주세요.</p>}
-          <button className="primary-button" type="submit">
+          <PendingButton className="primary-button" pendingLabel="로그인 중...">
             로그인
-          </button>
+          </PendingButton>
         </form>
       </div>
     </AppShell>

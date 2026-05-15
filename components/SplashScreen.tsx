@@ -17,11 +17,11 @@ export function SplashScreen({ clubSlug = "stc" }: { clubSlug?: ClubSlug }) {
     if (window.sessionStorage.getItem(storageKey) === "yes") return;
 
     setVisible(true);
-    const leaveTimer = window.setTimeout(() => setLeaving(true), 1200);
+    const leaveTimer = window.setTimeout(() => setLeaving(true), 2600);
     const hideTimer = window.setTimeout(() => {
       window.sessionStorage.setItem(storageKey, "yes");
       setVisible(false);
-    }, 1700);
+    }, 3200);
 
     return () => {
       window.clearTimeout(leaveTimer);

@@ -6,6 +6,10 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
 import type { Tournament } from "@/lib/domain/types";
 
+function tournamentManagePath(clubSlug: ClubSlug, tournamentId: string) {
+  return `${buildClubPath(clubSlug, "tournaments/manage")}?tournamentId=${encodeURIComponent(tournamentId)}`;
+}
+
 export function HomeDashboard({ clubSlug = "stc", tournaments = [] }: { clubSlug?: ClubSlug; tournaments?: Tournament[] }) {
   const recentTournaments = [...tournaments].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 4);
 
@@ -29,14 +33,14 @@ export function HomeDashboard({ clubSlug = "stc", tournaments = [] }: { clubSlug
         <strong className="section-head">최근 대회</strong>
         <div className="list-stack">
           {recentTournaments.map((tournament) => (
-            <Link className="list-card" href={buildClubPath(clubSlug, "tournaments")} key={tournament.id}>
+            <Link className="list-card" href={tournamentManagePath(clubSlug, tournament.id)} key={tournament.id}>
               <div className="list-card-top">
                 <strong>{tournament.name}</strong>
                 <StatusBadge status={tournament.status} />
               </div>
               <div className="list-card-meta">
                 <span>{tournament.date}</span>
-                <span>대회관리에서 확인</span>
+                <span>상세 관리로 이동</span>
               </div>
             </Link>
           ))}

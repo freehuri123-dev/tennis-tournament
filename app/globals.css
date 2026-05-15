@@ -724,6 +724,9 @@ textarea:focus-visible {
   min-height: 48px;
   border-radius: 14px;
   border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #fff;
   color: var(--muted);
   font-weight: 900;
@@ -1044,9 +1047,84 @@ textarea:focus-visible {
   align-items: stretch;
 }
 
+.tournament-list-row.single-action {
+  grid-template-columns: 1fr;
+}
+
 .tournament-list-row .tournament-card {
   width: 100%;
   text-align: left;
+}
+
+.tournament-list-row form,
+.tournament-delete-button {
+  width: 100%;
+  height: 100%;
+}
+
+.action-form {
+  position: relative;
+}
+
+.pending-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.pending-button:disabled {
+  cursor: wait;
+}
+
+.pending-button-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.button-progress,
+.form-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.form-progress {
+  top: 0;
+  bottom: auto;
+  z-index: 6;
+  border-radius: 999px;
+  background: rgba(47, 125, 50, 0.12);
+}
+
+.button-progress::after,
+.form-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.86);
+  animation: progress-slide 920ms ease-in-out infinite;
+}
+
+.form-progress::after {
+  background: linear-gradient(90deg, var(--green-deep), var(--green-bright));
+}
+
+@keyframes progress-slide {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(260%);
+  }
 }
 
 .match-card {
@@ -1445,6 +1523,71 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 15px;
   line-height: 1.55;
+}
+
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 22, 13, 0.44);
+  backdrop-filter: blur(2px);
+}
+
+.global-loading-box {
+  width: min(78vw, 280px);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 18px;
+  display: grid;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-strong);
+  text-align: center;
+}
+
+.global-loading-box strong {
+  color: var(--green-deep);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.global-loading-bar {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(47, 125, 50, 0.14);
+}
+
+.global-loading-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 44%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green-deep), var(--green-bright));
+  animation: progress-slide 920ms ease-in-out infinite;
+}
+
+.invalid-access-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top center, rgba(89, 178, 79, 0.14), transparent 38%),
+    linear-gradient(180deg, #f6fbf3 0%, #edf4ea 45%, #e4ece1 100%);
+  color: var(--text);
+  font-family: Arial, "Malgun Gothic", sans-serif;
+  text-align: center;
+}
+
+.invalid-access-page strong {
+  font-size: 22px;
+  font-weight: 900;
 }
 
 @media (max-width: 768px) {

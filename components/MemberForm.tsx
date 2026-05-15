@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
+import { ConfirmActionForm, FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
 import type { Member } from "@/lib/domain/types";
@@ -14,9 +15,10 @@ export function MemberForm({ member, clubSlug = "stc" }: MemberFormProps) {
   const isEditing = Boolean(member);
 
   return (
-    <AppShell title={isEditing ? "회원수정" : "회원등록"} subtitle="회원 정보 입력" active="members" clubSlug={clubSlug}>
+    <AppShell title={isEditing ? "회원수정" : "회원등록"} subtitle="회원 정보를 입력하세요." active="members" clubSlug={clubSlug}>
       <div className="page">
-        <form action={saveMemberAction}>
+        <form action={saveMemberAction} className="action-form">
+          <FormPendingOverlay label="회원 저장 중..." />
           <input name="clubSlug" type="hidden" value={clubSlug} />
           {member ? <input name="id" type="hidden" value={member.id} /> : null}
           <input name="active" type="hidden" value={String(member?.active ?? true)} />
@@ -47,9 +49,9 @@ export function MemberForm({ member, clubSlug = "stc" }: MemberFormProps) {
             <Link className="ghost-button" href={buildClubPath(clubSlug, "members")}>
               취소
             </Link>
-            <button className="primary-button" type="submit">
+            <PendingButton className="primary-button" pendingLabel="저장 중...">
               저장
-            </button>
+            </PendingButton>
           </div>
         </form>
 
@@ -57,16 +59,16 @@ export function MemberForm({ member, clubSlug = "stc" }: MemberFormProps) {
           <section className="danger-zone">
             <div>
               <strong>회원 삭제</strong>
-              <p>회원 목록과 참가자 선택에서 보이지 않게 합니다.</p>
+              <p>회원 목록과 참가자 선택에서 보이지 않게 됩니다.</p>
             </div>
-            <form action={deleteMemberAction}>
+            <ConfirmActionForm action={deleteMemberAction} confirmMessage="회원을 삭제하시겠습니까?" pendingLabel="회원 삭제 중...">
               <input name="clubSlug" type="hidden" value={clubSlug} />
               <input name="id" type="hidden" value={member.id} />
-              <button className="danger-button compact-danger" type="submit">
+              <PendingButton className="danger-button compact-danger" pendingLabel="삭제 중...">
                 <Trash2 size={18} />
                 삭제
-              </button>
-            </form>
+              </PendingButton>
+            </ConfirmActionForm>
           </section>
         ) : null}
       </div>

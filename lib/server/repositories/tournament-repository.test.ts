@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { fromDbScheduleFormat, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore } from "./tournament-repository";
+import { deleteTournament, fromDbScheduleFormat, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -8,7 +8,7 @@ const { prisma } = vi.hoisted(() => ({
     club: { findUnique: vi.fn() },
     member: { findMany: vi.fn() },
     match: { createMany: vi.fn(), deleteMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
-    tournament: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    tournament: { delete: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     tournamentGroup: { createMany: vi.fn(), deleteMany: vi.fn() },
     tournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
     tournamentParticipant: { createMany: vi.fn(), deleteMany: vi.fn() }
@@ -253,5 +253,21 @@ describe("tournament repository mapping", () => {
       where: { id: "match-2", tournament: { clubId: "club-1" } }
     });
     expect(prisma.match.update).not.toHaveBeenCalled();
+  });
+
+  it("deletes tournaments only inside the requested club", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "tournament-1" });
+    prisma.tournament.delete.mockResolvedValue({ id: "tournament-1" });
+
+    await expect(deleteTournament("stc", "tournament-1")).resolves.toBeUndefined();
+
+    expect(prisma.tournament.findFirst).toHaveBeenCalledWith({
+      where: { id: "tournament-1", clubId: "club-1" },
+      select: { id: true }
+    });
+    expect(prisma.tournament.delete).toHaveBeenCalledWith({
+      where: { id: "tournament-1" }
+    });
   });
 });
