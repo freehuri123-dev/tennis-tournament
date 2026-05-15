@@ -1,8 +1,9 @@
 "use client";
 
-import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "@/lib/domain/sample-data";
-import { withDateStatus } from "@/lib/domain/tournament-status";
-import type { Match, Member, Tournament, TournamentGroup } from "@/lib/domain/types";
+import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "../domain/sample-data";
+import { withDateStatus } from "../domain/tournament-status";
+import type { Match, Member, Tournament, TournamentGroup } from "../domain/types";
+import type { ClubSlug } from "../domain/club";
 
 export type TournamentState = {
   version: number;
@@ -12,6 +13,7 @@ export type TournamentState = {
   currentTournamentId: string;
   tournament: Tournament;
   groups: TournamentGroup[];
+  tournamentParticipantIds: Record<string, string[]>;
   groupMemberIds: Record<string, string[]>;
   matches: Match[];
   deletedPublicSlugs: string[];
@@ -19,7 +21,15 @@ export type TournamentState = {
 
 const STORAGE_KEY = "tennis-monthly-tournament-state";
 const ADMIN_PASSWORD = "1234";
-const STORAGE_VERSION = 6;
+const STORAGE_VERSION = 7;
+
+function collectParticipantIds(groupMemberIds: Record<string, string[]>) {
+  return Array.from(new Set(Object.values(groupMemberIds).flat()));
+}
+
+export function getTournamentStorageKey(clubSlug?: ClubSlug) {
+  return clubSlug ? `${STORAGE_KEY}:${clubSlug}` : STORAGE_KEY;
+}
 
 export function createInitialState(): TournamentState {
   return {
@@ -30,6 +40,7 @@ export function createInitialState(): TournamentState {
     currentTournamentId: sampleTournament.id,
     tournament: withDateStatus(sampleTournament),
     groups: sampleGroups,
+    tournamentParticipantIds: { [sampleTournament.id]: collectParticipantIds(sampleGroupMemberIds) },
     groupMemberIds: sampleGroupMemberIds,
     matches: createSampleMatches(),
     deletedPublicSlugs: []
@@ -40,13 +51,12 @@ export function checkAdminPassword(password: string) {
   return password === ADMIN_PASSWORD;
 }
 
-export function loadTournamentState(): TournamentState {
+export function loadTournamentState(clubSlug?: ClubSlug): TournamentState {
   if (typeof window === "undefined") return createInitialState();
-  const saved = window.localStorage.getItem(STORAGE_KEY);
+  const saved = window.localStorage.getItem(getTournamentStorageKey(clubSlug));
   if (!saved) return createInitialState();
   const parsed = JSON.parse(saved) as Partial<TournamentState>;
   const initial = createInitialState();
-  if (parsed.version !== STORAGE_VERSION) return initial;
   const tournaments = (parsed.tournaments ?? [parsed.tournament ?? initial.tournament, ...initial.tournaments.filter((item) => item.id !== (parsed.tournament ?? initial.tournament).id)]).map((tournament) => withDateStatus(tournament));
   const currentTournamentId = parsed.currentTournamentId ?? (parsed.tournament ?? initial.tournament).id;
   const tournament = withDateStatus(parsed.tournament ?? tournaments.find((item) => item.id === currentTournamentId) ?? initial.tournament);
@@ -54,10 +64,14 @@ export function loadTournamentState(): TournamentState {
   return {
     ...initial,
     ...parsed,
+    version: STORAGE_VERSION,
     tournaments,
     currentTournamentId,
     tournament,
     groups: parsed.groups ?? initial.groups,
+    tournamentParticipantIds: parsed.tournamentParticipantIds ?? {
+      [currentTournamentId]: collectParticipantIds(parsed.groupMemberIds ?? initial.groupMemberIds)
+    },
     groupMemberIds: parsed.groupMemberIds ?? initial.groupMemberIds,
     matches: parsed.matches ?? initial.matches,
     members: parsed.members ?? initial.members,
@@ -65,6 +79,6 @@ export function loadTournamentState(): TournamentState {
   };
 }
 
-export function saveTournamentState(state: TournamentState) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+export function saveTournamentState(state: TournamentState, clubSlug?: ClubSlug) {
+  window.localStorage.setItem(getTournamentStorageKey(clubSlug), JSON.stringify(state));
 }
