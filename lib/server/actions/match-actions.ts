@@ -10,6 +10,7 @@ export async function updateMatchScoreAction(input: unknown, clubSlug: ClubSlug)
   await requireAdmin();
 
   const scoreInput = matchScoreInputSchema.parse(input);
-  await updateMatchScore(scoreInput);
+  await updateMatchScore(clubSlug, scoreInput);
   revalidatePath(`/${clubSlug}/tournaments/manage`);
+  revalidatePath("/admin/tournaments/manage");
 }

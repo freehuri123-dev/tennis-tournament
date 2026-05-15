@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { deleteMemberAction } from "./actions/member-actions";
+import { updateMatchScoreAction } from "./actions/match-actions";
 import { createTournamentAction, persistTournamentStateAction } from "./actions/tournament-actions";
 import type { TournamentState } from "../store/tournament-store";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
-const { redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, upsertTournament } = vi.hoisted(() => ({
+const { redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, upsertTournament } = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -12,6 +13,7 @@ const { redirect, revalidatePath, requireAdmin, replaceTournamentState, softDele
   requireAdmin: vi.fn(),
   replaceTournamentState: vi.fn(),
   softDeleteMember: vi.fn(),
+  updateMatchScore: vi.fn(),
   upsertTournament: vi.fn()
 }));
 
@@ -21,6 +23,7 @@ vi.mock("./auth/admin-session", () => ({ requireAdmin }));
 vi.mock("./repositories/tournament-repository", () => ({
   replaceTournamentState,
   softDeleteMember,
+  updateMatchScore,
   upsertMember: vi.fn(),
   upsertTournament
 }));
@@ -145,5 +148,27 @@ describe("server action validation", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");
     expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments");
     expect(revalidatePath).toHaveBeenCalledWith("/public/stc/spring-tournament");
+  });
+
+  it("passes club scope when updating match scores", async () => {
+    await expect(
+      updateMatchScoreAction(
+        {
+          matchId: "match-1",
+          sideAScore: 6,
+          sideBScore: 4
+        },
+        "otc"
+      )
+    ).resolves.toBeUndefined();
+
+    expect(requireAdmin).toHaveBeenCalled();
+    expect(updateMatchScore).toHaveBeenCalledWith("otc", {
+      matchId: "match-1",
+      sideAScore: 6,
+      sideBScore: 4
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments/manage");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");
   });
 });

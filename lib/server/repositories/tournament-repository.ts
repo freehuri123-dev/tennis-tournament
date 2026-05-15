@@ -308,8 +308,14 @@ export async function softDeleteMember(clubSlug: ClubSlug, memberId: string): Pr
   if (result.count !== 1) throw new Error(`Member not found: ${memberId}`);
 }
 
-export async function updateMatchScore(input: MatchScoreInput): Promise<Match> {
+export async function updateMatchScore(clubSlug: ClubSlug, input: MatchScoreInput): Promise<Match> {
   const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const existing = await prisma.match.findFirst({
+    where: { id: input.matchId, tournament: { clubId: club.id } }
+  });
+  if (!existing) throw new Error(`Match not found: ${input.matchId}`);
+
   const status = input.sideAScore === null || input.sideBScore === null ? "scheduled" : "completed";
   const match = await prisma.match.update({
     where: { id: input.matchId },

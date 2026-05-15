@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mars, PhoneCall, Plus, Search, Venus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
+import { requireAdmin } from "@/lib/server/auth/admin-session";
 import { listMembersByClub } from "@/lib/server/repositories/tournament-repository";
 
 type MemberManagementPageProps = {
@@ -78,6 +79,7 @@ async function MemberManagementPage({ clubSlug = "stc", query = "" }: MemberMana
 }
 
 export default async function AdminMembersPage({ searchParams }: AdminMembersPageProps) {
+  await requireAdmin();
   const params = await searchParams;
   return <MemberManagementPage clubSlug="stc" query={params?.q} />;
 }

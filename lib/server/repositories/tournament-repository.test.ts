@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { fromDbScheduleFormat, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate } from "./tournament-repository";
+import { fromDbScheduleFormat, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
     $transaction: vi.fn(),
     club: { findUnique: vi.fn() },
     member: { findMany: vi.fn() },
-    match: { createMany: vi.fn(), deleteMany: vi.fn() },
+    match: { createMany: vi.fn(), deleteMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     tournament: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     tournamentGroup: { createMany: vi.fn(), deleteMany: vi.fn() },
     tournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
@@ -197,5 +197,61 @@ describe("tournament repository mapping", () => {
     expect(prisma.tournamentGroupMember.deleteMany).not.toHaveBeenCalled();
     expect(prisma.tournamentGroup.deleteMany).not.toHaveBeenCalled();
     expect(prisma.tournamentParticipant.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("updates match scores only inside the requested club", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.match.findFirst.mockResolvedValue({
+      id: "match-1",
+      tournamentId: "tournament-1",
+      groupId: "group-1",
+      matchNumber: 1,
+      sideAPlayerIds: ["member-1", "member-2"],
+      sideBPlayerIds: ["member-3", "member-4"],
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled",
+      sortOrder: 1
+    });
+    prisma.match.update.mockResolvedValue({
+      id: "match-1",
+      tournamentId: "tournament-1",
+      groupId: "group-1",
+      matchNumber: 1,
+      sideAPlayerIds: ["member-1", "member-2"],
+      sideBPlayerIds: ["member-3", "member-4"],
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed",
+      sortOrder: 1
+    });
+
+    await expect(updateMatchScore("stc", { matchId: "match-1", sideAScore: 6, sideBScore: 4 })).resolves.toMatchObject({
+      id: "match-1",
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed"
+    });
+
+    expect(prisma.match.findFirst).toHaveBeenCalledWith({
+      where: { id: "match-1", tournament: { clubId: "club-1" } }
+    });
+    expect(prisma.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "match-1" }
+      })
+    );
+  });
+
+  it("rejects match score updates outside the requested club", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.match.findFirst.mockResolvedValue(null);
+
+    await expect(updateMatchScore("stc", { matchId: "match-2", sideAScore: 6, sideBScore: 4 })).rejects.toThrow("Match not found: match-2");
+
+    expect(prisma.match.findFirst).toHaveBeenCalledWith({
+      where: { id: "match-2", tournament: { clubId: "club-1" } }
+    });
+    expect(prisma.match.update).not.toHaveBeenCalled();
   });
 });

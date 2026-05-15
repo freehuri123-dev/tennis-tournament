@@ -3,6 +3,7 @@ import { Mars, PhoneCall, Plus, Search, Venus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { InvalidClubPage } from "@/components/InvalidClubPage";
 import { buildClubPath, isKnownClubSlug } from "@/lib/domain/club";
+import { requireAdmin } from "@/lib/server/auth/admin-session";
 import { listMembersByClub } from "@/lib/server/repositories/tournament-repository";
 
 function maskPhone(phone?: string) {
@@ -17,6 +18,7 @@ export default async function ClubMembersPage({
   params: Promise<{ clubSlug: string }>;
   searchParams?: Promise<{ q?: string }>;
 }) {
+  await requireAdmin();
   const { clubSlug } = await params;
   if (!isKnownClubSlug(clubSlug)) return <InvalidClubPage />;
 
