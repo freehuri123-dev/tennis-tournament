@@ -1184,46 +1184,54 @@ textarea:focus-visible {
   min-height: 70px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   cursor: pointer;
 }
 
 .match-number-badge {
-  min-width: 72px;
+  min-width: 58px;
   min-height: 54px;
-  padding: 8px;
+  padding: 7px 6px;
   border-radius: 14px;
   display: grid;
   place-items: center;
   background: var(--green-deep);
   color: #fff;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 950;
   text-align: center;
+}
+
+.match-summary-body {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .match-summary-teams {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 6px;
-  align-items: center;
+  gap: 4px;
 }
 
 .match-summary-teams span {
   min-width: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   line-height: 1.25;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .match-summary-teams span:first-child {
-  text-align: right;
+  text-align: left;
 }
 
-.match-summary-teams b {
+.match-summary-score {
   min-width: 46px;
   padding: 8px 6px;
   border-radius: 999px;
@@ -1234,7 +1242,7 @@ textarea:focus-visible {
   text-align: center;
 }
 
-.match-card.completed .match-summary-teams b {
+.match-card.completed .match-summary-score {
   background: #e8f0ff;
   color: #24437a;
 }

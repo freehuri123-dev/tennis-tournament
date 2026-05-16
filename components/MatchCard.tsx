@@ -11,10 +11,12 @@ export function MatchCard({ match, members }: { match: Match; members: Member[] 
     <details className={`match-card ${hasScore ? "completed" : "pending"}`} open={!hasScore}>
       <summary className="match-summary">
         <span className="match-number-badge">경기 {match.matchNumber}</span>
-        <span className="match-summary-teams">
-          <span>{sideANames.join(", ")}</span>
-          <b>{scoreText}</b>
-          <span>{sideBNames.join(", ")}</span>
+        <span className="match-summary-body">
+          <span className="match-summary-teams">
+            <span>{sideANames.join(", ")}</span>
+            <span>{sideBNames.join(", ")}</span>
+          </span>
+          <b className="match-summary-score">{scoreText}</b>
         </span>
         <span className={`status-pill ${hasScore ? "completed" : "draft"}`}>{hasScore ? "완료" : "대기"}</span>
       </summary>
