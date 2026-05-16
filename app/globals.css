@@ -1160,7 +1160,83 @@ textarea:focus-visible {
 .match-card {
   padding: 12px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
+}
+
+.match-card.completed {
+  background: #fbfcfa;
+}
+
+.match-card.pending {
+  border-color: rgba(47, 125, 50, 0.34);
+  box-shadow: 0 14px 30px rgba(47, 125, 50, 0.16);
+}
+
+.match-card summary {
+  list-style: none;
+}
+
+.match-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.match-summary {
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.match-number-badge {
+  min-width: 72px;
+  min-height: 54px;
+  padding: 8px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--green-deep);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.match-summary-teams {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.match-summary-teams span {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.match-summary-teams span:first-child {
+  text-align: right;
+}
+
+.match-summary-teams b {
+  min-width: 46px;
+  padding: 8px 6px;
+  border-radius: 999px;
+  background: #ecf7e8;
+  color: var(--green-deep);
+  font-size: 16px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.match-card.completed .match-summary-teams b {
+  background: #e8f0ff;
+  color: #24437a;
 }
 
 .match-edit-card {
@@ -1179,7 +1255,7 @@ textarea:focus-visible {
 }
 
 .match-team {
-  min-height: 104px;
+  min-height: 78px;
   padding: 10px;
   border-radius: 16px;
   display: grid;
@@ -1196,14 +1272,14 @@ textarea:focus-visible {
 }
 
 .match-player {
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 10px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   background: #fff;
   border: 1px solid var(--line);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
 }
 

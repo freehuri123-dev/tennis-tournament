@@ -3,30 +3,38 @@ import type { Match, Member } from "@/lib/domain/types";
 export function MatchCard({ match, members }: { match: Match; members: Member[] }) {
   const nameOf = (id: string) => members.find((member) => member.id === id)?.name ?? "미정";
   const hasScore = match.sideAScore !== null && match.sideBScore !== null;
+  const sideANames = match.sideAPlayerIds.map(nameOf);
+  const sideBNames = match.sideBPlayerIds.map(nameOf);
+  const scoreText = hasScore ? `${match.sideAScore}:${match.sideBScore}` : "VS";
 
   return (
-    <article className="match-card">
-      <div className="match-card-top">
-        <strong>경기 {match.matchNumber}</strong>
+    <details className={`match-card ${hasScore ? "completed" : "pending"}`} open={!hasScore}>
+      <summary className="match-summary">
+        <span className="match-number-badge">경기 {match.matchNumber}</span>
+        <span className="match-summary-teams">
+          <span>{sideANames.join(", ")}</span>
+          <b>{scoreText}</b>
+          <span>{sideBNames.join(", ")}</span>
+        </span>
         <span className={`status-pill ${hasScore ? "completed" : "draft"}`}>{hasScore ? "완료" : "대기"}</span>
-      </div>
+      </summary>
       <div className="match-team-grid">
         <div className="match-team match-team-a">
-          {match.sideAPlayerIds.map((id, index) => (
-            <span className="match-player" key={`${id || "empty"}-a-${index}`}>
-              {nameOf(id)}
+          {sideANames.map((name, index) => (
+            <span className="match-player" key={`${match.id}-a-${index}`}>
+              {name}
             </span>
           ))}
         </div>
-        <div className="match-vs">{hasScore ? `${match.sideAScore}:${match.sideBScore}` : "VS"}</div>
+        <div className="match-vs">{scoreText}</div>
         <div className="match-team match-team-b">
-          {match.sideBPlayerIds.map((id, index) => (
-            <span className="match-player" key={`${id || "empty"}-b-${index}`}>
-              {nameOf(id)}
+          {sideBNames.map((name, index) => (
+            <span className="match-player" key={`${match.id}-b-${index}`}>
+              {name}
             </span>
           ))}
         </div>
       </div>
-    </article>
+    </details>
   );
 }
