@@ -44,10 +44,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const pendingScrollMatchId = useRef<string | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
 
+  const membersById = useMemo(() => new Map(state.members.map((member) => [member.id, member])), [state.members]);
   const tournament = withDateStatus(state.tournament);
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
-  const tournamentParticipants = state.members.filter((member) => tournamentParticipantIds.includes(member.id));
+  const tournamentParticipants = tournamentParticipantIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member));
   const drawGroupId = activeDrawGroupId && state.groups.some((group) => group.id === activeDrawGroupId) ? activeDrawGroupId : state.groups[0]?.id;
   const rankingGroupId = activeRankingGroupId && state.groups.some((group) => group.id === activeRankingGroupId) ? activeRankingGroupId : state.groups[0]?.id;
 
@@ -70,11 +71,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const rankings = useMemo(() => {
     return state.groups.map((group) => {
       const groupMemberIds = state.groupMemberIds[group.id] ?? [];
-      const members = state.members.filter((member) => groupMemberIds.includes(member.id));
+      const members = groupMemberIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member));
       const matches = state.matches.filter((match) => match.groupId === group.id);
       return { group, rows: calculateRankings(members, matches) };
     });
-  }, [state]);
+  }, [membersById, state]);
 
   function normalizeState(next: TournamentState) {
     const nextTournament = withDateStatus(next.tournament);
@@ -133,11 +134,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function groupParticipants(groupId: string) {
     const ids = state.groupMemberIds[groupId] ?? [];
-    return state.members.filter((member) => ids.includes(member.id));
+    return ids.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member));
   }
 
   function memberName(id: string) {
-    return state.members.find((member) => member.id === id)?.name ?? "미정";
+    return membersById.get(id)?.name ?? "미정";
   }
 
   function teamLabel(ids: string[]) {
@@ -369,7 +370,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function availableMembersForMatch(match: Match, selected?: string) {
     const groupIds = state.groupMemberIds[match.groupId] ?? [];
     const used = new Set([...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => id !== selected));
-    return state.members.filter((member) => groupIds.includes(member.id) && !used.has(member.id));
+    return groupIds
+      .map((id) => membersById.get(id))
+      .filter((member): member is typeof state.members[number] => Boolean(member))
+      .filter((member) => !used.has(member.id));
   }
 
   function selectableMembersForGroup(groupId: string) {

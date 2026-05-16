@@ -62,6 +62,26 @@ function makeStateWithMatch(): TournamentState {
   };
 }
 
+function makeHanulStateWithCustomOrder(): TournamentState {
+  const state = makeState();
+  const members = Array.from({ length: 10 }, (_, index) => ({
+    id: `m${index + 1}`,
+    name: `Member ${index + 1}`,
+    gender: index % 2 === 0 ? "male" as const : "female" as const,
+    notes: ""
+  }));
+  const orderedIds = ["m5", "m4", "m3", "m2", "m1", "m6", "m7", "m8", "m9", "m10"];
+
+  return {
+    ...state,
+    members,
+    groups: [{ ...state.groups[0], scheduleFormat: "hanul-aa" }],
+    tournamentParticipantIds: { t1: members.map((member) => member.id) },
+    groupMemberIds: { g1: orderedIds },
+    matches: []
+  };
+}
+
 describe("TournamentManageClient save timing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -123,6 +143,21 @@ describe("TournamentManageClient save timing", () => {
       .map((button) => button.querySelector("strong")?.textContent);
 
     expect(nextNames).toEqual([initialNames[2], initialNames[1], initialNames[0], initialNames[3]]);
+  });
+
+  it("generates Hanul AA matches from the current dragged group order", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { container } = render(<TournamentManageClient initialState={makeHanulStateWithCustomOrder()} clubSlug="stc" />);
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("button.primary-button")!);
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    const savedState = vi.mocked(persistTournamentStateAction).mock.calls[0][1];
+
+    expect(savedState.matches[0].sideAPlayerIds).toEqual(["m5", "m4"]);
+    expect(savedState.matches[0].sideBPlayerIds).toEqual(["m3", "m2"]);
+    expect(savedState.matches[2].sideAPlayerIds).toEqual(["m4", "m3"]);
+    expect(savedState.matches[2].sideBPlayerIds).toEqual(["m6", "m10"]);
   });
 
   it("keeps score edits local until the result save button is pressed", async () => {

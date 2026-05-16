@@ -10,6 +10,25 @@ function makeMembers(count: number): Member[] {
   }));
 }
 
+function slotLabel(index: number) {
+  return index < 9 ? String(index + 1) : String.fromCharCode(65 + index - 9);
+}
+
+function matchTemplates(count: number) {
+  const members = makeMembers(count);
+  const idToSlot = new Map(members.map((member, index) => [member.id, slotLabel(index)]));
+  return generateInitialMatches({
+    tournamentId: "t1",
+    groupId: "g1",
+    format: "hanul-aa",
+    participants: members
+  }).map((match) => {
+    const sideA = match.sideAPlayerIds.map((id) => idToSlot.get(id)).join("");
+    const sideB = match.sideBPlayerIds.map((id) => idToSlot.get(id)).join("");
+    return `${sideA}:${sideB}`;
+  });
+}
+
 describe("generateInitialMatches", () => {
   it("KDK-V2010 이미지 표의 seed_no 대진을 사용한다", () => {
     const matches = generateInitialMatches({
@@ -67,6 +86,21 @@ describe("generateInitialMatches", () => {
     expect(getHanulSeedSlots(10)).toEqual(["1", "8", "A"]);
     expect(matches[0].sideAPlayerIds).toEqual(["m1", "m2"]);
     expect(matches[0].sideBPlayerIds).toEqual(["m3", "m4"]);
+  });
+
+  it("한울AA 대진표는 도움말 이미지의 인원별 게임 순서를 따른다", () => {
+    expect(matchTemplates(5)).toEqual(["12:34", "13:25", "14:35", "15:24", "23:45"]);
+    expect(matchTemplates(6)).toEqual(["12:34", "15:46", "23:56", "14:25", "24:36", "16:35"]);
+    expect(matchTemplates(7)).toEqual(["12:34", "56:17", "35:24", "14:67", "23:57", "16:25", "46:37"]);
+    expect(matchTemplates(8)).toEqual(["12:34", "56:78", "13:57", "24:68", "37:48", "15:26", "16:38", "25:47"]);
+    expect(matchTemplates(9)).toEqual(["12:34", "56:78", "19:57", "23:68", "49:38", "15:26", "17:89", "36:45", "24:79"]);
+    expect(matchTemplates(10)).toEqual(["12:34", "56:78", "23:6A", "19:58", "3A:45", "27:89", "4A:68", "13:79", "46:59", "17:2A"]);
+    expect(matchTemplates(11)).toEqual(["12:34", "56:78", "1B:9A", "23:68", "4A:57", "26:9B", "13:5B", "49:8A", "17:28", "5A:6B", "39:47"]);
+    expect(matchTemplates(12)).toEqual(["12:34", "56:78", "9A:BC", "37:48", "29:5A", "1B:6C", "13:57", "24:9B", "68:AC", "17:2B", "35:6A", "49:8C"]);
+    expect(matchTemplates(13)).toEqual(["12:34", "56:78", "9A:BC", "1D:25", "37:4A", "68:9B", "CD:13", "26:5A", "47:8B", "9C:2D", "15:AB", "3C:67", "48:9D"]);
+    expect(matchTemplates(14)).toEqual(["12:34", "56:78", "9A:BC", "DE:13", "24:57", "68:9B", "26:CD", "79:AE", "14:8B", "5E:6A", "3C:7B", "2D:89", "3E:45", "AC:1D"]);
+    expect(matchTemplates(15)).toEqual(["12:34", "56:78", "9A:BC", "DE:1F", "23:57", "46:AB", "8D:9E", "4F:5C", "13:6B", "27:8A", "9C:5E", "36:DF", "1B:8C", "47:EF", "2A:9D"]);
+    expect(matchTemplates(16)).toEqual(["12:34", "56:78", "9A:BC", "DE:FG", "13:57", "24:68", "9B:DF", "AC:EG", "15:9D", "37:BF", "26:AE", "48:CG", "19:2A", "5D:6E", "3B:4C", "7F:8G"]);
   });
 
   it("지원하지 않는 인원수는 안내문구를 반환한다", () => {
