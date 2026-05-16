@@ -17,26 +17,36 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
 
   const access = useMemo(() => getPublicTournamentAccess(slug, state.tournaments, state.deletedPublicSlugs), [slug, state.deletedPublicSlugs, state.tournaments]);
   const displayTournament = access.type === "live" ? access.tournament : state.tournament;
+  const membersById = useMemo(() => new Map(state.members.map((member) => [member.id, member])), [state.members]);
+  const matchesByGroupId = useMemo(() => {
+    const grouped = new Map(state.groups.map((group) => [group.id, [] as typeof state.matches]));
+    for (const match of state.matches) {
+      const matches = grouped.get(match.groupId);
+      if (matches) matches.push(match);
+    }
+    return grouped;
+  }, [state.groups, state.matches]);
+  const groupMembersByGroupId = useMemo(() => {
+    return new Map(state.groups.map((group) => {
+      const memberIds = state.groupMemberIds[group.id] ?? [];
+      const members = memberIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member));
+      return [group.id, members] as const;
+    }));
+  }, [membersById, state.groupMemberIds, state.groups]);
 
   const scheduleGroupId = activeScheduleGroupId && state.groups.some((group) => group.id === activeScheduleGroupId) ? activeScheduleGroupId : state.groups[0]?.id;
   const rankingGroupId = activeRankingGroupId && state.groups.some((group) => group.id === activeRankingGroupId) ? activeRankingGroupId : state.groups[0]?.id;
 
   const groupRankings = useMemo(() => {
     return state.groups.map((group) => {
-      const groupMemberIds = state.groupMemberIds[group.id] ?? [];
-      const members = state.members.filter((member) => groupMemberIds.includes(member.id));
-      const matches = state.matches.filter((match) => match.groupId === group.id);
+      const members = groupMembersByGroupId.get(group.id) ?? [];
+      const matches = matchesByGroupId.get(group.id) ?? [];
       return { group, rows: calculateRankings(members, matches) };
     });
-  }, [state]);
+  }, [groupMembersByGroupId, matchesByGroupId, state.groups]);
 
   const overallRanking = useMemo(() => {
-    const rows = state.groups.flatMap((group) => {
-      const groupMemberIds = state.groupMemberIds[group.id] ?? [];
-      const members = state.members.filter((member) => groupMemberIds.includes(member.id));
-      const matches = state.matches.filter((match) => match.groupId === group.id);
-      return calculateRankings(members, matches).map((row) => ({ ...row, groupName: state.groups.length === 1 ? undefined : group.name }));
-    });
+    const rows = groupRankings.flatMap(({ group, rows }) => rows.map((row) => ({ ...row, groupName: state.groups.length === 1 ? undefined : group.name })));
 
     return rows
       .sort(
@@ -49,7 +59,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
           a.name.localeCompare(b.name, "ko")
       )
       .map((row, index) => ({ ...row, rank: index + 1 }));
-  }, [state]);
+  }, [groupRankings, state.groups.length]);
 
   function displayGroupName(groupName: string) {
     return state.groups.length === 1 ? "전체" : groupName;
@@ -68,8 +78,8 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
     );
   }
 
-  const visibleScheduleGroups = state.groups.filter((group) => state.groups.length === 1 || group.id === scheduleGroupId);
-  const visibleRankingGroups = groupRankings.filter(({ group }) => state.groups.length === 1 || group.id === rankingGroupId);
+  const visibleScheduleGroups = useMemo(() => state.groups.filter((group) => state.groups.length === 1 || group.id === scheduleGroupId), [scheduleGroupId, state.groups]);
+  const visibleRankingGroups = useMemo(() => groupRankings.filter(({ group }) => state.groups.length === 1 || group.id === rankingGroupId), [groupRankings, rankingGroupId, state.groups.length]);
 
   if (access.type === "deleted") {
     return (
@@ -118,10 +128,9 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
               <div className="stack" key={group.id}>
                 <div className="today-card-top">
                   <strong>{displayGroupName(group.name)}</strong>
-                  <span className="group-chip">{state.matches.filter((match) => match.groupId === group.id).length}경기</span>
+                  <span className="group-chip">{matchesByGroupId.get(group.id)?.length ?? 0}경기</span>
                 </div>
-                {state.matches
-                  .filter((match) => match.groupId === group.id)
+                {[...(matchesByGroupId.get(group.id) ?? [])]
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((match) => (
                     <MatchCard key={match.id} match={match} members={state.members} />
