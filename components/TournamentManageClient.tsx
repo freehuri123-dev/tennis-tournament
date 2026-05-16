@@ -14,11 +14,13 @@ import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, TournamentGroup } from "@/lib/domain/types";
+import { updateMatchScoreAction } from "@/lib/server/actions/match-actions";
 import { persistTournamentStateAction, updateTournamentDateAction } from "@/lib/server/actions/tournament-actions";
 import type { TournamentState } from "@/lib/store/tournament-store";
 
 type TabId = "setup" | "draw" | "ranking";
 type HelpImage = "kdk-v2010" | "hanul-aa" | null;
+type ScoreSaveStatus = "saving" | "saved" | "error";
 
 const helpImages = {
   "kdk-v2010": { src: "/KDK-V2010.png", title: "KDK-V2010 대진방식" },
@@ -41,8 +43,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [activeRankingGroupId, setActiveRankingGroupId] = useState<string | null>(null);
   const [openPlayerEditMatchId, setOpenPlayerEditMatchId] = useState<string | null>(null);
   const [draggingMember, setDraggingMember] = useState<{ groupId: string; memberId: string } | null>(null);
+  const [scoreSaveStatusByMatchId, setScoreSaveStatusByMatchId] = useState<Record<string, ScoreSaveStatus>>({});
   const pendingScrollMatchId = useRef<string | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
+  const scoreSaveTimersRef = useRef(new Map<string, number>());
+  const scoreSaveQueuesRef = useRef(new Map<string, Promise<void>>());
 
   const membersById = useMemo(() => new Map(state.members.map((member) => [member.id, member])), [state.members]);
   const tournament = withDateStatus(state.tournament);
@@ -67,6 +72,15 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     pendingScrollMatchId.current = null;
     target?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [state.matches.length]);
+
+  useEffect(() => {
+    return () => {
+      for (const timerId of scoreSaveTimersRef.current.values()) {
+        window.clearTimeout(timerId);
+      }
+      scoreSaveTimersRef.current.clear();
+    };
+  }, []);
 
   const rankings = useMemo(() => {
     return state.groups.map((group) => {
@@ -126,6 +140,52 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         });
       saveQueueRef.current = saveTask;
     });
+  }
+
+  function setScoreSaveStatus(matchId: string, status: ScoreSaveStatus) {
+    setScoreSaveStatusByMatchId((current) => ({ ...current, [matchId]: status }));
+  }
+
+  function runScoreSave(match: Match) {
+    window.clearTimeout(scoreSaveTimersRef.current.get(match.id));
+    scoreSaveTimersRef.current.delete(match.id);
+    setScoreSaveStatus(match.id, "saving");
+
+    const previous = scoreSaveQueuesRef.current.get(match.id) ?? Promise.resolve();
+    const current = previous
+      .catch(() => undefined)
+      .then(async () => {
+        await updateMatchScoreAction(
+          {
+            matchId: match.id,
+            sideAScore: match.sideAScore,
+            sideBScore: match.sideBScore
+          },
+          clubSlug
+        );
+      });
+
+    scoreSaveQueuesRef.current.set(match.id, current);
+    current
+      .then(() => {
+        if (scoreSaveQueuesRef.current.get(match.id) === current) setScoreSaveStatus(match.id, "saved");
+      })
+      .catch(() => {
+        if (scoreSaveQueuesRef.current.get(match.id) === current) setScoreSaveStatus(match.id, "error");
+      });
+  }
+
+  function scheduleScoreSave(match: Match) {
+    window.clearTimeout(scoreSaveTimersRef.current.get(match.id));
+    const timerId = window.setTimeout(() => runScoreSave(match), 900);
+    scoreSaveTimersRef.current.set(match.id, timerId);
+  }
+
+  function flushScoreSave(matchId: string) {
+    const timerId = scoreSaveTimersRef.current.get(matchId);
+    if (!timerId) return;
+    const match = state.matches.find((item) => item.id === matchId);
+    if (match) runScoreSave(match);
   }
 
   function displayGroupName(group: TournamentGroup) {
@@ -341,10 +401,16 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function updateMatch(matchId: string, patch: Partial<Match>) {
     if (isCompleted) return;
+    let nextMatch: Match | null = null;
     updateLocal({
       ...state,
-      matches: state.matches.map((match) => (match.id === matchId ? { ...match, ...patch } : match))
+      matches: state.matches.map((match) => {
+        if (match.id !== matchId) return match;
+        nextMatch = { ...match, ...patch };
+        return nextMatch;
+      })
     });
+    if (nextMatch && ("sideAScore" in patch || "sideBScore" in patch)) scheduleScoreSave(nextMatch);
   }
 
   function deleteMatch(matchId: string) {
@@ -618,7 +684,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           <span>{teamLabel(match.sideAPlayerIds)}</span>
                           <div className="score-entry">
                             <small>점수</small>
-                            <input aria-label="위쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
+                            <input aria-label="위쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
                           </div>
                         </label>
                         <div className="score-vs-label">VS</div>
@@ -626,10 +692,17 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           <span>{teamLabel(match.sideBPlayerIds)}</span>
                           <div className="score-entry">
                             <small>점수</small>
-                            <input aria-label="아래쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
+                            <input aria-label="아래쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
                           </div>
                         </label>
                       </div>
+                      {scoreSaveStatusByMatchId[match.id] && (
+                        <p className={`notice-text score-save-status ${scoreSaveStatusByMatchId[match.id]}`}>
+                          {scoreSaveStatusByMatchId[match.id] === "saving" && "점수 저장 중..."}
+                          {scoreSaveStatusByMatchId[match.id] === "saved" && "점수 저장됨"}
+                          {scoreSaveStatusByMatchId[match.id] === "error" && "점수 저장 실패. 다시 입력하면 재시도됩니다."}
+                        </p>
+                      )}
                       <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                         <summary>선수 변경</summary>
                         <div className="score-input-grid compact">
@@ -658,11 +731,6 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   ))}
               </div>
             ))}
-            {state.matches.length > 0 && (
-              <button className="primary-button" disabled={isCompleted} onClick={() => persist(state)} type="button">
-                경기 결과 저장
-              </button>
-            )}
           </section>
         )}
 

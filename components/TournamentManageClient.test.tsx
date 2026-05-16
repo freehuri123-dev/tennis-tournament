@@ -1,8 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TournamentManageClient } from "./TournamentManageClient";
 import type { TournamentState } from "@/lib/store/tournament-store";
+import { updateMatchScoreAction } from "@/lib/server/actions/match-actions";
 import { persistTournamentStateAction, updateTournamentDateAction } from "@/lib/server/actions/tournament-actions";
+
+vi.mock("@/lib/server/actions/match-actions", () => ({
+  updateMatchScoreAction: vi.fn(() => Promise.resolve())
+}));
 
 vi.mock("@/lib/server/actions/tournament-actions", () => ({
   persistTournamentStateAction: vi.fn(() => Promise.resolve({ ok: true })),
@@ -84,6 +89,7 @@ function makeHanulStateWithCustomOrder(): TournamentState {
 
 describe("TournamentManageClient save timing", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     window.sessionStorage.clear();
   });
@@ -160,16 +166,48 @@ describe("TournamentManageClient save timing", () => {
     expect(savedState.matches[2].sideBPlayerIds).toEqual(["m6", "m10"]);
   });
 
-  it("keeps score edits local until the result save button is pressed", async () => {
+  it("auto-saves score edits after the user pauses typing", async () => {
+    vi.useFakeTimers();
     render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: "대진표" }));
     fireEvent.change(screen.getByLabelText("위쪽 팀 점수"), { target: { value: "6" } });
 
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
+    expect(updateMatchScoreAction).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "경기 결과 저장" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(899);
+    });
+    expect(updateMatchScoreAction).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(updateMatchScoreAction).toHaveBeenCalledWith(
+      { matchId: "match-1", sideAScore: 6, sideBScore: null },
+      "stc"
+    );
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
+  });
+
+  it("flushes pending score auto-save when the input loses focus", async () => {
+    vi.useFakeTimers();
+    render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const scoreInput = screen.getByLabelText("위쪽 팀 점수");
+    fireEvent.change(scoreInput, { target: { value: "6" } });
+    await act(async () => {
+      fireEvent.blur(scoreInput);
+      await Promise.resolve();
+    });
+
+    expect(updateMatchScoreAction).toHaveBeenCalledWith(
+      { matchId: "match-1", sideAScore: 6, sideBScore: null },
+      "stc"
+    );
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
   });
 });

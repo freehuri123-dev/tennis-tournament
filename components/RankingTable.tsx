@@ -1,10 +1,22 @@
 import type { RankingRow } from "@/lib/domain/types";
 
+type RankingTableRow = RankingRow & { groupName?: string };
+
 type RankingTableProps = {
-  rows: Array<RankingRow & { groupName?: string }>;
+  rows: RankingTableRow[];
 };
 
 export function RankingTable({ rows }: RankingTableProps) {
+  function hasPointDiffTie(row: RankingTableRow) {
+    return rows.some((other) =>
+      other.memberId !== row.memberId &&
+      other.groupName === row.groupName &&
+      other.rankingPoints === row.rankingPoints &&
+      other.wins === row.wins &&
+      other.pointDiff === row.pointDiff
+    );
+  }
+
   return (
     <div className="ranking-card-list">
       {rows.map((row) => (
@@ -23,6 +35,9 @@ export function RankingTable({ rows }: RankingTableProps) {
             <span><b>{row.rankingPoints}</b>승점</span>
             <span><b>{row.pointDiff > 0 ? `+${row.pointDiff}` : row.pointDiff}</b>득실차</span>
           </div>
+          {hasPointDiffTie(row) && (
+            <small className="ranking-tie-detail">득실 동률: 득점 {row.pointsFor} / 실점 {row.pointsAgainst}</small>
+          )}
         </article>
       ))}
       {rows.length === 0 && <p className="lead">아직 순위에 표시할 선수가 없습니다.</p>}
