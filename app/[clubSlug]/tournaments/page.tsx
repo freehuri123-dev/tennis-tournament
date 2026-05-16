@@ -30,12 +30,13 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
       <div className="page">
         <section className="section-card">
           <div className="tab-row two-tabs">
-            <PendingLink className={`tab-button ${tab === "current" ? "active" : ""}`} href={buildClubPath(clubSlug, "tournaments")}>
+            <PendingLink className={`tab-button ${tab === "current" ? "active" : ""}`} href={buildClubPath(clubSlug, "tournaments")} showPending={false}>
               현재 대회
             </PendingLink>
             <PendingLink
               className={`tab-button ${tab === "completed" ? "active" : ""}`}
               href={`${buildClubPath(clubSlug, "tournaments")}?tab=completed`}
+              showPending={false}
             >
               완료 대회
             </PendingLink>

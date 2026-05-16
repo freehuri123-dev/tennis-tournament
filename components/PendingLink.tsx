@@ -9,12 +9,14 @@ type PendingLinkProps = {
   href: string;
   children: ReactNode;
   className?: string;
+  showPending?: boolean;
 };
 
-export function PendingLink({ href, children, className }: PendingLinkProps) {
+export function PendingLink({ href, children, className, showPending = true }: PendingLinkProps) {
   const [pending, setPending] = useState(false);
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (!showPending) return;
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
     if (href === `${window.location.pathname}${window.location.search}`) return;
     setPending(true);

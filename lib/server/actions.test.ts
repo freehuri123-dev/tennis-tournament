@@ -95,11 +95,11 @@ describe("server action validation", () => {
 
   it("creates a default tournament for the requested club", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-15T09:30:00.000Z"));
+    vi.setSystemTime(new Date("2026-05-15T15:30:00.000Z"));
     upsertTournament.mockResolvedValue({
       id: "tournament-1",
       name: "새 월례대회",
-      date: "2026-05-15",
+      date: "2026-05-17",
       publicSlug: "tournament-generated",
       status: "draft"
     });
@@ -112,7 +112,7 @@ describe("server action validation", () => {
     expect(upsertTournament).toHaveBeenCalledWith({
       clubSlug: "otc",
       name: "새 월례대회",
-      date: "2026-05-15",
+      date: "2026-05-17",
       publicSlug: expect.stringMatching(/^tournament-[a-z0-9-]+$/)
     });
     expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments");

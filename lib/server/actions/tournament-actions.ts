@@ -20,6 +20,18 @@ function revalidateTournamentAdminPaths(clubSlug: string) {
   revalidatePath("/admin/tournaments");
 }
 
+function tomorrowDateString() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "numeric"
+  }).formatToParts(new Date());
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const tomorrow = new Date(Date.UTC(value("year"), value("month") - 1, value("day") + 1));
+  return tomorrow.toISOString().slice(0, 10);
+}
+
 export async function saveTournamentAction(formData: FormData) {
   const input = tournamentInputSchema.parse({
     id: formString(formData, "id"),
@@ -66,7 +78,7 @@ export async function createTournamentAction(formData: FormData) {
   const input = tournamentInputSchema.parse({
     clubSlug,
     name: "새 월례대회",
-    date: new Date().toISOString().slice(0, 10),
+    date: tomorrowDateString(),
     publicSlug: createTournamentSlug(idSeed)
   });
 
