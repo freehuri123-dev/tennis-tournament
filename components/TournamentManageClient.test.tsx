@@ -110,6 +110,21 @@ describe("TournamentManageClient save timing", () => {
     await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
   });
 
+  it("swaps only the dragged participant and drop target in group order", () => {
+    const { container } = render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
+    const participants = Array.from(container.querySelectorAll<HTMLButtonElement>(".sortable-participant"));
+    const initialNames = participants.map((button) => button.querySelector("strong")?.textContent);
+
+    fireEvent.dragStart(participants[0]);
+    fireEvent.dragOver(participants[2]);
+    fireEvent.drop(participants[2]);
+
+    const nextNames = Array.from(container.querySelectorAll<HTMLButtonElement>(".sortable-participant"))
+      .map((button) => button.querySelector("strong")?.textContent);
+
+    expect(nextNames).toEqual([initialNames[2], initialNames[1], initialNames[0], initialNames[3]]);
+  });
+
   it("keeps score edits local until the result save button is pressed", async () => {
     render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
 

@@ -57,7 +57,16 @@ describe("generateInitialMatches", () => {
   });
 
   it("한울AA 10명은 1, 8, A 순번을 자동 시드 슬롯으로 표시한다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "hanul-aa",
+      participants: makeMembers(10)
+    });
+
     expect(getHanulSeedSlots(10)).toEqual(["1", "8", "A"]);
+    expect(matches[0].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(matches[0].sideBPlayerIds).toEqual(["m3", "m4"]);
   });
 
   it("지원하지 않는 인원수는 안내문구를 반환한다", () => {

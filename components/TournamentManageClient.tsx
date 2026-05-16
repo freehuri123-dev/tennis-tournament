@@ -275,8 +275,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const toIndex = currentIds.indexOf(targetMemberId);
     if (fromIndex < 0 || toIndex < 0) return;
     const nextIds = [...currentIds];
-    const [moved] = nextIds.splice(fromIndex, 1);
-    nextIds.splice(toIndex, 0, moved);
+    [nextIds[fromIndex], nextIds[toIndex]] = [nextIds[toIndex], nextIds[fromIndex]];
     updateLocal({
       ...state,
       groupMemberIds: { ...state.groupMemberIds, [groupId]: nextIds },
