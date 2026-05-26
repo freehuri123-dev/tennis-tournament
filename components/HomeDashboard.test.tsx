@@ -8,7 +8,7 @@ describe("HomeDashboard", () => {
       <HomeDashboard
         clubSlug="stc"
         tournaments={[
-          { id: "t1", name: "5월 정기대회", date: "2026-05-24", publicSlug: "tournament-t1", status: "draft" }
+          { id: "t1", name: "5월 정기대회", date: "2026-05-24", publicSlug: "1234", status: "draft" }
         ]}
       />
     );

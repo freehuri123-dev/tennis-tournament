@@ -113,7 +113,7 @@ describe("server action validation", () => {
       clubSlug: "otc",
       name: "새 월례대회",
       date: "2026-05-17",
-      publicSlug: expect.stringMatching(/^tournament-[a-z0-9-]+$/)
+      publicSlug: expect.stringMatching(/^\d{4}$/)
     });
     expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments");
 

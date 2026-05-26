@@ -29,4 +29,9 @@ describe("mobile app frame styles", () => {
     expect(css).toMatch(/\.global-loading-overlay\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;[^}]*background:\s*rgba\(10,\s*22,\s*13,\s*0\.44\);/s);
     expect(css).toMatch(/\.global-loading-bar::after\s*\{[\s\S]*animation:\s*progress-slide\s+920ms\s+ease-in-out\s+infinite;/s);
   });
+
+  it("keeps public match teams and score in one row", () => {
+    expect(css).toMatch(/\.public-team-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+54px\s+minmax\(0,\s*1fr\);[^}]*align-items:\s*center;/s);
+    expect(css).toMatch(/\.public-team-grid\s+\.match-player\s*\{[^}]*white-space:\s*nowrap;[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/s);
+  });
 });

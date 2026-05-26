@@ -24,9 +24,9 @@ function makeState(): TournamentState {
       { id: "m3", name: "이민준", gender: "male", notes: "" },
       { id: "m4", name: "최지은", gender: "female", notes: "" }
     ],
-    tournaments: [{ id: "t1", name: "5월 정기대회", date: "2026-05-24", publicSlug: "tournament-t1", status: "draft" }],
+    tournaments: [{ id: "t1", name: "5월 정기대회", date: "2026-05-24", publicSlug: "1234", status: "draft" }],
     currentTournamentId: "t1",
-    tournament: { id: "t1", name: "5월 정기대회", date: "2026-05-24", publicSlug: "tournament-t1", status: "draft" },
+    tournament: { id: "t1", name: "5월 정기대회", date: "2026-05-24", publicSlug: "1234", status: "draft" },
     groups: [{ id: "g1", tournamentId: "t1", name: "A조", scheduleFormat: "random", sortOrder: 1, seedPlayerIds: [] }],
     tournamentParticipantIds: { t1: [] },
     groupMemberIds: { g1: [] },

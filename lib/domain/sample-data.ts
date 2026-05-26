@@ -19,7 +19,7 @@ export const sampleTournament: Tournament = withDateStatus({
   id: "t1",
   name: "5월 정기대회",
   date: "2026-05-24",
-  publicSlug: "tournament-t1",
+  publicSlug: "1234",
   status: "draft"
 });
 
@@ -29,7 +29,7 @@ export const sampleTournaments: Tournament[] = [
     id: "t0",
     name: "4월 정기대회",
     date: "2026-04-20",
-    publicSlug: "tournament-t0",
+    publicSlug: "1235",
     status: "completed"
   })
 ];

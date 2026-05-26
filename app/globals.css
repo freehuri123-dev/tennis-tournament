@@ -1255,6 +1255,54 @@ textarea:focus-visible {
   box-shadow: var(--shadow);
 }
 
+.public-match-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  gap: 10px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.public-match-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.public-team-grid {
+  grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.public-team-grid .match-team {
+  min-height: 70px;
+  padding: 8px;
+  border-radius: 14px;
+}
+
+.public-team-grid .match-player {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.public-match-score {
+  width: 58px;
+  height: 58px;
+  font-size: 18px;
+}
+
+.public-match-score.completed {
+  background: #24437a;
+}
+
 .match-team-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -1742,5 +1790,9 @@ textarea:focus-visible {
   .match-vs {
     width: 52px;
     height: 52px;
+  }
+
+  .public-team-grid {
+    grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
   }
 }

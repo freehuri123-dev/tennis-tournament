@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { PublicShell } from "./AppShell";
-import { MatchCard } from "./MatchCard";
+import { PublicMatchCard } from "./PublicMatchCard";
 import { RankingTable } from "./RankingTable";
 import type { ClubSlug } from "../lib/domain/club";
 import { calculateRankings } from "../lib/domain/ranking";
@@ -14,6 +14,11 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
   const [activeTab, setActiveTab] = useState<"schedule" | "group" | "overall">("schedule");
   const [activeScheduleGroupId, setActiveScheduleGroupId] = useState<string | null>(null);
   const [activeRankingGroupId, setActiveRankingGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => window.location.reload(), 5 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const access = useMemo(() => getPublicTournamentAccess(slug, state.tournaments, state.deletedPublicSlugs), [slug, state.deletedPublicSlugs, state.tournaments]);
   const displayTournament = access.type === "live" ? access.tournament : state.tournament;
@@ -133,7 +138,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
                 {[...(matchesByGroupId.get(group.id) ?? [])]
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((match) => (
-                    <MatchCard key={match.id} match={match} members={state.members} />
+                    <PublicMatchCard key={match.id} match={match} members={state.members} />
                   ))}
               </div>
             ))}

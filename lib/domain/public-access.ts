@@ -6,7 +6,8 @@ export type PublicAccessResult =
   | { type: "deleted" };
 
 export function createTournamentSlug(id: string) {
-  return `tournament-${id.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`;
+  const numericSeed = Number(id.replace(/\D/g, "").slice(-8) || Date.now());
+  return String(1000 + (numericSeed % 9000));
 }
 
 export function getPublicTournamentAccess(slug: string, tournaments: Tournament[], deletedPublicSlugs: string[] = []): PublicAccessResult {

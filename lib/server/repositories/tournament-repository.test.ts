@@ -143,6 +143,33 @@ describe("tournament repository mapping", () => {
     expect(state?.tournament.publicSlug).toBe("public-slug");
   });
 
+  it("loads old tournaments by their new short numeric public code", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findUnique.mockResolvedValue(null);
+    prisma.tournament.findMany.mockResolvedValue([
+      {
+        id: "tournament-1",
+        name: "Public Tournament",
+        date: new Date("2026-05-24T00:00:00.000Z"),
+        publicSlug: "tournament-tournament-1",
+        status: "active",
+        participants: [],
+        groups: [],
+        matches: []
+      }
+    ]);
+    prisma.member.findMany.mockResolvedValue([]);
+
+    const state = await loadPublicTournamentState("stc", "1001");
+
+    expect(prisma.tournament.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { clubId_publicSlug: { clubId: "club-1", publicSlug: "1001" } }
+      })
+    );
+    expect(state?.tournament.publicSlug).toBe("1001");
+  });
+
   it("rejects crafted nested state before deleting existing tournament rows", async () => {
     const state: TournamentState = {
       version: 8,

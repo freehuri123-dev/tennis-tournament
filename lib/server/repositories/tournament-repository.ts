@@ -1,6 +1,7 @@
 import type { ScheduleFormat } from "@prisma/client";
 import type { z } from "zod";
 import type { ClubSlug } from "../../domain/club";
+import { createTournamentSlug } from "../../domain/public-access";
 import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "../../domain/sample-data";
 import { withDateStatus } from "../../domain/tournament-status";
 import type { Match, Member, Tournament, TournamentGroup } from "../../domain/types";
@@ -97,7 +98,7 @@ function toDomainTournament(tournament: {
     id: tournament.id,
     name: tournament.name,
     date: toDomainDate(tournament.date),
-    publicSlug: tournament.publicSlug,
+    publicSlug: createTournamentSlug(tournament.id),
     status: tournament.status
   });
 }
@@ -593,19 +594,28 @@ export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: 
 
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
-  const selectedTournament = await prisma.tournament.findUnique({
+  const tournamentInclude = {
+    participants: { orderBy: [{ sortOrder: "asc" as const }, { memberId: "asc" as const }] },
+    groups: {
+      orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }],
+      include: {
+        members: { orderBy: [{ sortOrder: "asc" as const }, { memberId: "asc" as const }] }
+      }
+    },
+    matches: { orderBy: [{ sortOrder: "asc" as const }, { matchNumber: "asc" as const }, { id: "asc" as const }] }
+  };
+  let selectedTournament = await prisma.tournament.findUnique({
     where: { clubId_publicSlug: { clubId: club.id, publicSlug } },
-    include: {
-      participants: { orderBy: [{ sortOrder: "asc" }, { memberId: "asc" }] },
-      groups: {
-        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-        include: {
-          members: { orderBy: [{ sortOrder: "asc" }, { memberId: "asc" }] }
-        }
-      },
-      matches: { orderBy: [{ sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }] }
-    }
+    include: tournamentInclude
   });
+
+  if (!selectedTournament && /^\d{4}$/.test(publicSlug)) {
+    const candidates = await prisma.tournament.findMany({
+      where: { clubId: club.id },
+      include: tournamentInclude
+    });
+    selectedTournament = candidates.find((tournament) => createTournamentSlug(tournament.id) === publicSlug) ?? null;
+  }
 
   if (!selectedTournament) return null;
 
@@ -617,7 +627,7 @@ export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: 
           orderBy: [{ name: "asc" }, { id: "asc" }]
         })
       : [];
-  const tournament = toDomainTournament(selectedTournament);
+  const tournament = { ...toDomainTournament(selectedTournament), publicSlug };
   const groups = selectedTournament.groups.map(toDomainGroup);
   const tournamentParticipantIds = {
     [selectedTournament.id]: selectedTournament.participants.map((participant) => participant.memberId)
