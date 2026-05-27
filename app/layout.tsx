@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "테니스 월례대회",
-  description: "테니스 클럽 월례대회 대진표와 순위표"
+  title: "Tennis Tournament Management System",
+  description: "Tennis tournament draw and ranking management system"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

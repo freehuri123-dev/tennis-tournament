@@ -34,7 +34,7 @@ export function SplashScreen({ clubSlug = "stc" }: { clubSlug?: ClubSlug }) {
 
   return (
     <div className={`splash-screen ${leaving ? "leaving" : ""}`}>
-      <img alt="테니스 월례대회 시작 화면" src={introImages[clubSlug]} />
+      <img alt="Tennis Tournament Management System intro" src={introImages[clubSlug]} />
     </div>
   );
 }
