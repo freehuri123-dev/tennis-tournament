@@ -15,9 +15,10 @@ export default async function ClubLoginPage({ params, searchParams }: ClubLoginP
 
   const club = getClubBySlug(clubSlug);
   const hasError = query?.error === "1";
+  const organizationLabel = club?.organizationLabel ?? "클럽";
 
   return (
-    <AppShell title="클럽 로그인" subtitle={`${club?.shortName ?? "Club"} 클럽 관리 페이지입니다.`} clubSlug={clubSlug}>
+    <AppShell title={`${organizationLabel} 로그인`} subtitle={`${club?.shortName ?? "Club"} ${organizationLabel} 관리 페이지입니다.`} clubSlug={clubSlug}>
       <div className="page">
         <form action={loginAdminAction} className="section-card stack action-form">
           <FormPendingOverlay label="로그인 중..." />

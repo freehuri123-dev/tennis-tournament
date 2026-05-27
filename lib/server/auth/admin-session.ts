@@ -94,5 +94,6 @@ export async function logoutAdminAction() {
   const cookieStore = await cookies();
   cookieStore.delete(getAdminSessionCookieName("stc"));
   cookieStore.delete(getAdminSessionCookieName("otc"));
+  cookieStore.delete(getAdminSessionCookieName("joogo"));
   redirect("/stc/login");
 }

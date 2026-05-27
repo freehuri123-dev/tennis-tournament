@@ -5,7 +5,8 @@ import type { ClubSlug } from "@/lib/domain/club";
 
 const introImages: Record<ClubSlug, string> = {
   stc: "/stc_intro.png",
-  otc: "/otc_intro.png"
+  otc: "/otc_intro.png",
+  joogo: "/joogo_intro.png"
 };
 
 export function SplashScreen({ clubSlug = "stc" }: { clubSlug?: ClubSlug }) {

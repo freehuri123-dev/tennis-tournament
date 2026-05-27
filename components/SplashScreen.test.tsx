@@ -9,4 +9,8 @@ describe("SplashScreen timing", () => {
     expect(source).toContain("setTimeout(() => setLeaving(true), 2600)");
     expect(source).toContain("}, 3200)");
   });
+
+  it("uses the joogo intro image for the joogo meeting", () => {
+    expect(source).toContain('joogo: "/joogo_intro.png"');
+  });
 });

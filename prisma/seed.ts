@@ -43,6 +43,8 @@ async function main() {
       }
     });
 
+    if (seedClub.seedSampleData === false) continue;
+
     for (const member of sampleMembers) {
       await prisma.member.create({
         data: {
