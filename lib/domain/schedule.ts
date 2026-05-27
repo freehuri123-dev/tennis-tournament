@@ -13,13 +13,17 @@ type ScheduleFormat = TournamentGroup["scheduleFormat"];
 const FORMAT_LABELS: Record<ScheduleFormat, string> = {
   "kdk-v2010": "KDK-V2010",
   "hanul-aa": "한울AA방식 KDK",
-  random: "랜덤"
+  random: "랜덤 KDK 방식",
+  "fixed-pair-tournament": "복식 토너먼트",
+  "single-tournament": "단식 토너먼트"
 };
 
 const MIN_MAX: Record<ScheduleFormat, { min: number; max: number }> = {
   "kdk-v2010": { min: 5, max: 10 },
   "hanul-aa": { min: 5, max: 16 },
-  random: { min: 4, max: Number.POSITIVE_INFINITY }
+  random: { min: 4, max: Number.POSITIVE_INFINITY },
+  "fixed-pair-tournament": { min: 4, max: Number.POSITIVE_INFINITY },
+  "single-tournament": { min: 2, max: Number.POSITIVE_INFINITY }
 };
 
 const KDK_TEMPLATES: Record<number, string[]> = {
@@ -67,6 +71,13 @@ export function getScheduleRequirement(format: ScheduleFormat) {
 
 export function validateScheduleParticipants(format: ScheduleFormat, count: number) {
   const requirement = getScheduleRequirement(format);
+  if (format === "fixed-pair-tournament") {
+    if (count < requirement.min) return `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.`;
+    return count % 2 === 1 ? `${requirement.label} 방식은 2명씩 페어를 만들어야 하므로 참가자 수가 짝수여야 합니다.` : "";
+  }
+  if (format === "single-tournament") {
+    return count < requirement.min ? `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.` : "";
+  }
   if (format === "random") {
     return count < requirement.min ? `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.` : "";
   }
@@ -93,6 +104,8 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   const validationMessage = validateScheduleParticipants(input.format, participantCount);
   if (validationMessage) return [];
   if (input.format === "random") return generateRandomMatches(input);
+  if (input.format === "fixed-pair-tournament") return generateTournamentMatches(input, 2);
+  if (input.format === "single-tournament") return generateTournamentMatches(input, 1);
 
   const playerMap = createDefaultSeedMap(input.participants);
   const templates = input.format === "kdk-v2010" ? KDK_TEMPLATES[participantCount] : HANUL_TEMPLATES[participantCount];
@@ -143,6 +156,366 @@ function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
   }
 
   return matches;
+}
+
+function generateTournamentMatches(input: GenerateInitialMatchesInput, teamSize: 1 | 2): Match[] {
+  const teams = createTournamentTeams(input.participants, teamSize);
+  const matches: Match[] = [];
+  let roundTeamCount = teams.length;
+
+  for (let index = 0; index < teams.length; index += 2) {
+    matches.push(createMatch(input, matches.length + 1, teams[index] ?? [], teams[index + 1] ?? []));
+  }
+
+  roundTeamCount = Math.ceil(roundTeamCount / 2);
+  while (roundTeamCount > 1) {
+    const roundMatchCount = Math.ceil(roundTeamCount / 2);
+    for (let index = 0; index < roundMatchCount; index += 1) {
+      matches.push(createMatch(input, matches.length + 1, [], []));
+    }
+    roundTeamCount = roundMatchCount;
+  }
+
+  return applyTournamentAdvancement(matches, input.groupId);
+}
+
+function createMatch(input: GenerateInitialMatchesInput, sortOrder: number, sideAPlayerIds: string[], sideBPlayerIds: string[]): Match {
+  return {
+    id: `${input.groupId}-match-${sortOrder}`,
+    tournamentId: input.tournamentId,
+    groupId: input.groupId,
+    matchNumber: sortOrder,
+    sideAPlayerIds,
+    sideBPlayerIds,
+    sideAScore: null,
+    sideBScore: null,
+    status: "scheduled",
+    sortOrder
+  };
+}
+
+function createTournamentTeams(participants: Member[], teamSize: 1 | 2) {
+  const teams: string[][] = [];
+  for (let index = 0; index < participants.length; index += teamSize) {
+    teams.push(participants.slice(index, index + teamSize).map((member) => member.id));
+  }
+  return teams;
+}
+
+export function getFixedPairTournamentRoundCounts(totalMatches: number) {
+  for (let firstRoundCount = 1; firstRoundCount <= totalMatches; firstRoundCount += 1) {
+    const counts = createSequentialRoundCounts(firstRoundCount);
+    if (counts.reduce((total, count) => total + count, 0) === totalMatches) return counts;
+  }
+  return [];
+}
+
+function createSequentialRoundCounts(firstRoundCount: number) {
+  const counts: number[] = [];
+  let roundCount = firstRoundCount;
+  while (roundCount >= 1) {
+    counts.push(roundCount);
+    if (roundCount === 1) break;
+    roundCount = Math.ceil(roundCount / 2);
+  }
+  return counts;
+}
+
+export function getTournamentRoundLabel(roundIndex: number, roundCounts: number[]) {
+  if (roundIndex === roundCounts.length - 1) return "결승";
+  if (roundIndex === roundCounts.length - 2) return "준결승";
+  const firstRoundTeams = nextPowerOfTwo(roundCounts[0] * 2 - 1);
+  return `${Math.max(2, firstRoundTeams / 2 ** roundIndex)}강`;
+}
+
+export function getFixedPairTournamentRoundLabel(roundIndex: number, roundCount: number) {
+  return getTournamentRoundLabel(roundIndex, createSequentialRoundCounts(Math.ceil(2 ** roundCount / 2)));
+}
+
+export type TournamentByeSelectionOption = {
+  roundIndex: number;
+  byeMatchId: string;
+  playMatchId: string;
+  selectedSourceMatchId: string | null;
+  options: Array<{
+    sourceMatchId: string;
+    teamIds: string[];
+  }>;
+};
+
+export function getTournamentByeSelectionOptions(matches: Match[], groupId: string): TournamentByeSelectionOption[] {
+  const groupMatches = matches.filter((match) => match.groupId === groupId).sort((a, b) => a.sortOrder - b.sortOrder);
+  const roundCounts = getFixedPairTournamentRoundCounts(groupMatches.length);
+  const options: TournamentByeSelectionOption[] = [];
+  const updated = new Map(matches.map((match) => [match.id, { ...match }]));
+
+  for (let roundIndex = 0; roundIndex < roundCounts.length - 1; roundIndex += 1) {
+    const block = getManualByeBlock(roundCounts, roundIndex, groupMatches);
+    if (block) {
+      const choiceOptions = getByeEligibleSourceMatches(block, updated).map(({ match, winner }) => ({
+        sourceMatchId: match.id,
+        teamIds: winner
+      }));
+      const byeTarget = updated.get(block.byeMatch.id);
+      const selectedSourceMatchId = choiceOptions.find((option) => sameIds(option.teamIds, byeTarget?.sideAPlayerIds ?? []))?.sourceMatchId ?? null;
+
+      if (choiceOptions.length >= 2 && choiceOptions.every((option) => option.teamIds.length > 0)) {
+        options.push({
+          roundIndex,
+          byeMatchId: block.byeMatch.id,
+          playMatchId: block.playMatch.id,
+          selectedSourceMatchId,
+          options: choiceOptions
+        });
+      }
+    }
+  }
+
+  return options;
+}
+
+export function selectTournamentBye(matches: Match[], groupId: string, roundIndex: number, sourceMatchId: string) {
+  const groupMatches = matches.filter((match) => match.groupId === groupId).sort((a, b) => a.sortOrder - b.sortOrder);
+  const roundCounts = getFixedPairTournamentRoundCounts(groupMatches.length);
+  const updated = new Map(matches.map((match) => [match.id, { ...match }]));
+  const block = getManualByeBlock(roundCounts, roundIndex, groupMatches);
+  if (!block) return matches;
+
+  const selected = getByeEligibleSourceMatches(block, updated).find(({ match }) => match.id === sourceMatchId);
+  if (!selected || selected.winner.length === 0) return matches;
+
+  setMatchSide(updated, block.byeMatch.id, "A", selected.winner);
+
+  return applyTournamentAdvancement(matches.map((match) => updated.get(match.id) ?? match), groupId);
+}
+
+export function applyTournamentAdvancement(matches: Match[], groupId: string) {
+  const groupMatches = matches.filter((match) => match.groupId === groupId).sort((a, b) => a.sortOrder - b.sortOrder);
+  const roundCounts = getFixedPairTournamentRoundCounts(groupMatches.length);
+  if (roundCounts.length === 0) return matches;
+
+  const updated = new Map(matches.map((match) => [match.id, { ...match }]));
+  const assignedSlots = new Set<string>();
+  const selectedByeMatchIds = new Set<string>();
+  let previousStart = 0;
+
+  for (let roundIndex = 0; roundIndex < roundCounts.length - 1; roundIndex += 1) {
+    const currentCount = roundCounts[roundIndex];
+    const nextStart = previousStart + currentCount;
+    const manualByeBlock = getManualByeBlock(roundCounts, roundIndex, groupMatches);
+
+    for (let matchIndex = 0; matchIndex < currentCount; matchIndex += 1) {
+      const source = updated.get(groupMatches[previousStart + matchIndex].id);
+      if (manualByeBlock && matchIndex >= manualByeBlock.blockStart) {
+        continue;
+      }
+
+      const nextSlot = getTournamentNextSlot(roundCounts, roundIndex, matchIndex, groupMatches, updated);
+      const target = updated.get(groupMatches[nextStart + nextSlot.matchIndex].id);
+      if (!source || !target) continue;
+
+      const sourceAssignedThisRun = assignedSlots.has(`${source.id}:A`) || assignedSlots.has(`${source.id}:B`);
+      const allowByeWinner = canUseByeWinner(roundCounts, roundIndex, matchIndex) && (
+        selectedByeMatchIds.has(source.id) || !(roundCounts.length > 3 && hasOneSideOnly(source) && sourceAssignedThisRun)
+      );
+      const winner = getMatchWinnerPlayerIds(source, allowByeWinner);
+      const key = nextSlot.side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
+      assignMatchSide(updated, assignedSlots, target.id, key === "sideAPlayerIds" ? "A" : "B", winner);
+    }
+
+    if (manualByeBlock) applyManualByeBlock(manualByeBlock, roundCounts, groupMatches, updated, assignedSlots, selectedByeMatchIds);
+
+    previousStart = nextStart;
+  }
+
+  clearUnassignedFutureSlots(groupMatches, roundCounts[0] ?? 0, updated, assignedSlots);
+
+  return matches.map((match) => updated.get(match.id) ?? match);
+}
+
+export const applyFixedPairTournamentAdvancement = applyTournamentAdvancement;
+
+function nextPowerOfTwo(value: number) {
+  let size = 1;
+  while (size < value) size *= 2;
+  return size;
+}
+
+function getMatchWinnerPlayerIds(match: Match, allowBye: boolean) {
+  const hasA = match.sideAPlayerIds.length > 0;
+  const hasB = match.sideBPlayerIds.length > 0;
+  if (allowBye && hasA && !hasB) return match.sideAPlayerIds;
+  if (allowBye && !hasA && hasB) return match.sideBPlayerIds;
+  if (!hasA || !hasB || match.sideAScore === null || match.sideBScore === null || match.sideAScore === match.sideBScore) return [];
+  return match.sideAScore > match.sideBScore ? match.sideAPlayerIds : match.sideBPlayerIds;
+}
+
+function getTournamentNextSlot(
+  roundCounts: number[],
+  roundIndex: number,
+  matchIndex: number,
+  groupMatches: Match[],
+  updated: Map<string, Match>
+) {
+  void roundCounts;
+  void roundIndex;
+  void groupMatches;
+  void updated;
+
+  return { matchIndex: Math.floor(matchIndex / 2), side: matchIndex % 2 === 0 ? "A" : "B" } as const;
+}
+
+function getManualByeBlock(roundCounts: number[], roundIndex: number, groupMatches: Match[]) {
+  const currentCount = roundCounts[roundIndex];
+  if (currentCount < 3 || currentCount % 2 === 0) return null;
+  const roundStart = roundCounts.slice(0, roundIndex).reduce((total, count) => total + count, 0);
+  const nextStart = roundStart + currentCount;
+  const blockStart = currentCount - 3;
+  const byeMatchIndex = Math.floor(blockStart / 2);
+  return {
+    roundIndex,
+    blockStart,
+    sourceMatches: [groupMatches[roundStart + blockStart], groupMatches[roundStart + blockStart + 1], groupMatches[roundStart + blockStart + 2]],
+    byeMatch: groupMatches[nextStart + byeMatchIndex],
+    playMatch: groupMatches[nextStart + byeMatchIndex + 1]
+  };
+}
+
+function canUseByeWinner(roundCounts: number[], roundIndex: number, matchIndex: number) {
+  if (roundIndex === 0) return true;
+  return hasEmptyIncomingSlot(roundCounts, roundIndex, matchIndex);
+}
+
+function hasEmptyIncomingSlot(roundCounts: number[], roundIndex: number, matchIndex: number) {
+  const previousRoundIndex = roundIndex - 1;
+  if (previousRoundIndex < 0) return false;
+  const sourceCount = roundCounts[previousRoundIndex];
+  const filledSides = new Set<"A" | "B">();
+
+  for (let sourceIndex = 0; sourceIndex < sourceCount; sourceIndex += 1) {
+    const slot = getTournamentNextSlotFromCounts(roundCounts, previousRoundIndex, sourceIndex);
+    if (slot.matchIndex === matchIndex) filledSides.add(slot.side);
+  }
+
+  return filledSides.size === 1;
+}
+
+function getTournamentNextSlotFromCounts(roundCounts: number[], roundIndex: number, matchIndex: number) {
+  const currentCount = roundCounts[roundIndex];
+  const shifted = currentCount >= 3 && currentCount % 2 === 1;
+  if (shifted) {
+    const lastThreeStart = currentCount - 3;
+    if (matchIndex < lastThreeStart) {
+      return { matchIndex: Math.floor(matchIndex / 2), side: matchIndex % 2 === 0 ? "A" : "B" } as const;
+    }
+    if (matchIndex === lastThreeStart) return { matchIndex: Math.floor(lastThreeStart / 2), side: "A" } as const;
+    return { matchIndex: Math.floor(lastThreeStart / 2) + 1, side: matchIndex === lastThreeStart + 1 ? "A" : "B" } as const;
+  }
+  return { matchIndex: Math.floor(matchIndex / 2), side: matchIndex % 2 === 0 ? "A" : "B" } as const;
+}
+
+function hasOneSideOnly(match: Match) {
+  return (match.sideAPlayerIds.length > 0 && match.sideBPlayerIds.length === 0) || (match.sideAPlayerIds.length === 0 && match.sideBPlayerIds.length > 0);
+}
+
+function getByeEligibleSourceMatches(block: NonNullable<ReturnType<typeof getManualByeBlock>>, updated: Map<string, Match>) {
+  const sourceInfos = block.sourceMatches.map((match) => {
+    const source = updated.get(match.id) ?? match;
+    return {
+      match,
+      source,
+      winner: getMatchWinnerPlayerIds(source, hasOneSideOnly(source))
+    };
+  });
+  const oneSidedSources = sourceInfos.filter(({ source }) => hasOneSideOnly(source));
+  return oneSidedSources.length > 0 ? sourceInfos.filter(({ source }) => !hasOneSideOnly(source)) : sourceInfos;
+}
+
+function applyManualByeBlock(
+  block: NonNullable<ReturnType<typeof getManualByeBlock>>,
+  roundCounts: number[],
+  groupMatches: Match[],
+  updated: Map<string, Match>,
+  assignedSlots: Set<string>,
+  selectedByeMatchIds: Set<string>
+) {
+  const sourceInfos = block.sourceMatches.map((match) => {
+    const source = updated.get(match.id) ?? match;
+    return {
+      match,
+      source,
+      winner: getMatchWinnerPlayerIds(source, hasOneSideOnly(source))
+    };
+  });
+  const eligibleSources = getByeEligibleSourceMatches(block, updated);
+  const byeTarget = updated.get(block.byeMatch.id);
+  const selected = byeTarget && byeTarget.sideAPlayerIds.length > 0
+    ? eligibleSources.find(({ winner }) => winner.length > 0 && sameIds(winner, byeTarget.sideAPlayerIds))
+    : undefined;
+
+  assignMatchSide(updated, assignedSlots, block.byeMatch.id, "B", []);
+
+  if (!selected) {
+    assignMatchSide(updated, assignedSlots, block.byeMatch.id, "A", []);
+    const oneSided = sourceInfos.find(({ source }) => hasOneSideOnly(source));
+    const selectedManualBye = oneSided && isSelectedManualByeSource(block, oneSided.match, roundCounts, groupMatches);
+    if (selectedManualBye) {
+      assignMatchSide(updated, assignedSlots, block.byeMatch.id, "A", oneSided.winner);
+      assignMatchSide(updated, assignedSlots, block.playMatch.id, "A", []);
+      assignMatchSide(updated, assignedSlots, block.playMatch.id, "B", []);
+      return;
+    }
+    assignMatchSide(updated, assignedSlots, block.playMatch.id, "A", []);
+    assignMatchSide(updated, assignedSlots, block.playMatch.id, "B", block.roundIndex === 0 ? oneSided?.winner ?? [] : []);
+    return;
+  }
+
+  const remaining = sourceInfos.filter(({ match }) => match.id !== selected.match.id);
+  selectedByeMatchIds.add(block.byeMatch.id);
+  assignMatchSide(updated, assignedSlots, block.byeMatch.id, "A", selected.winner);
+  assignMatchSide(updated, assignedSlots, block.playMatch.id, "A", remaining[0]?.winner ?? []);
+  assignMatchSide(updated, assignedSlots, block.playMatch.id, "B", remaining[1]?.winner ?? []);
+}
+
+function isSelectedManualByeSource(
+  block: NonNullable<ReturnType<typeof getManualByeBlock>>,
+  sourceMatch: Match,
+  roundCounts: number[],
+  groupMatches: Match[]
+) {
+  if (block.roundIndex === 0) return false;
+  const previousBlock = getManualByeBlock(roundCounts, block.roundIndex - 1, groupMatches);
+  return previousBlock?.byeMatch.id === sourceMatch.id;
+}
+
+function setMatchSide(updated: Map<string, Match>, matchId: string, side: "A" | "B", playerIds: string[]) {
+  const target = updated.get(matchId);
+  if (!target) return;
+  const key = side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
+  if (sameIds(target[key], playerIds)) return;
+  updated.set(matchId, {
+    ...target,
+    [key]: playerIds,
+    sideAScore: null,
+    sideBScore: null,
+    status: "scheduled"
+  });
+}
+
+function assignMatchSide(updated: Map<string, Match>, assignedSlots: Set<string>, matchId: string, side: "A" | "B", playerIds: string[]) {
+  assignedSlots.add(`${matchId}:${side}`);
+  setMatchSide(updated, matchId, side, playerIds);
+}
+
+function clearUnassignedFutureSlots(groupMatches: Match[], firstRoundCount: number, updated: Map<string, Match>, assignedSlots: Set<string>) {
+  for (const match of groupMatches.slice(firstRoundCount)) {
+    if (!assignedSlots.has(`${match.id}:A`)) setMatchSide(updated, match.id, "A", []);
+    if (!assignedSlots.has(`${match.id}:B`)) setMatchSide(updated, match.id, "B", []);
+  }
+}
+
+function sameIds(left: string[], right: string[]) {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
 }
 
 function shuffle<T>(items: T[]) {

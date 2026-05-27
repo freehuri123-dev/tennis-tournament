@@ -21,6 +21,8 @@ enum ScheduleFormat {
   hanul_aa
   kdk_v2010
   random
+  fixed_pair_tournament
+  single_tournament
 }
 
 enum MatchStatus {

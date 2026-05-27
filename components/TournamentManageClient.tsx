@@ -8,7 +8,7 @@ import { RankingTable } from "@/components/RankingTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { ClubSlug } from "@/lib/domain/club";
 import { calculateRankings } from "@/lib/domain/ranking";
-import { generateInitialMatches, getHanulSeedSlots, getScheduleFormatLabel, validateScheduleParticipants } from "@/lib/domain/schedule";
+import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
 import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
@@ -221,8 +221,92 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     return ids.map(memberName).join(", ") || "선수 미정";
   }
 
+  function tournamentTeamLabel(ids: string[], fallback = "승자 대기") {
+    return ids.length > 0 ? ids.map(memberName).join(", ") : fallback;
+  }
+
+  function isTournamentFormat(group: TournamentGroup) {
+    return group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament";
+  }
+
+  function tournamentTeamSize(group: TournamentGroup) {
+    return group.scheduleFormat === "single-tournament" ? 1 : 2;
+  }
+
+  function tournamentRoundSections(group: TournamentGroup) {
+    const matches = [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const counts = getFixedPairTournamentRoundCounts(matches.length);
+    let start = 0;
+    return counts.map((count, roundIndex) => {
+      const roundMatches = matches.slice(start, start + count);
+      start += count;
+      return {
+        label: getTournamentRoundLabel(roundIndex, counts),
+        matches: roundMatches
+      };
+    });
+  }
+
+  function tournamentMatchRoundLabel(group: TournamentGroup, match: Match) {
+    const matches = [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const counts = getFixedPairTournamentRoundCounts(matches.length);
+    let start = 0;
+    for (let roundIndex = 0; roundIndex < counts.length; roundIndex += 1) {
+      const end = start + counts[roundIndex];
+      if (matches.slice(start, end).some((item) => item.id === match.id)) return getTournamentRoundLabel(roundIndex, counts);
+      start = end;
+    }
+    return "";
+  }
+
+  function tournamentByeSelections(group: TournamentGroup) {
+    return getTournamentByeSelectionOptions(state.matches, group.id);
+  }
+
+  function tournamentSideFallback(group: TournamentGroup, match: Match, side: "A" | "B") {
+    const firstRoundCount = getFixedPairTournamentRoundCounts(matchesByGroupId.get(group.id)?.length ?? 0)[0] ?? 0;
+    const sideIds = side === "A" ? match.sideAPlayerIds : match.sideBPlayerIds;
+    const otherIds = side === "A" ? match.sideBPlayerIds : match.sideAPlayerIds;
+    const selectedByeMatch = tournamentByeSelections(group).some((selection) => selection.byeMatchId === match.id && selection.selectedSourceMatchId);
+    if (selectedByeMatch && sideIds.length === 0 && otherIds.length > 0) return "BYE";
+    return match.sortOrder <= firstRoundCount && sideIds.length === 0 && otherIds.length > 0 ? "BYE" : "승자 대기";
+  }
+
+  function isInitialAutoByeTeam(group: TournamentGroup, memberIndex: number, memberCount: number) {
+    if (!isTournamentFormat(group)) return false;
+    const teamSize = tournamentTeamSize(group);
+    if (memberCount % teamSize !== 0) return false;
+    const teamCount = memberCount / teamSize;
+    if (teamCount < 3 || teamCount % 2 === 0) return false;
+    return Math.floor(memberIndex / teamSize) === teamCount - 1;
+  }
+
+  function tournamentSeedNote(group: TournamentGroup, memberIndex: number, memberCount: number) {
+    const base = group.scheduleFormat === "single-tournament"
+      ? `${memberIndex + 1}시드`
+      : group.scheduleFormat === "fixed-pair-tournament"
+        ? `${Math.floor(memberIndex / 2) + 1}페어`
+        : getHanulSeedSlots(memberCount).includes(orderSlotLabel(memberIndex))
+          ? "자동 시드"
+          : "참여";
+    return isInitialAutoByeTeam(group, memberIndex, memberCount) ? `${base} · 자동 부전승` : base;
+  }
+
+  function canEnterMatchScore(match: Match) {
+    return match.sideAPlayerIds.length > 0 && match.sideBPlayerIds.length > 0;
+  }
+
+  function shuffle<T>(items: T[]) {
+    const next = [...items];
+    for (let index = next.length - 1; index > 0; index -= 1) {
+      const target = Math.floor(Math.random() * (index + 1));
+      [next[index], next[target]] = [next[target], next[index]];
+    }
+    return next;
+  }
+
   function openHelpImage(format: TournamentGroup["scheduleFormat"]) {
-    if (format === "random") return;
+    if (format === "random" || format === "fixed-pair-tournament" || format === "single-tournament") return;
     setHelpImage(format);
   }
 
@@ -252,9 +336,14 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function selectTournamentParticipantsByGender(gender: "male" | "female") {
-    const participantIds = state.members
+    const genderParticipantIds = state.members
       .filter((member) => member.gender === gender && (!member.deleted || tournamentParticipantIds.includes(member.id)))
       .map((member) => member.id);
+    const genderParticipantIdSet = new Set(genderParticipantIds);
+    const allGenderSelected = genderParticipantIds.length > 0 && genderParticipantIds.every((id) => tournamentParticipantIds.includes(id));
+    const participantIds = allGenderSelected
+      ? tournamentParticipantIds.filter((id) => !genderParticipantIdSet.has(id))
+      : Array.from(new Set([...tournamentParticipantIds, ...genderParticipantIds]));
 
     applyTournamentParticipantSelection(participantIds);
   }
@@ -299,6 +388,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function addGroup() {
     if (isCompleted) return;
+    if (state.groups.some(isTournamentFormat)) {
+      window.alert("토너먼트 방식은 한 그룹으로만 진행할 수 있습니다.");
+      return;
+    }
     if (!canAddTournamentGroup(tournamentParticipantIds)) {
       window.alert("참가자를 먼저 선택해주세요.");
       setParticipantPanelOpen(true);
@@ -338,9 +431,30 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function updateGroupFormat(groupId: string, scheduleFormat: TournamentGroup["scheduleFormat"]) {
     if (isCompleted) return;
+    const targetGroup = state.groups.find((group) => group.id === groupId);
+    const tournamentMode = scheduleFormat === "fixed-pair-tournament" || scheduleFormat === "single-tournament";
+    const nextGroups = tournamentMode && targetGroup
+      ? [{ ...targetGroup, scheduleFormat, seedPlayerIds: [], name: "전체", sortOrder: 1 }]
+      : state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat, seedPlayerIds: [] } : group));
+    const nextGroupIds = new Set(nextGroups.map((group) => group.id));
+    const nextGroupMemberIds = Object.fromEntries(
+      Object.entries(state.groupMemberIds).filter(([targetId]) => nextGroupIds.has(targetId))
+    );
     updateLocal({
       ...state,
-      groups: state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat, seedPlayerIds: [] } : group))
+      groups: nextGroups,
+      groupMemberIds: nextGroupMemberIds,
+      matches: state.matches.filter((match) => nextGroupIds.has(match.groupId))
+    });
+  }
+
+  function randomizeTournamentSeeds(groupId: string) {
+    if (isCompleted) return;
+    const shuffledIds = shuffle(selectableMembersForGroup(groupId).map((member) => member.id));
+    updateLocal({
+      ...state,
+      groupMemberIds: { ...state.groupMemberIds, [groupId]: shuffledIds },
+      groups: state.groups.map((group) => (group.id === groupId ? { ...group, seedPlayerIds: [] } : group))
     });
   }
 
@@ -432,15 +546,42 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function updateMatch(matchId: string, patch: Partial<Match>) {
     if (isCompleted) return;
     let nextMatch: Match | null = null;
-    updateLocal({
+    const nextState = {
       ...state,
       matches: state.matches.map((match) => {
         if (match.id !== matchId) return match;
         nextMatch = { ...match, ...patch };
         return nextMatch;
       })
+    };
+    const updatedMatch = nextMatch as Match | null;
+    const matchGroup = updatedMatch ? state.groups.find((group) => group.id === updatedMatch.groupId) : undefined;
+    const shouldAdvanceFixedTournament = Boolean(
+      updatedMatch &&
+      matchGroup &&
+      isTournamentFormat(matchGroup) &&
+      ("sideAScore" in patch || "sideBScore" in patch) &&
+      updatedMatch.sideAScore !== null &&
+      updatedMatch.sideBScore !== null
+    );
+    const advancedState = shouldAdvanceFixedTournament
+      ? { ...nextState, matches: applyTournamentAdvancement(nextState.matches, updatedMatch!.groupId) }
+      : nextState;
+
+    if (shouldAdvanceFixedTournament) {
+      persist(advancedState);
+    } else {
+      updateLocal(advancedState);
+    }
+    if (updatedMatch && ("sideAScore" in patch || "sideBScore" in patch)) scheduleScoreSave(updatedMatch);
+  }
+
+  function chooseTournamentBye(groupId: string, roundIndex: number, sourceMatchId: string) {
+    if (isCompleted || !sourceMatchId) return;
+    persist({
+      ...state,
+      matches: selectTournamentBye(state.matches, groupId, roundIndex, sourceMatchId)
     });
-    if (nextMatch && ("sideAScore" in patch || "sideBScore" in patch)) scheduleScoreSave(nextMatch);
   }
 
   function deleteMatch(matchId: string) {
@@ -555,16 +696,16 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   <strong className="section-head">대회 참가자</strong>
                   <small>선택됨 {tournamentParticipants.length}명</small>
                 </span>
-                <b>{participantPanelOpen ? "닫기" : "참가자 수정"}</b>
+                <b>{participantPanelOpen ? "닫기" : "참가자등록"}</b>
               </button>
               {participantPanelOpen && (
                 <div className="stack soft-enter">
-                  <div className="participant-bulk-actions" aria-label="성별 참가자 전체선택">
+                  <div className="participant-bulk-actions" aria-label="성별 참가자 선택">
                     <button disabled={isCompleted} onClick={() => selectTournamentParticipantsByGender("male")} type="button">
-                      남자만 전체선택
+                      남자만 선택
                     </button>
                     <button disabled={isCompleted} onClick={() => selectTournamentParticipantsByGender("female")} type="button">
-                      여자만 전체선택
+                      여자만 선택
                     </button>
                   </div>
                   <div className="participant-list">
@@ -594,7 +735,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
             <section className="section-card stack">
               <div className="today-card-top">
                 <strong className="section-head" style={{ marginBottom: 0 }}>그룹 편성</strong>
-                <button className="ghost-button" disabled={isCompleted} onClick={addGroup} type="button">
+                <button className="ghost-button" disabled={isCompleted || state.groups.some(isTournamentFormat)} onClick={addGroup} type="button">
                   <Plus size={18} />
                   그룹 추가
                 </button>
@@ -622,13 +763,15 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     </div>
                     <div className="format-field">
                       <span>대진방식 선택</span>
-                      <div className={`format-row ${group.scheduleFormat === "random" ? "single" : ""}`}>
+                      <div className={`format-row ${group.scheduleFormat === "random" || isTournamentFormat(group) ? "single" : ""}`}>
                       <select className="select-input" disabled={isCompleted} onChange={(event) => updateGroupFormat(group.id, event.target.value as TournamentGroup["scheduleFormat"])} value={group.scheduleFormat}>
                         <option value="kdk-v2010">KDK-V2010 방식</option>
                         <option value="hanul-aa">한울AA KDK 방식</option>
-                        <option value="random">랜덤 방식</option>
+                        <option value="random">랜덤 KDK 방식</option>
+                        <option value="fixed-pair-tournament">복식 토너먼트</option>
+                        <option value="single-tournament">단식 토너먼트</option>
                       </select>
-                      {group.scheduleFormat !== "random" && (
+                      {group.scheduleFormat !== "random" && !isTournamentFormat(group) && (
                         <button className="icon-help-button" aria-label="대진방식 보기" onClick={() => openHelpImage(group.scheduleFormat)} type="button">
                           <HelpCircle size={20} />
                         </button>
@@ -642,6 +785,18 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     </div>
                     {group.scheduleFormat === "hanul-aa" && seedSlots.size > 0 && (
                       <p className="notice-text">한울AA 시드 자리: {[...seedSlots].join(", ")}번. 해당 순번 위치가 자동 시드자로 적용됩니다.</p>
+                    )}
+                    {isTournamentFormat(group) && (
+                      <div className="fixed-pair-tools">
+                        <button className="ghost-button" disabled={isCompleted || tournamentParticipantIds.length < (group.scheduleFormat === "single-tournament" ? 2 : 4)} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
+                          {group.scheduleFormat === "single-tournament" ? "랜덤 시드 생성" : "랜덤 페어 생성"}
+                        </button>
+                        <p className="notice-text">
+                          {group.scheduleFormat === "single-tournament"
+                            ? "아래 순번을 토너먼트 시드로 사용합니다. 드래그로 순서를 바꿔 시드를 수정하세요."
+                            : "아래 순번을 2명씩 묶어 한 페어로 사용합니다. 드래그로 순서를 바꾸거나 회원을 추가/제외해서 페어를 수정하세요."}
+                        </p>
+                      </div>
                     )}
                     <div className="participant-list">
                       {selectedMembers.map((member, index) => {
@@ -666,7 +821,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           >
                             <span className="order-badge">{slot}</span>
                             <strong>{member.name}</strong>
-                            <small>{isSeedSlot ? "자동 시드" : "참여"}</small>
+                            <small>{tournamentSeedNote(group, index, selectedMembers.length)}</small>
                           </button>
                         );
                       })}
@@ -681,10 +836,28 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         );
                       })}
                     </div>
-                    <button className="danger-button" disabled={isCompleted} onClick={() => deleteGroup(group.id)} type="button">
+                    {isTournamentFormat(group) && selectedMembers.length > 0 && (
+                      <div className="fixed-pair-preview">
+                        {Array.from({ length: Math.ceil(selectedMembers.length / tournamentTeamSize(group)) }, (_, index) => {
+                          const pair = selectedMembers.slice(index * tournamentTeamSize(group), index * tournamentTeamSize(group) + tournamentTeamSize(group));
+                          const isAutoBye = pair.length === tournamentTeamSize(group) && isInitialAutoByeTeam(group, index * tournamentTeamSize(group), selectedMembers.length);
+                          return (
+                            <div className={`fixed-pair-card ${pair.length < tournamentTeamSize(group) ? "incomplete" : ""} ${isAutoBye ? "auto-bye" : ""}`} key={`pair-${index}`}>
+                              <span>
+                                {group.scheduleFormat === "single-tournament" ? `${index + 1}시드` : `${index + 1}페어`}
+                                {isAutoBye && <em className="auto-bye-badge">자동 부전승</em>}
+                              </span>
+                              <strong>{pair.map((member) => member.name).join(" · ") || "선수 미정"}</strong>
+                              {pair.length < tournamentTeamSize(group) && <small>한 명 더 필요</small>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!isTournamentFormat(group) && <button className="danger-button" disabled={isCompleted} onClick={() => deleteGroup(group.id)} type="button">
                       <Trash2 size={18} />
                       그룹 삭제
-                    </button>
+                    </button>}
                   </div>
                 );
               })}
@@ -707,29 +880,60 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
               <div className="stack" key={group.id}>
                 <div className="today-card-top">
                   <strong>{displayGroupName(group)}</strong>
-                  <button className="ghost-button" disabled={isCompleted} onClick={() => addMatch(group.id)} type="button">
+                  {!isTournamentFormat(group) && <button className="ghost-button" disabled={isCompleted} onClick={() => addMatch(group.id)} type="button">
                     <Plus size={18} />
                     경기 추가
-                  </button>
+                  </button>}
                 </div>
                 {[...(matchesByGroupId.get(group.id) ?? [])]
                   .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((match) => (
-                    <div className="match-edit-card stack" id={`match-${match.id}`} key={match.id}>
+                  .map((match) => {
+                    const byeSelection = isTournamentFormat(group) ? tournamentByeSelections(group).find((selection) => selection.byeMatchId === match.id) : undefined;
+                    return (
+                    <div className="stack" key={match.id}>
+                      {byeSelection && (
+                        <div className="bye-selection-box">
+                          <div>
+                            <strong>부전승 선택</strong>
+                            <small>{getTournamentRoundLabel(byeSelection.roundIndex + 1, getFixedPairTournamentRoundCounts((matchesByGroupId.get(group.id) ?? []).length))} 진출팀</small>
+                          </div>
+                          <select
+                            className="select-input"
+                            disabled={isCompleted}
+                            onChange={(event) => chooseTournamentBye(group.id, byeSelection.roundIndex, event.target.value)}
+                            value={byeSelection.selectedSourceMatchId ?? ""}
+                          >
+                            <option value="">부전승 팀 선택</option>
+                            {byeSelection.options.map((option) => (
+                              <option key={option.sourceMatchId} value={option.sourceMatchId}>
+                                {tournamentTeamLabel(option.teamIds)} 부전승
+                              </option>
+                            ))}
+                          </select>
+                          <p className="notice-text">이 라운드에서 BYE로 올라갈 팀을 선택합니다. 직전 BYE 팀은 후보에서 제외됩니다.</p>
+                        </div>
+                      )}
+                    <div className="match-edit-card stack" id={`match-${match.id}`}>
+                      {isTournamentFormat(group) && (
+                        <div className="tournament-round-head">
+                          <span>{tournamentMatchRoundLabel(group, match)}</span>
+                          <strong>경기 {match.sortOrder}</strong>
+                        </div>
+                      )}
                       <div className="score-panel vertical">
                         <label>
-                          <span>{teamLabel(match.sideAPlayerIds)}</span>
+                          <span>{isTournamentFormat(group) ? tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A")) : teamLabel(match.sideAPlayerIds)}</span>
                           <div className="score-entry">
                             <small>점수</small>
-                            <input aria-label="위쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
+                            <input aria-label="위쪽 팀 점수" className="score-input" disabled={isCompleted || (isTournamentFormat(group) && !canEnterMatchScore(match))} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
                           </div>
                         </label>
                         <div className="score-vs-label">VS</div>
                         <label>
-                          <span>{teamLabel(match.sideBPlayerIds)}</span>
+                          <span>{isTournamentFormat(group) ? tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B")) : teamLabel(match.sideBPlayerIds)}</span>
                           <div className="score-entry">
                             <small>점수</small>
-                            <input aria-label="아래쪽 팀 점수" className="score-input" disabled={isCompleted} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
+                            <input aria-label="아래쪽 팀 점수" className="score-input" disabled={isCompleted || (isTournamentFormat(group) && !canEnterMatchScore(match))} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
                           </div>
                         </label>
                       </div>
@@ -740,7 +944,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           {scoreSaveStatusByMatchId[match.id] === "error" && "점수 저장 실패. 다시 입력하면 재시도됩니다."}
                         </p>
                       )}
-                      <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
+                      {!isTournamentFormat(group) && <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                         <summary>선수 변경</summary>
                         <div className="score-input-grid compact">
                           {(["A", "A", "B", "B"] as const).map((side, index) => {
@@ -759,13 +963,15 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                             );
                           })}
                         </div>
-                      </details>
-                      <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
+                      </details>}
+                      {!isTournamentFormat(group) && <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
                         <Trash2 size={18} />
                         경기 삭제
-                      </button>
+                      </button>}
                     </div>
-                  ))}
+                    </div>
+                  );
+                  })}
               </div>
             ))}
           </section>
@@ -773,12 +979,29 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
         {activeTab === "ranking" && (
           <section className="section-card stack tab-panel" key="ranking">
-            <strong className="section-head">순위</strong>
+            <strong className="section-head">{visibleRankingGroups.some(({ group }) => isTournamentFormat(group)) ? "토너먼트 결과" : "순위"}</strong>
             {renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
             {visibleRankingGroups.map(({ group, rows }) => (
               <div className="stack" key={group.id}>
                 <strong>{displayGroupName(group)}</strong>
-                <RankingTable rows={rows} />
+                {isTournamentFormat(group) ? (
+                  <div className="tournament-result-board">
+                    {tournamentRoundSections(group).map((round) => (
+                      <div className="tournament-result-round" key={round.label}>
+                        <strong>{round.label}</strong>
+                        {round.matches.map((match) => (
+                          <div className="tournament-result-match" key={match.id}>
+                            <span>{tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A"))}</span>
+                            <b>{match.sideAScore ?? "-"} : {match.sideBScore ?? "-"}</b>
+                            <span>{tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B"))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <RankingTable rows={rows} />
+                )}
               </div>
             ))}
           </section>

@@ -21,7 +21,7 @@ export type TournamentGroup = {
   id: string;
   tournamentId: string;
   name: string;
-  scheduleFormat: "hanul-aa" | "kdk-v2010" | "random";
+  scheduleFormat: "hanul-aa" | "kdk-v2010" | "random" | "fixed-pair-tournament" | "single-tournament";
   sortOrder: number;
   seedPlayerIds?: string[];
 };

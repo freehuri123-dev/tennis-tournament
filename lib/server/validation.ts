@@ -34,7 +34,7 @@ export const tournamentInputSchema = z.object({
   publicSlug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/)
 });
 
-export const scheduleFormatSchema = z.enum(["hanul-aa", "kdk-v2010", "random"]);
+export const scheduleFormatSchema = z.enum(["hanul-aa", "kdk-v2010", "random", "fixed-pair-tournament", "single-tournament"]);
 
 export const matchScoreInputSchema = z.object({
   matchId: z.string().trim().min(1),

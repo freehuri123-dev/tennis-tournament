@@ -4,6 +4,7 @@ import { TournamentManageClient } from "./TournamentManageClient";
 import type { TournamentState } from "@/lib/store/tournament-store";
 import { updateMatchScoreAction } from "@/lib/server/actions/match-actions";
 import { persistTournamentStateAction, updateTournamentDateAction } from "@/lib/server/actions/tournament-actions";
+import { applyTournamentAdvancement, generateInitialMatches } from "@/lib/domain/schedule";
 
 vi.mock("@/lib/server/actions/match-actions", () => ({
   updateMatchScoreAction: vi.fn(() => Promise.resolve())
@@ -87,6 +88,82 @@ function makeHanulStateWithCustomOrder(): TournamentState {
   };
 }
 
+function makeFixedPairTournamentState(): TournamentState {
+  const state = makeState();
+  return {
+    ...state,
+    groups: [{ ...state.groups[0], scheduleFormat: "fixed-pair-tournament" }],
+    tournamentParticipantIds: { t1: state.members.map((member) => member.id) },
+    groupMemberIds: { g1: state.members.map((member) => member.id) },
+    matches: [
+      {
+        id: "g1-match-1",
+        tournamentId: "t1",
+        groupId: "g1",
+        matchNumber: 1,
+        sideAPlayerIds: ["m1", "m2"],
+        sideBPlayerIds: ["m3", "m4"],
+        sideAScore: null,
+        sideBScore: null,
+        status: "scheduled",
+        sortOrder: 1
+      }
+    ]
+  };
+}
+
+function makeTournamentByeState(): TournamentState {
+  const state = makeFixedPairTournamentState();
+  return {
+    ...state,
+    matches: [
+      {
+        id: "g1-match-bye",
+        tournamentId: "t1",
+        groupId: "g1",
+        matchNumber: 1,
+        sideAPlayerIds: ["m1", "m2"],
+        sideBPlayerIds: [],
+        sideAScore: null,
+        sideBScore: null,
+        status: "scheduled",
+        sortOrder: 1
+      }
+    ]
+  };
+}
+
+function makeNinePairTournamentState(): TournamentState {
+  const state = makeState();
+  const members = Array.from({ length: 18 }, (_, index) => ({
+    id: `m${index + 1}`,
+    name: `Member ${index + 1}`,
+    gender: index % 2 === 0 ? "male" as const : "female" as const,
+    notes: ""
+  }));
+  const baseState = {
+    ...state,
+    members,
+    groups: [{ ...state.groups[0], scheduleFormat: "fixed-pair-tournament" as const }],
+    tournamentParticipantIds: { t1: members.map((member) => member.id) },
+    groupMemberIds: { g1: members.map((member) => member.id) },
+    matches: generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: members
+    })
+  };
+
+  return {
+    ...baseState,
+    matches: applyTournamentAdvancement(baseState.matches.map((match) => {
+      if (match.sortOrder >= 1 && match.sortOrder <= 4) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1")
+  };
+}
+
 describe("TournamentManageClient save timing", () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -97,7 +174,7 @@ describe("TournamentManageClient save timing", () => {
   it("keeps participant clicks local until schedules are generated", () => {
     render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /참가자 수정/ }));
+    fireEvent.click(screen.getByRole("button", { name: /참가자등록/ }));
     fireEvent.click(screen.getByRole("button", { name: /김철수/ }));
 
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
@@ -110,8 +187,8 @@ describe("TournamentManageClient save timing", () => {
   it("selects only members of the chosen gender without saving immediately", () => {
     const { container } = render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /참가자 수정/ }));
-    fireEvent.click(screen.getByRole("button", { name: "남자만 전체선택" }));
+    fireEvent.click(screen.getByRole("button", { name: /참가자등록/ }));
+    fireEvent.click(screen.getByRole("button", { name: "남자만 선택" }));
     fireEvent.click(screen.getByRole("button", { name: "참가자 선택완료" }));
 
     const summary = container.querySelector(".selected-summary");
@@ -119,6 +196,20 @@ describe("TournamentManageClient save timing", () => {
     expect(summary?.textContent).toContain("이민준");
     expect(summary?.textContent).not.toContain("박영희");
     expect(summary?.textContent).not.toContain("최지은");
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
+  });
+
+  it("toggles gender bulk selection off when pressed again", () => {
+    const { container } = render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /참가자등록/ }));
+    fireEvent.click(screen.getByRole("button", { name: "남자만 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "남자만 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "참가자 선택완료" }));
+
+    const summary = container.querySelector(".selected-summary");
+    expect(summary?.textContent).not.toContain("김철수");
+    expect(summary?.textContent).not.toContain("이민준");
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
   });
 
@@ -224,5 +315,46 @@ describe("TournamentManageClient save timing", () => {
       "stc"
     );
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
+  });
+
+  it("opens fixed-pair tournament draw and accepts score input", async () => {
+    render(<TournamentManageClient initialState={makeFixedPairTournamentState()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.change(screen.getByLabelText("위쪽 팀 점수"), { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText("아래쪽 팀 점수"), { target: { value: "3" } });
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    expect(screen.getByDisplayValue("6")).toBeTruthy();
+    expect(screen.getByDisplayValue("3")).toBeTruthy();
+  });
+
+  it("disables tournament score inputs for BYE matches", () => {
+    render(<TournamentManageClient initialState={makeTournamentByeState()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+
+    expect((screen.getByLabelText("위쪽 팀 점수") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("아래쪽 팀 점수") as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("shows the initial automatic BYE in the seed preview before generating matches", () => {
+    render(<TournamentManageClient initialState={makeNinePairTournamentState()} clubSlug="stc" />);
+
+    expect(screen.getAllByText(/자동 부전승/).length).toBeGreaterThan(0);
+  });
+
+  it("saves a selected tournament BYE as an automatic winner in the next round", async () => {
+    const { container } = render(<TournamentManageClient initialState={makeNinePairTournamentState()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const byeSelect = container.querySelector<HTMLSelectElement>(".bye-selection-box select");
+    expect(byeSelect).toBeTruthy();
+    fireEvent.change(byeSelect!, { target: { value: "g1-match-4" } });
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    const savedState = vi.mocked(persistTournamentStateAction).mock.calls[0][1];
+    expect(savedState.matches[6].sideAPlayerIds).toEqual(["m13", "m14"]);
+    expect(savedState.matches[8].sideAPlayerIds).toEqual(["m13", "m14"]);
   });
 });

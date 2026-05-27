@@ -20,6 +20,10 @@ export function toDbScheduleFormat(value: TournamentGroup["scheduleFormat"]): Sc
       return "kdk_v2010";
     case "random":
       return "random";
+    case "fixed-pair-tournament":
+      return "fixed_pair_tournament";
+    case "single-tournament":
+      return "single_tournament";
     default:
       return assertNever(value);
   }
@@ -33,6 +37,10 @@ export function fromDbScheduleFormat(value: ScheduleFormat): TournamentGroup["sc
       return "kdk-v2010";
     case "random":
       return "random";
+    case "fixed_pair_tournament":
+      return "fixed-pair-tournament";
+    case "single_tournament":
+      return "single-tournament";
     default:
       return assertNever(value);
   }

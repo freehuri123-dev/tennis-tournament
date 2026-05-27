@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateInitialMatches, getHanulSeedCount, getHanulSeedSlots, validateScheduleParticipants } from "./schedule";
+import { applyTournamentAdvancement, generateInitialMatches, getHanulSeedCount, getHanulSeedSlots, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "./schedule";
 import type { Member } from "./types";
 
 function makeMembers(count: number): Member[] {
@@ -127,5 +127,284 @@ describe("generateInitialMatches", () => {
 
     expect(matches.length).toBeGreaterThanOrEqual(4);
     expect([...playCounts.values()].every((count) => count >= 4)).toBe(true);
+  });
+
+  it("복식 토너먼트는 순번대로 붙이고 마지막 홀수 페어만 BYE로 올린다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(10)
+    });
+
+    expect(matches).toHaveLength(6);
+    expect(matches[0].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(matches[0].sideBPlayerIds).toEqual(["m3", "m4"]);
+    expect(matches[1].sideAPlayerIds).toEqual(["m5", "m6"]);
+    expect(matches[1].sideBPlayerIds).toEqual(["m7", "m8"]);
+    expect(matches[2].sideAPlayerIds).toEqual(["m9", "m10"]);
+    expect(matches[2].sideBPlayerIds).toEqual([]);
+    expect(matches[3].sideAPlayerIds).toEqual([]);
+    expect(matches[3].sideBPlayerIds).toEqual([]);
+    expect(matches[4].sideAPlayerIds).toEqual([]);
+    expect(matches[4].sideBPlayerIds).toEqual(["m9", "m10"]);
+    expect(matches[5].sideAPlayerIds).toEqual([]);
+    expect(matches[5].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 5페어일 때 이전 경기 승자 중 부전승 팀을 선택할 때까지 다음 라운드를 비워둔다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(10)
+    });
+    const scored = matches.map((match) => {
+      if (match.sortOrder === 1) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      if (match.sortOrder === 2) return { ...match, sideAScore: 6, sideBScore: 4, status: "completed" as const };
+      return match;
+    });
+
+    const advanced = applyTournamentAdvancement(scored, "g1");
+
+    expect(advanced[3].sideAPlayerIds).toEqual([]);
+    expect(advanced[3].sideBPlayerIds).toEqual([]);
+    expect(advanced[4].sideAPlayerIds).toEqual([]);
+    expect(advanced[4].sideBPlayerIds).toEqual(["m9", "m10"]);
+    expect(advanced[5].sideAPlayerIds).toEqual([]);
+    expect(advanced[5].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 이전 경기 승자 중 선택한 팀만 다음 라운드 BYE를 받게 한다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(10)
+    });
+    const scored = applyTournamentAdvancement(matches.map((match) => {
+      if (match.sortOrder === 1) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      if (match.sortOrder === 2) return { ...match, sideAScore: 6, sideBScore: 4, status: "completed" as const };
+      return match;
+    }), "g1");
+
+    const options = getTournamentByeSelectionOptions(scored, "g1");
+    const selected = selectTournamentBye(scored, "g1", options[0].roundIndex, "g1-match-2");
+
+    expect(options[0].options.map((option) => option.sourceMatchId)).toEqual(["g1-match-1", "g1-match-2"]);
+    expect(selected[3].sideAPlayerIds).toEqual(["m5", "m6"]);
+    expect(selected[3].sideBPlayerIds).toEqual([]);
+    expect(selected[4].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(selected[4].sideBPlayerIds).toEqual(["m9", "m10"]);
+    expect(selected[5].sideAPlayerIds).toEqual(["m5", "m6"]);
+    expect(selected[5].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 9페어일 때 라운드마다 직전 BYE 팀을 제외하고 부전승 후보를 만든다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(18)
+    });
+    const firstRoundScored = applyTournamentAdvancement(matches.map((match) => {
+      if (match.sortOrder >= 1 && match.sortOrder <= 4) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+    const firstOptions = getTournamentByeSelectionOptions(firstRoundScored, "g1");
+    const firstSelected = selectTournamentBye(firstRoundScored, "g1", firstOptions[0].roundIndex, "g1-match-4");
+    const secondRoundScored = applyTournamentAdvancement(firstSelected.map((match) => {
+      if (match.sortOrder === 6 || match.sortOrder === 8) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+
+    const secondOptions = getTournamentByeSelectionOptions(secondRoundScored, "g1");
+    const semiByeOptions = secondOptions.find((option) => option.roundIndex === 1);
+
+    expect(firstOptions[0].options.map((option) => option.sourceMatchId)).toEqual(["g1-match-3", "g1-match-4"]);
+    expect(semiByeOptions?.options.map((option) => option.sourceMatchId)).toEqual(["g1-match-6", "g1-match-8"]);
+    expect(semiByeOptions?.options.map((option) => option.teamIds)).not.toContainEqual(["m13", "m14"]);
+    expect(secondRoundScored[8].sideAPlayerIds).toEqual(["m13", "m14"]);
+    expect(secondRoundScored[9].sideAPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 16강 BYE 팀을 준결승에 미리 표시하지 않는다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(18)
+    });
+
+    expect(matches[4].sideAPlayerIds).toEqual(["m17", "m18"]);
+    expect(matches[4].sideBPlayerIds).toEqual([]);
+    expect(matches[7].sideBPlayerIds).toEqual(["m17", "m18"]);
+    expect(matches[9].sideAPlayerIds).toEqual([]);
+    expect(matches[9].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 선택된 16강 부전승 팀을 8강 승자로 준결승에 올린다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(18)
+    });
+    const firstRoundScored = applyTournamentAdvancement(matches.map((match) => {
+      if (match.sortOrder >= 1 && match.sortOrder <= 4) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+    const firstOptions = getTournamentByeSelectionOptions(firstRoundScored, "g1");
+    const firstSelected = selectTournamentBye(firstRoundScored, "g1", firstOptions[0].roundIndex, "g1-match-4");
+
+    expect(firstSelected[6].sideAPlayerIds).toEqual(["m13", "m14"]);
+    expect(firstSelected[6].sideBPlayerIds).toEqual([]);
+    expect(firstSelected[7].sideAPlayerIds).toEqual(["m9", "m10"]);
+    expect(firstSelected[7].sideBPlayerIds).toEqual(["m17", "m18"]);
+    expect(firstSelected[8].sideAPlayerIds).toEqual(["m13", "m14"]);
+    expect(firstSelected[9].sideAPlayerIds).toEqual([]);
+    expect(firstSelected[9].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 이전 계산에서 남은 결승 진출 표시를 재계산 때 제거한다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(18)
+    });
+    const firstRoundScored = applyTournamentAdvancement(matches.map((match) => {
+      if (match.sortOrder >= 1 && match.sortOrder <= 4) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+    const firstOptions = getTournamentByeSelectionOptions(firstRoundScored, "g1");
+    const firstSelected = selectTournamentBye(firstRoundScored, "g1", firstOptions[0].roundIndex, "g1-match-4");
+    const staleFinal = firstSelected.map((match) => (
+      match.sortOrder === 11 ? { ...match, sideAPlayerIds: ["m13", "m14"] } : match
+    ));
+
+    const recalculated = applyTournamentAdvancement(staleFinal, "g1");
+
+    expect(recalculated[10].sideAPlayerIds).toEqual([]);
+    expect(recalculated[10].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 준결승에서 선택한 부전승 팀을 결승으로 올린다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(18)
+    });
+    const firstRoundScored = applyTournamentAdvancement(matches.map((match) => {
+      if (match.sortOrder >= 1 && match.sortOrder <= 4) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+    const firstOptions = getTournamentByeSelectionOptions(firstRoundScored, "g1");
+    const firstSelected = selectTournamentBye(firstRoundScored, "g1", firstOptions[0].roundIndex, "g1-match-4");
+    const secondRoundScored = applyTournamentAdvancement(firstSelected.map((match) => {
+      if (match.sortOrder === 6 || match.sortOrder === 8) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+    const semiOptions = getTournamentByeSelectionOptions(secondRoundScored, "g1").find((option) => option.roundIndex === 1);
+
+    const semiSelected = selectTournamentBye(secondRoundScored, "g1", semiOptions!.roundIndex, "g1-match-6");
+
+    expect(semiSelected[8].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(semiSelected[10].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(semiSelected[10].sideBPlayerIds).toEqual([]);
+  });
+
+  it("복식 토너먼트는 부전승 선택 후 남은 두 팀의 경기 승자를 다음 라운드로 올린다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(10)
+    });
+    const firstRoundScored = applyTournamentAdvancement(matches.map((match) => {
+      if (match.sortOrder >= 1 && match.sortOrder <= 2) return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      return match;
+    }), "g1");
+    const firstOptions = getTournamentByeSelectionOptions(firstRoundScored, "g1");
+    const firstSelected = selectTournamentBye(firstRoundScored, "g1", firstOptions[0].roundIndex, "g1-match-2");
+    const next = applyTournamentAdvancement(firstSelected.map((match) => (
+      match.sortOrder === 5
+        ? { ...match, sideAScore: 6, sideBScore: 4, status: "completed" as const }
+        : match
+    )), "g1");
+
+    expect(next[5].sideAPlayerIds).toEqual(["m5", "m6"]);
+    expect(next[5].sideBPlayerIds).toEqual(["m1", "m2"]);
+  });
+
+  it("복식 토너먼트는 6페어처럼 직전 BYE 팀이 없어도 세 승자 중 부전승 팀을 선택한다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(12)
+    });
+    const scored = applyTournamentAdvancement(matches.map((match) => (
+      match.sortOrder >= 1 && match.sortOrder <= 3
+        ? { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const }
+        : match
+    )), "g1");
+
+    const options = getTournamentByeSelectionOptions(scored, "g1");
+    const selected = selectTournamentBye(scored, "g1", options[0].roundIndex, "g1-match-2");
+
+    expect(options[0].options.map((option) => option.sourceMatchId)).toEqual(["g1-match-1", "g1-match-2", "g1-match-3"]);
+    expect(selected[3].sideAPlayerIds).toEqual(["m5", "m6"]);
+    expect(selected[4].sideAPlayerIds).toEqual(["m1", "m2"]);
+    expect(selected[4].sideBPlayerIds).toEqual(["m9", "m10"]);
+  });
+
+  it("복식 토너먼트는 경기 승자를 다음 라운드로 자동 배치한다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "fixed-pair-tournament",
+      participants: makeMembers(8)
+    });
+    const scored = matches.map((match) => (
+      match.sortOrder === 1
+        ? { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const }
+        : match
+    ));
+
+    const advanced = applyTournamentAdvancement(scored, "g1");
+
+    expect(advanced[2].sideAPlayerIds).toEqual(["m1", "m2"]);
+  });
+
+  it("복식 토너먼트는 홀수 참가자 수를 허용하지 않는다", () => {
+    expect(validateScheduleParticipants("fixed-pair-tournament", 5)).toContain("짝수");
+  });
+
+  it("단식 토너먼트는 참가자 한 명씩 순번대로 붙이고 마지막 홀수 참가자만 BYE로 올린다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "single-tournament",
+      participants: makeMembers(5)
+    });
+
+    expect(matches).toHaveLength(6);
+    expect(matches[0].sideAPlayerIds).toEqual(["m1"]);
+    expect(matches[0].sideBPlayerIds).toEqual(["m2"]);
+    expect(matches[1].sideAPlayerIds).toEqual(["m3"]);
+    expect(matches[1].sideBPlayerIds).toEqual(["m4"]);
+    expect(matches[2].sideAPlayerIds).toEqual(["m5"]);
+    expect(matches[2].sideBPlayerIds).toEqual([]);
+    expect(matches[4].sideAPlayerIds).toEqual([]);
+    expect(matches[4].sideBPlayerIds).toEqual(["m5"]);
+  });
+
+  it("토너먼트 라운드는 팀 수 기준으로 16강, 8강, 준결승, 결승처럼 표시한다", () => {
+    expect(getTournamentRoundLabel(0, [5, 3, 2, 1])).toBe("16강");
+    expect(getTournamentRoundLabel(1, [5, 3, 2, 1])).toBe("8강");
+    expect(getTournamentRoundLabel(2, [5, 3, 2, 1])).toBe("준결승");
+    expect(getTournamentRoundLabel(3, [5, 3, 2, 1])).toBe("결승");
   });
 });

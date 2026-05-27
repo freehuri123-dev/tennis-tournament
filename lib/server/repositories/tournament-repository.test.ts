@@ -27,9 +27,13 @@ describe("tournament repository mapping", () => {
     expect(toDbScheduleFormat("hanul-aa")).toBe("hanul_aa");
     expect(toDbScheduleFormat("kdk-v2010")).toBe("kdk_v2010");
     expect(toDbScheduleFormat("random")).toBe("random");
+    expect(toDbScheduleFormat("fixed-pair-tournament")).toBe("fixed_pair_tournament");
+    expect(toDbScheduleFormat("single-tournament")).toBe("single_tournament");
     expect(fromDbScheduleFormat("hanul_aa")).toBe("hanul-aa");
     expect(fromDbScheduleFormat("kdk_v2010")).toBe("kdk-v2010");
     expect(fromDbScheduleFormat("random")).toBe("random");
+    expect(fromDbScheduleFormat("fixed_pair_tournament")).toBe("fixed-pair-tournament");
+    expect(fromDbScheduleFormat("single_tournament")).toBe("single-tournament");
   });
 
   it("serializes DB dates as yyyy-mm-dd domain dates", () => {
