@@ -88,6 +88,25 @@ function makeHanulStateWithCustomOrder(): TournamentState {
   };
 }
 
+function makeKdkTenParticipantState(): TournamentState {
+  const state = makeState();
+  const members = Array.from({ length: 10 }, (_, index) => ({
+    id: `m${index + 1}`,
+    name: `Member ${index + 1}`,
+    gender: index % 2 === 0 ? "male" as const : "female" as const,
+    notes: ""
+  }));
+
+  return {
+    ...state,
+    members,
+    groups: [{ ...state.groups[0], scheduleFormat: "kdk-v2010" }],
+    tournamentParticipantIds: { t1: members.map((member) => member.id) },
+    groupMemberIds: { g1: members.map((member) => member.id) },
+    matches: []
+  };
+}
+
 function makeFixedPairTournamentState(): TournamentState {
   const state = makeState();
   return {
@@ -270,6 +289,12 @@ describe("TournamentManageClient save timing", () => {
     expect(savedState.matches[0].sideBPlayerIds).toEqual(["m3", "m2"]);
     expect(savedState.matches[2].sideAPlayerIds).toEqual(["m4", "m3"]);
     expect(savedState.matches[2].sideBPlayerIds).toEqual(["m6", "m10"]);
+  });
+
+  it("does not show automatic seed labels for KDK-V2010 groups", () => {
+    render(<TournamentManageClient initialState={makeKdkTenParticipantState()} clubSlug="stc" />);
+
+    expect(screen.queryByText(/자동 시드/)).toBeNull();
   });
 
   it("auto-saves score edits after the user pauses typing", async () => {

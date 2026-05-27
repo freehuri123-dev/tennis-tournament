@@ -286,7 +286,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       ? `${memberIndex + 1}시드`
       : group.scheduleFormat === "fixed-pair-tournament"
         ? `${Math.floor(memberIndex / 2) + 1}페어`
-        : getHanulSeedSlots(memberCount).includes(orderSlotLabel(memberIndex))
+        : group.scheduleFormat === "hanul-aa" && getHanulSeedSlots(memberCount).includes(orderSlotLabel(memberIndex))
           ? "자동 시드"
           : "참여";
     return isInitialAutoByeTeam(group, memberIndex, memberCount) ? `${base} · 자동 부전승` : base;
