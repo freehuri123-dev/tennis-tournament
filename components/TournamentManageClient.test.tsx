@@ -107,6 +107,21 @@ describe("TournamentManageClient save timing", () => {
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
   });
 
+  it("selects only members of the chosen gender without saving immediately", () => {
+    const { container } = render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /참가자 수정/ }));
+    fireEvent.click(screen.getByRole("button", { name: "남자만 전체선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "참가자 선택완료" }));
+
+    const summary = container.querySelector(".selected-summary");
+    expect(summary?.textContent).toContain("김철수");
+    expect(summary?.textContent).toContain("이민준");
+    expect(summary?.textContent).not.toContain("박영희");
+    expect(summary?.textContent).not.toContain("최지은");
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
+  });
+
   it("saves date changes immediately but keeps title changes local", async () => {
     render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
 

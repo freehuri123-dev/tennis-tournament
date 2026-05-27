@@ -77,7 +77,7 @@ export async function createTournamentAction(formData: FormData) {
   const idSeed = `tournament-${Date.now()}`;
   const input = tournamentInputSchema.parse({
     clubSlug,
-    name: "새 월례대회",
+    name: "새 대회",
     date: tomorrowDateString(),
     publicSlug: createTournamentSlug(idSeed)
   });

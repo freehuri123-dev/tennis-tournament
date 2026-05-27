@@ -226,23 +226,37 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     setHelpImage(format);
   }
 
-  function toggleTournamentParticipant(memberId: string) {
+  function applyTournamentParticipantSelection(participantIds: string[]) {
     if (isCompleted) return;
-    const nextSelection = updateTournamentParticipantSelection({ currentParticipantIds: tournamentParticipantIds, memberId });
-    if (nextSelection.removed && state.matches.length > 0 && !window.confirm("참가자를 제외하면 기존 대진표와 경기결과가 초기화됩니다. 계속할까요?")) return;
+    const nextParticipantIdSet = new Set(participantIds);
+    const removed = tournamentParticipantIds.some((id) => !nextParticipantIdSet.has(id));
+    if (removed && state.matches.length > 0 && !window.confirm("참가자를 제외하면 기존 대진표와 경기결과가 초기화됩니다. 계속할까요?")) return;
     const synced = filterGroupMembersByTournamentParticipants({
-      participantIds: nextSelection.participantIds,
+      participantIds,
       groups: state.groups,
       groupMemberIds: state.groupMemberIds
     });
 
     updateLocal({
       ...state,
-      tournamentParticipantIds: { ...state.tournamentParticipantIds, [tournament.id]: nextSelection.participantIds },
+      tournamentParticipantIds: { ...state.tournamentParticipantIds, [tournament.id]: participantIds },
       groups: synced.groups,
       groupMemberIds: synced.groupMemberIds,
-      matches: nextSelection.removed ? [] : state.matches
+      matches: removed ? [] : state.matches
     });
+  }
+
+  function toggleTournamentParticipant(memberId: string) {
+    const nextSelection = updateTournamentParticipantSelection({ currentParticipantIds: tournamentParticipantIds, memberId });
+    applyTournamentParticipantSelection(nextSelection.participantIds);
+  }
+
+  function selectTournamentParticipantsByGender(gender: "male" | "female") {
+    const participantIds = state.members
+      .filter((member) => member.gender === gender && (!member.deleted || tournamentParticipantIds.includes(member.id)))
+      .map((member) => member.id);
+
+    applyTournamentParticipantSelection(participantIds);
   }
 
   async function shareTournament() {
@@ -545,6 +559,14 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
               </button>
               {participantPanelOpen && (
                 <div className="stack soft-enter">
+                  <div className="participant-bulk-actions" aria-label="성별 참가자 전체선택">
+                    <button disabled={isCompleted} onClick={() => selectTournamentParticipantsByGender("male")} type="button">
+                      남자만 전체선택
+                    </button>
+                    <button disabled={isCompleted} onClick={() => selectTournamentParticipantsByGender("female")} type="button">
+                      여자만 전체선택
+                    </button>
+                  </div>
                   <div className="participant-list">
                     {state.members.filter((member) => !member.deleted || tournamentParticipantIds.includes(member.id)).map((member) => {
                       const selected = tournamentParticipantIds.includes(member.id);

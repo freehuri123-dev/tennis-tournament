@@ -98,7 +98,7 @@ describe("server action validation", () => {
     vi.setSystemTime(new Date("2026-05-15T15:30:00.000Z"));
     upsertTournament.mockResolvedValue({
       id: "tournament-1",
-      name: "새 월례대회",
+      name: "새 대회",
       date: "2026-05-17",
       publicSlug: "tournament-generated",
       status: "draft"
@@ -111,7 +111,7 @@ describe("server action validation", () => {
     expect(requireAdmin).toHaveBeenCalledWith("otc");
     expect(upsertTournament).toHaveBeenCalledWith({
       clubSlug: "otc",
-      name: "새 월례대회",
+      name: "새 대회",
       date: "2026-05-17",
       publicSlug: expect.stringMatching(/^\d{4}$/)
     });
