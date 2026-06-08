@@ -18,6 +18,6 @@ describe("SplashScreen", () => {
   });
 
   it("uses the army intro image for the army meeting", () => {
-    expect(source).toContain('army: "/army_intro.png"');
+    expect(source).toContain('army: "/army_intro.jpg"');
   });
 });
