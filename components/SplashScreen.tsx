@@ -25,7 +25,7 @@ export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: 
 
     const autoStartTimer = window.setTimeout(() => {
       startApp();
-    }, 5000);
+    }, 10000);
 
     return () => {
       window.clearTimeout(autoStartTimer);

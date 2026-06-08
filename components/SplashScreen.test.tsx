@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 describe("SplashScreen", () => {
   const source = readFileSync(join(process.cwd(), "components", "SplashScreen.tsx"), "utf8");
 
-  it("lets the user start or automatically continues after five seconds", () => {
+  it("lets the user start or automatically continues after ten seconds", () => {
     expect(source).toContain("시작하기");
     expect(source).toContain("function startApp()");
-    expect(source).toContain("}, 5000)");
+    expect(source).toContain("}, 10000)");
     expect(source).toContain("splash-started:${clubSlug}");
     expect(source).not.toContain("setTimeout(() => setLeaving(true), 2600)");
   });
