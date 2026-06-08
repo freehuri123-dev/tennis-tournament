@@ -51,7 +51,7 @@ export function PublicShell({ title, subtitle, children, clubSlug = "stc" }: Omi
 
   return (
     <div className="app-shell">
-      <SplashScreen clubSlug={clubSlug} />
+      <SplashScreen clubSlug={clubSlug} startLabel="대진표 확인하기" />
       <div className="mobile-frame">
         <header className="app-header">
           <span className="header-brand">{club?.name ?? "테니스 클럽"}</span>
