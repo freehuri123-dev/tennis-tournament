@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { deleteTournament, fromDbScheduleFormat, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore } from "./tournament-repository";
+import { deleteTournament, fromDbScheduleFormat, listMembersByClub, loadPublicTournamentState, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -38,6 +38,21 @@ describe("tournament repository mapping", () => {
 
   it("serializes DB dates as yyyy-mm-dd domain dates", () => {
     expect(toDomainDate(new Date("2026-05-24T00:00:00.000Z"))).toBe("2026-05-24");
+  });
+
+  it("sorts numeric member names in natural display order", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "army" });
+    prisma.member.findMany.mockResolvedValue([
+      { id: "member-10", name: "10", gender: null, level: null, notes: "", phone: null, active: true, deleted: false },
+      { id: "member-2", name: "2", gender: null, level: null, notes: "", phone: null, active: true, deleted: false },
+      { id: "member-1", name: "1", gender: null, level: null, notes: "", phone: null, active: true, deleted: false }
+    ]);
+
+    await expect(listMembersByClub("army")).resolves.toMatchObject([
+      { name: "1" },
+      { name: "2" },
+      { name: "10" }
+    ]);
   });
 
   it("returns null for an unknown public slug without loading fallback tournament data", async () => {

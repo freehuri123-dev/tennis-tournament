@@ -8,6 +8,11 @@ import type { Match, Member, Tournament, TournamentGroup } from "../../domain/ty
 import type { TournamentState } from "../../store/tournament-store";
 import type { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "../validation";
 
+const memberNameCollator = new Intl.Collator("ko-KR", {
+  numeric: true,
+  sensitivity: "base"
+});
+
 function assertNever(value: never): never {
   throw new Error(`Unexpected schedule format: ${value}`);
 }
@@ -93,6 +98,13 @@ function toPublicDomainMember(member: {
     active: member.active,
     deleted: member.deleted
   };
+}
+
+function sortMembersByDisplayName<T extends Pick<Member, "id" | "name">>(members: T[]): T[] {
+  return [...members].sort((left, right) => {
+    const byName = memberNameCollator.compare(left.name, right.name);
+    return byName === 0 ? left.id.localeCompare(right.id) : byName;
+  });
 }
 
 function toDomainTournament(tournament: {
@@ -252,7 +264,7 @@ export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
     where: { clubId: club.id, deleted: false },
     orderBy: [{ name: "asc" }, { id: "asc" }]
   });
-  return members.map(toDomainMember);
+  return sortMembersByDisplayName(members.map(toDomainMember));
 }
 
 export async function getMemberById(clubSlug: ClubSlug, memberId: string): Promise<Member | null> {
@@ -447,7 +459,7 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
     })
   ]);
 
-  const domainMembers = members.map(toDomainMember);
+  const domainMembers = sortMembersByDisplayName(members.map(toDomainMember));
   if (!selectedTournament) return emptyTournamentState(domainMembers);
 
   const groups = selectedTournament.groups.map(toDomainGroup);

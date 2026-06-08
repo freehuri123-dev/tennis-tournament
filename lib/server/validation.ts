@@ -10,7 +10,7 @@ const optionalIdSchema = z.preprocess(
   z.string().trim().min(1).optional()
 );
 
-export const clubSlugSchema = z.enum(["stc", "otc", "joogo"]);
+export const clubSlugSchema = z.enum(["stc", "otc", "joogo", "army"]);
 
 export const memberInputSchema = z.object({
   id: optionalIdSchema,
