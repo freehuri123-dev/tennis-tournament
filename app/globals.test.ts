@@ -16,8 +16,8 @@ describe("mobile app frame styles", () => {
     expect(css).toMatch(/@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.mobile-frame\s*\{[^}]*width:\s*100%;[^}]*min-height:\s*100dvh;[^}]*border-radius:\s*0;/s);
   });
 
-  it("stretches the splash screen image on phone-sized screens without cropping", () => {
-    expect(css).toMatch(/@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.splash-screen\s+img\s*\{[^}]*width:\s*100vw;[^}]*height:\s*100dvh;[^}]*object-fit:\s*fill;/s);
+  it("fills the splash screen image on phone-sized screens", () => {
+    expect(css).toMatch(/@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.splash-screen\s+img\s*\{[^}]*width:\s*100vw;[^}]*height:\s*100dvh;[^}]*object-fit:\s*cover;/s);
   });
 
   it("styles pending form progress feedback", () => {
