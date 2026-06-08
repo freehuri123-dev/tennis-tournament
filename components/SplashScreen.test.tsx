@@ -14,7 +14,7 @@ describe("SplashScreen", () => {
   });
 
   it("uses the joogo intro image for the joogo meeting", () => {
-    expect(source).toContain('joogo: "/joogo_intro.png"');
+    expect(source).toContain('joogo: "/joogo_intro.jpg"');
   });
 
   it("uses the army intro image for the army meeting", () => {
