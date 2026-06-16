@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Trophy } from "lucide-react";
 import { PublicShell } from "./AppShell";
 import { PublicMatchCard } from "./PublicMatchCard";
 import { RankingTable } from "./RankingTable";
@@ -24,6 +24,8 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
 
   const access = useMemo(() => getPublicTournamentAccess(slug, state.tournaments, state.deletedPublicSlugs), [slug, state.deletedPublicSlugs, state.tournaments]);
   const displayTournament = access.type === "live" ? access.tournament : state.tournament;
+  const recordYear = displayTournament.date.slice(0, 4);
+  const publicRecordsHref = `/public/${clubSlug}/records?year=${recordYear}`;
   const membersById = useMemo(() => new Map(state.members.map((member) => [member.id, member])), [state.members]);
   const matchesByGroupId = useMemo(() => {
     const grouped = new Map(state.groups.map((group) => [group.id, [] as typeof state.matches]));
@@ -143,6 +145,24 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
     if (hasTournamentFormat && activeTab === "overall") setActiveTab("group");
   }, [activeTab, hasTournamentFormat]);
 
+  function renderPublicMatch(group: TournamentGroup, match: Match) {
+    return isTournamentFormat(group) ? (
+      <div className="public-match-card fixed-public-match" key={match.id}>
+        <div className="tournament-round-head">
+          <span>{tournamentMatchRoundLabel(group, match)}</span>
+          <strong>경기 {match.sortOrder}</strong>
+        </div>
+        <div className="public-match-row">
+          <strong>{tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A"))}</strong>
+          <span>{match.sideAScore ?? "-"} : {match.sideBScore ?? "-"}</span>
+          <strong>{tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B"))}</strong>
+        </div>
+      </div>
+    ) : (
+      <PublicMatchCard key={match.id} match={match} members={state.members} />
+    );
+  }
+
   if (access.type === "deleted") {
     return (
       <PublicShell title="삭제된 대회입니다" subtitle="공유 링크를 다시 확인해주세요" clubSlug={clubSlug}>
@@ -163,91 +183,100 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
           <RefreshCw size={20} />
           새로고침
         </button>
-        <section className="section-card">
-          <div className="tab-row">
-            {tabs.map(([id, label]) => (
-              <button
-                className={`tab-button ${activeTab === id ? "active" : ""}`}
-                key={id}
-                onClick={() => setActiveTab(id as typeof activeTab)}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </section>
+        <a className="public-records-link" href={publicRecordsHref}>
+          <Trophy size={18} />
+          {recordYear} 기록/랭킹 보기
+        </a>
 
-        {activeTab === "schedule" && (
-          <section className="section-card stack tab-panel" key="schedule">
-            <strong className="section-head">오늘의 대진표</strong>
-            {renderGroupTabs(scheduleGroupId, setActiveScheduleGroupId)}
-            {visibleScheduleGroups.map((group) => (
-              <div className="stack" key={group.id}>
-                <div className="today-card-top">
-                  <strong>{displayGroupName(group.name)}</strong>
-                  <span className="group-chip">{matchesByGroupId.get(group.id)?.length ?? 0}경기</span>
+        {!hasTournamentFormat && state.groups.length > 1 && (
+          <section className="public-tablet-board" aria-label="태블릿 전체 대진표">
+            {groupRankings.map(({ group }) => (
+              <article className="public-tablet-group" key={group.id}>
+                <div className="public-tablet-group-head">
+                  <strong>{group.name}</strong>
+                  <span>{matchesByGroupId.get(group.id)?.length ?? 0}경기</span>
                 </div>
-                {[...(matchesByGroupId.get(group.id) ?? [])]
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((match) => (
-                    isTournamentFormat(group) ? (
-                      <div className="public-match-card fixed-public-match" key={match.id}>
-                        <div className="tournament-round-head">
-                          <span>{tournamentMatchRoundLabel(group, match)}</span>
-                          <strong>경기 {match.sortOrder}</strong>
-                        </div>
-                        <div className="public-match-row">
-                          <strong>{tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A"))}</strong>
-                          <span>{match.sideAScore ?? "-"} : {match.sideBScore ?? "-"}</span>
-                          <strong>{tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B"))}</strong>
-                        </div>
-                      </div>
-                    ) : (
-                      <PublicMatchCard key={match.id} match={match} members={state.members} />
-                    )
-                  ))}
-              </div>
+                <div className="public-tablet-match-list">
+                  {[...(matchesByGroupId.get(group.id) ?? [])]
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((match) => renderPublicMatch(group, match))}
+                </div>
+              </article>
             ))}
           </section>
         )}
 
-        {activeTab === "group" && (
-          <section className="section-card stack tab-panel" key="group">
-            <strong className="section-head">{hasTournamentFormat ? "토너먼트 결과" : "그룹별 순위"}</strong>
-            {!hasTournamentFormat && renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
-            {visibleRankingGroups.map(({ group, rows }) => (
-              <div className="stack" key={group.id}>
-                {!hasTournamentFormat && <strong>{displayGroupName(group.name)}</strong>}
-                {isTournamentFormat(group) ? (
-                  <div className="tournament-result-board">
-                    {tournamentRoundSections(group).map((round) => (
-                      <div className="tournament-result-round" key={round.label}>
-                        <strong>{round.label}</strong>
-                        {round.matches.map((match) => (
-                          <div className="tournament-result-match" key={match.id}>
-                            <span>{tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A"))}</span>
-                            <b>{match.sideAScore ?? "-"} : {match.sideBScore ?? "-"}</b>
-                            <span>{tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B"))}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+        <div className="public-phone-view">
+          <section className="section-card">
+            <div className="tab-row">
+              {tabs.map(([id, label]) => (
+                <button
+                  className={`tab-button ${activeTab === id ? "active" : ""}`}
+                  key={id}
+                  onClick={() => setActiveTab(id as typeof activeTab)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {activeTab === "schedule" && (
+            <section className="section-card stack tab-panel" key="schedule">
+              <strong className="section-head">오늘의 대진표</strong>
+              {renderGroupTabs(scheduleGroupId, setActiveScheduleGroupId)}
+              {visibleScheduleGroups.map((group) => (
+                <div className="stack" key={group.id}>
+                  <div className="today-card-top">
+                    <strong>{displayGroupName(group.name)}</strong>
+                    <span className="group-chip">{matchesByGroupId.get(group.id)?.length ?? 0}경기</span>
                   </div>
-                ) : (
-                  <RankingTable rows={rows} />
-                )}
-              </div>
-            ))}
-          </section>
-        )}
+                  {[...(matchesByGroupId.get(group.id) ?? [])]
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((match) => renderPublicMatch(group, match))}
+                </div>
+              ))}
+            </section>
+          )}
 
-        {activeTab === "overall" && (
-          <section className="section-card stack tab-panel" key="overall">
-            <strong className="section-head">전체 통합 순위</strong>
-            <RankingTable rows={overallRanking} />
-          </section>
-        )}
+          {activeTab === "group" && (
+            <section className="section-card stack tab-panel" key="group">
+              <strong className="section-head">{hasTournamentFormat ? "토너먼트 결과" : "그룹별 순위"}</strong>
+              {!hasTournamentFormat && renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
+              {visibleRankingGroups.map(({ group, rows }) => (
+                <div className="stack" key={group.id}>
+                  {!hasTournamentFormat && <strong>{displayGroupName(group.name)}</strong>}
+                  {isTournamentFormat(group) ? (
+                    <div className="tournament-result-board">
+                      {tournamentRoundSections(group).map((round) => (
+                        <div className="tournament-result-round" key={round.label}>
+                          <strong>{round.label}</strong>
+                          {round.matches.map((match) => (
+                            <div className="tournament-result-match" key={match.id}>
+                              <span>{tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A"))}</span>
+                              <b>{match.sideAScore ?? "-"} : {match.sideBScore ?? "-"}</b>
+                              <span>{tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B"))}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <RankingTable rows={rows} />
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
+
+          {activeTab === "overall" && (
+            <section className="section-card stack tab-panel" key="overall">
+              <strong className="section-head">전체 통합 순위</strong>
+              <RankingTable rows={overallRanking} />
+            </section>
+          )}
+        </div>
       </div>
     </PublicShell>
   );

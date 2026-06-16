@@ -1,4 +1,4 @@
-import { CalendarDays, Home, Users } from "lucide-react";
+import { CalendarDays, Home, Trophy, Users } from "lucide-react";
 import { buildClubPath, getClubBySlug, type ClubSlug } from "../lib/domain/club";
 import { PendingLink } from "./PendingLink";
 import { SplashScreen } from "./SplashScreen";
@@ -7,7 +7,7 @@ type AppShellProps = {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
-  active?: "home" | "members" | "tournaments";
+  active?: "home" | "members" | "tournaments" | "records";
   clubSlug?: ClubSlug;
 };
 
@@ -16,7 +16,8 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
   const navItems = [
     { key: "home", href: buildClubPath(clubSlug), label: "홈", icon: Home },
     { key: "members", href: buildClubPath(clubSlug, "members"), label: "회원", icon: Users },
-    { key: "tournaments", href: buildClubPath(clubSlug, "tournaments"), label: "대회", icon: CalendarDays }
+    { key: "tournaments", href: buildClubPath(clubSlug, "tournaments"), label: "대회", icon: CalendarDays },
+    { key: "records", href: buildClubPath(clubSlug, "records"), label: "기록", icon: Trophy }
   ] as const;
 
   return (
@@ -50,9 +51,9 @@ export function PublicShell({ title, subtitle, children, clubSlug = "stc" }: Omi
   const club = getClubBySlug(clubSlug);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell public-app-shell">
       <SplashScreen clubSlug={clubSlug} startLabel="대진표 확인하기" />
-      <div className="mobile-frame">
+      <div className="mobile-frame public-mobile-frame">
         <header className="app-header">
           <span className="header-brand">{club?.name ?? "테니스 클럽"}</span>
           <strong className="header-title">{title}</strong>

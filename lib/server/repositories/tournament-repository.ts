@@ -429,6 +429,40 @@ export async function listTournamentsByClub(clubSlug: ClubSlug): Promise<Tournam
   return tournaments.map(toDomainTournament);
 }
 
+export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members: Member[]; tournaments: Tournament[]; matches: Match[] }> {
+  if (shouldUseLocalSampleData()) {
+    const state = localSampleState();
+    return {
+      members: state.members,
+      tournaments: state.tournaments,
+      matches: state.matches
+    };
+  }
+
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const [members, tournaments, matches] = await Promise.all([
+    prisma.member.findMany({
+      where: { clubId: club.id, deleted: false },
+      orderBy: [{ name: "asc" }, { id: "asc" }]
+    }),
+    prisma.tournament.findMany({
+      where: { clubId: club.id },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
+    }),
+    prisma.match.findMany({
+      where: { tournament: { clubId: club.id } },
+      orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
+    })
+  ]);
+
+  return {
+    members: sortMembersByDisplayName(members.map(toDomainMember)),
+    tournaments: tournaments.map(toDomainTournament),
+    matches: matches.map(toDomainMatch)
+  };
+}
+
 export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId?: string): Promise<TournamentState> {
   if (shouldUseLocalSampleData()) return localSampleState();
 

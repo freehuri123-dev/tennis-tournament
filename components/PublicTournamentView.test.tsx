@@ -31,4 +31,17 @@ describe("PublicTournamentView auto refresh", () => {
 
     expect(window.location.reload).toHaveBeenCalledTimes(1);
   });
+
+  it("renders every group in the tablet overview board", () => {
+    const state = createInitialState();
+    const { container } = render(<PublicTournamentView state={state} slug="1234" clubSlug="stc" />);
+
+    expect(container.querySelectorAll(".public-tablet-group")).toHaveLength(state.groups.length);
+  });
+
+  it("links to public records for the tournament year", () => {
+    const { container } = render(<PublicTournamentView state={createInitialState()} slug="1234" clubSlug="stc" />);
+
+    expect(container.querySelector(".public-records-link")?.getAttribute("href")).toBe("/public/stc/records?year=2026");
+  });
 });

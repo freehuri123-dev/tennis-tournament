@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Users } from "lucide-react";
+import { CalendarDays, Trophy, Users } from "lucide-react";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
@@ -25,6 +25,10 @@ export function HomeDashboard({ clubSlug = "stc", tournaments = [] }: { clubSlug
           <PendingLink className="quick-card" href={buildClubPath(clubSlug, "tournaments")}>
             <CalendarDays size={24} />
             <strong>대회관리</strong>
+          </PendingLink>
+          <PendingLink className="quick-card" href={buildClubPath(clubSlug, "records")}>
+            <Trophy size={24} />
+            <strong>기록/랭킹</strong>
           </PendingLink>
         </div>
       </section>
