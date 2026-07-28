@@ -40,4 +40,11 @@ describe("mobile app frame styles", () => {
     expect(css).toMatch(/--green:\s*#3b8f80;/);
     expect(css).toMatch(/--green-bright:\s*#76b8aa;/);
     expect(css).toMatch(/\/\*\s*Cool mint theme\s*\*\//);
-  });});
+  });
+
+  it("uses the modern serif typography system", () => {
+    expect(css).toMatch(/\/\*\s*Modern serif typography\s*\*\//);
+    expect(css).toMatch(/\.invalid-access-page\s*\{[^}]*font-family:\s*var\(--font-noto-sans-kr\)/s);
+    expect(css).toMatch(/\.header-title,[\s\S]*\.section-head,[\s\S]*font-family:\s*var\(--font-noto-serif-kr\)/);
+  });
+});

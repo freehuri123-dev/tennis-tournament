@@ -3603,3 +3603,35 @@ a,
     text-align: left;
   }
 }
+/* Modern serif typography */
+body,
+.invalid-access-page {
+  font-family: var(--font-noto-sans-kr), "Malgun Gothic", sans-serif;
+  letter-spacing: -0.012em;
+}
+
+.header-title,
+.hero-card h1,
+.hero-card h2,
+.section-head,
+.home-feature-copy strong {
+  font-family: var(--font-noto-serif-kr), "Batang", serif;
+  letter-spacing: -0.045em;
+}
+
+.header-title {
+  line-height: 1.28;
+}
+
+.hero-card h1,
+.hero-card h2 {
+  line-height: 1.3;
+}
+
+.section-head {
+  font-weight: 700;
+}
+
+.home-feature-copy strong {
+  line-height: 1.35;
+}
