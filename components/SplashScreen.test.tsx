@@ -13,6 +13,11 @@ describe("SplashScreen", () => {
     expect(source).not.toContain("setTimeout(() => setLeaving(true), 2600)");
   });
 
+  it("uses optimized summer intro images for the STC and OTC clubs", () => {
+    expect(source).toContain('stc: "/stc_intro_summer_coast.webp"');
+    expect(source).toContain('otc: "/otc_intro_summer_coast.webp"');
+  });
+
   it("uses the joogo intro image for the joogo meeting", () => {
     expect(source).toContain('joogo: "/joogo_intro.jpg"');
   });

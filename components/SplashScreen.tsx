@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ClubSlug } from "@/lib/domain/club";
 
 const introImages: Record<ClubSlug, string> = {
-  stc: "/stc_intro.jpg",
-  otc: "/otc_intro.jpg",
+  stc: "/stc_intro_summer_coast.webp",
+  otc: "/otc_intro_summer_coast.webp",
   joogo: "/joogo_intro.jpg",
   army: "/army_intro.jpg"
 };
