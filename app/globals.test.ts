@@ -34,4 +34,10 @@ describe("mobile app frame styles", () => {
     expect(css).toMatch(/\.public-team-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+54px\s+minmax\(0,\s*1fr\);[^}]*align-items:\s*center;/s);
     expect(css).toMatch(/\.public-team-grid\s+\.match-player\s*\{[^}]*white-space:\s*nowrap;[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/s);
   });
-});
+
+  it("uses the selected cool mint palette", () => {
+    expect(css).toMatch(/--bg:\s*#eef5f3;/);
+    expect(css).toMatch(/--green:\s*#3b8f80;/);
+    expect(css).toMatch(/--green-bright:\s*#76b8aa;/);
+    expect(css).toMatch(/\/\*\s*Cool mint theme\s*\*\//);
+  });});

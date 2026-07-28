@@ -172,6 +172,7 @@ function toDomainMatch(match: {
   sideBScore: number | null;
   status: "scheduled" | "completed";
   sortOrder: number;
+  courtNumber?: string | null;
 }): Match {
   return {
     id: match.id,
@@ -183,7 +184,8 @@ function toDomainMatch(match: {
     sideAScore: match.sideAScore,
     sideBScore: match.sideBScore,
     status: match.status,
-    sortOrder: match.sortOrder
+    sortOrder: match.sortOrder,
+    courtNumber: match.courtNumber ?? null
   };
 }
 
@@ -196,7 +198,7 @@ function emptyTournamentState(members: Member[]): TournamentState {
     currentTournamentId: "",
     tournament: {
       id: "",
-      name: "대회 없음",
+      name: "?�???�음",
       date: toDomainDate(new Date()),
       publicSlug: "empty",
       status: "draft"
@@ -341,6 +343,26 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
     await prisma.tournament.update({
       where: { id: input.id },
       data
+    })
+  );
+}
+
+export async function updateTournamentName(clubSlug: ClubSlug, tournamentId: string, name: string): Promise<Tournament> {
+  const prisma = await getPrisma();
+  const club = await getClubOrThrow(clubSlug);
+  const normalizedName = name.trim();
+  if (!normalizedName) throw new Error("Tournament name is required");
+
+  const existing = await prisma.tournament.findFirst({
+    where: { id: tournamentId, clubId: club.id },
+    select: { id: true }
+  });
+  if (!existing) throw new Error(`Tournament not found: ${tournamentId}`);
+
+  return toDomainTournament(
+    await prisma.tournament.update({
+      where: { id: tournamentId },
+      data: { name: normalizedName }
     })
   );
 }
@@ -633,7 +655,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
           sideAScore: match.sideAScore,
           sideBScore: match.sideBScore,
           status: match.status,
-          sortOrder: match.sortOrder || index + 1
+          sortOrder: match.sortOrder || index + 1,
+          courtNumber: match.courtNumber ?? null
         }))
       });
     }

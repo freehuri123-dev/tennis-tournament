@@ -10,7 +10,10 @@ export function PublicMatchCard({ match, members }: { match: Match; members: Mem
   return (
     <article className="public-match-card">
       <div className="public-match-summary">
-        <span className="match-number-badge">경기 {match.matchNumber}</span>
+        <div className="public-match-badges">
+          <span className="match-number-badge">경기 {match.matchNumber}</span>
+          {match.courtNumber && <span className="court-badge public-court-badge">{match.courtNumber}번 코트</span>}
+        </div>
         <span className={`status-pill ${hasScore ? "completed" : "draft"}`}>{hasScore ? "완료" : "대기"}</span>
       </div>
       <div className="match-team-grid public-team-grid">

@@ -39,6 +39,7 @@ export type Match = {
   sideBScore: number | null;
   status: MatchStatus;
   sortOrder: number;
+  courtNumber?: string | null;
 };
 
 export type RankingRow = {

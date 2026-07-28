@@ -151,6 +151,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
         <div className="tournament-round-head">
           <span>{tournamentMatchRoundLabel(group, match)}</span>
           <strong>경기 {match.sortOrder}</strong>
+          {match.courtNumber && <em className="court-badge fixed-public-court">{match.courtNumber}번 코트</em>}
         </div>
         <div className="public-match-row">
           <strong>{tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A"))}</strong>

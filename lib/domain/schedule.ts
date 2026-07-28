@@ -6,6 +6,8 @@ type GenerateInitialMatchesInput = {
   format: TournamentGroup["scheduleFormat"];
   participants: Member[];
   seedPlayerIds?: string[];
+  courtNumbers?: string[];
+  courtStartIndex?: number;
 };
 
 type ScheduleFormat = TournamentGroup["scheduleFormat"];
@@ -59,9 +61,9 @@ const HANUL_SEED_SLOTS: Record<number, string[]> = {
   10: ["1", "8", "A"],
   11: ["1", "5", "8", "9"],
   12: ["2", "3", "8", "A"],
-  13: ["1", "4", "5", "A"],
+  13: ["1", "4", "6", "B"],
   14: ["2", "5", "8", "C"],
-  15: ["1", "4", "5", "A", "D", "F"],
+  15: ["1", "4", "5", "A", "D"],
   16: ["1", "6", "B", "G", "7", "A"]
 };
 
@@ -103,14 +105,14 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   const participantCount = input.participants.length;
   const validationMessage = validateScheduleParticipants(input.format, participantCount);
   if (validationMessage) return [];
-  if (input.format === "random") return generateRandomMatches(input);
-  if (input.format === "fixed-pair-tournament") return generateTournamentMatches(input, 2);
-  if (input.format === "single-tournament") return generateTournamentMatches(input, 1);
+  if (input.format === "random") return assignCourtNumbers(generateRandomMatches(input), input.courtNumbers, input.courtStartIndex);
+  if (input.format === "fixed-pair-tournament") return assignCourtNumbers(generateTournamentMatches(input, 2), input.courtNumbers, input.courtStartIndex);
+  if (input.format === "single-tournament") return assignCourtNumbers(generateTournamentMatches(input, 1), input.courtNumbers, input.courtStartIndex);
 
   const playerMap = createDefaultSeedMap(input.participants);
   const templates = input.format === "kdk-v2010" ? KDK_TEMPLATES[participantCount] : HANUL_TEMPLATES[participantCount];
 
-  return templates.map((template, index) => {
+  return assignCourtNumbers(templates.map((template, index) => {
     const [sideA, sideB] = template.split(":");
     return {
       id: `${input.groupId}-match-${index + 1}`,
@@ -122,9 +124,10 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
       sideAScore: null,
       sideBScore: null,
       status: "scheduled",
-      sortOrder: index + 1
+      sortOrder: index + 1,
+      courtNumber: null
     };
-  });
+  }), input.courtNumbers, input.courtStartIndex);
 }
 
 function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
@@ -151,7 +154,8 @@ function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
       sideAScore: null,
       sideBScore: null,
       status: "scheduled",
-      sortOrder: matches.length + 1
+      sortOrder: matches.length + 1,
+      courtNumber: null
     });
   }
 
@@ -190,8 +194,21 @@ function createMatch(input: GenerateInitialMatchesInput, sortOrder: number, side
     sideAScore: null,
     sideBScore: null,
     status: "scheduled",
-    sortOrder
+    sortOrder,
+    courtNumber: null
   };
+}
+
+export function assignCourtNumbers(matches: Match[], courtNumbers?: string[], startIndex = 0): Match[] {
+  const normalizedCourtNumbers = (courtNumbers ?? []).map((court) => court.trim()).filter(Boolean);
+  if (normalizedCourtNumbers.length === 0) {
+    return matches.map((match) => ({ ...match, courtNumber: match.courtNumber ?? null }));
+  }
+
+  return matches.map((match, index) => ({
+    ...match,
+    courtNumber: normalizedCourtNumbers[(startIndex + index) % normalizedCourtNumbers.length]
+  }));
 }
 
 function createTournamentTeams(participants: Member[], teamSize: 1 | 2) {

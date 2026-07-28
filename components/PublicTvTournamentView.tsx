@@ -180,7 +180,7 @@ function TvCompactMatchPanel({
     <article className={`tv-compact-match ${highlight ? "highlight" : ""}`}>
       <div className="tv-compact-label">
         <span>{label}</span>
-        {match && <strong>경기 {match.matchNumber}</strong>}
+        {match && <div className="tv-match-badges"><strong>경기 {match.matchNumber}</strong>{match.courtNumber && <em className="tv-court-badge">{match.courtNumber}번 코트</em>}</div>}
       </div>
       {match ? (
         <div className="tv-compact-teams">

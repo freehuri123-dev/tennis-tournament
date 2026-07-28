@@ -15,17 +15,31 @@ import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, upda
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, TournamentGroup } from "@/lib/domain/types";
 import { updateMatchScoreAction } from "@/lib/server/actions/match-actions";
-import { persistTournamentStateAction, updateTournamentDateAction } from "@/lib/server/actions/tournament-actions";
+import { persistTournamentStateAction, updateTournamentDateAction, updateTournamentNameAction } from "@/lib/server/actions/tournament-actions";
 import type { TournamentState } from "@/lib/store/tournament-store";
 
 type TabId = "setup" | "draw" | "ranking";
 type HelpImage = "kdk-v2010" | "hanul-aa" | null;
 type ScoreSaveStatus = "saving" | "saved" | "error";
 
+const COURT_NUMBER_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const COURT_COUNT_OPTIONS = [2, 3, 4, 5, 6];
+
 const helpImages = {
   "kdk-v2010": { src: "/KDK-V2010.png", title: "KDK-V2010 대진방식" },
   "hanul-aa": { src: "/한울AA.png", title: "한울AA방식 KDK" }
 } as const;
+
+function assignedCourtNumbersFromMatches(matches: Match[]) {
+  const ordered = [...matches].sort((a, b) => a.sortOrder - b.sortOrder);
+  const courtNumbers: string[] = [];
+  for (const match of ordered) {
+    if (!match.courtNumber || !COURT_NUMBER_OPTIONS.includes(match.courtNumber) || courtNumbers.includes(match.courtNumber)) continue;
+    courtNumbers.push(match.courtNumber);
+    if (courtNumbers.length >= 6) break;
+  }
+  return courtNumbers;
+}
 
 type TournamentManageClientProps = {
   initialState: TournamentState;
@@ -33,6 +47,7 @@ type TournamentManageClientProps = {
 };
 
 export function TournamentManageClient({ initialState, clubSlug }: TournamentManageClientProps) {
+  const initialCourtNumbers = assignedCourtNumbersFromMatches(initialState.matches);
   const [state, setState] = useState(initialState);
   const [, startTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
@@ -44,10 +59,14 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [openPlayerEditMatchId, setOpenPlayerEditMatchId] = useState<string | null>(null);
   const [draggingMember, setDraggingMember] = useState<{ groupId: string; memberId: string } | null>(null);
   const [scoreSaveStatusByMatchId, setScoreSaveStatusByMatchId] = useState<Record<string, ScoreSaveStatus>>({});
+  const [courtAssignmentEnabled, setCourtAssignmentEnabled] = useState(initialState.groups.length === 1 && initialCourtNumbers.length > 0);
+  const [courtCount, setCourtCount] = useState(Math.min(6, Math.max(2, initialCourtNumbers.length || 2)));
+  const [selectedCourtNumbers, setSelectedCourtNumbers] = useState<string[]>(initialCourtNumbers);
   const pendingScrollMatchId = useRef<string | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
   const scoreSaveTimersRef = useRef(new Map<string, number>());
   const scoreSaveQueuesRef = useRef(new Map<string, Promise<void>>());
+  const lastSavedTournamentNameRef = useRef(initialState.tournament.name);
 
   const membersById = useMemo(() => new Map(state.members.map((member) => [member.id, member])), [state.members]);
   const matchesByGroupId = useMemo(() => {
@@ -68,6 +87,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const tournament = withDateStatus(state.tournament);
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
+  const canUseCourtAssignment = state.groups.length === 1;
   const tournamentParticipants = useMemo(
     () => tournamentParticipantIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member)),
     [membersById, tournamentParticipantIds]
@@ -159,6 +179,27 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     });
   }
 
+  function persistName(tournamentId: string, name: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName === lastSavedTournamentNameRef.current) return;
+    startTransition(() => {
+      setIsSaving(true);
+      const saveTask = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          await updateTournamentNameAction(clubSlug, tournamentId, trimmedName);
+          lastSavedTournamentNameRef.current = trimmedName;
+        })
+        .catch(() => {
+          window.alert("Failed to save tournament name. Please refresh and try again.");
+        })
+        .finally(() => {
+          if (saveQueueRef.current === saveTask) setIsSaving(false);
+        });
+      saveQueueRef.current = saveTask;
+    });
+  }
+
   function setScoreSaveStatus(matchId: string, status: ScoreSaveStatus) {
     setScoreSaveStatusByMatchId((current) => ({ ...current, [matchId]: status }));
   }
@@ -219,6 +260,56 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function teamLabel(ids: string[]) {
     return ids.map(memberName).join(", ") || "선수 미정";
+  }
+
+  function defaultCourtNumbers(nextCount = courtCount) {
+    return COURT_NUMBER_OPTIONS.slice(0, nextCount);
+  }
+
+  function selectedCourtNumbersForSchedule() {
+    if (!canUseCourtAssignment || !courtAssignmentEnabled) return [];
+    const numbers = selectedCourtNumbers.length >= courtCount ? selectedCourtNumbers : defaultCourtNumbers(courtCount);
+    return numbers.slice(0, courtCount);
+  }
+
+  function toggleCourtAssignment() {
+    if (isCompleted || !canUseCourtAssignment) return;
+    setCourtAssignmentEnabled((enabled) => {
+      const nextEnabled = !enabled;
+      if (nextEnabled) {
+        setSelectedCourtNumbers((current) => current.length >= courtCount ? current.slice(0, courtCount) : defaultCourtNumbers(courtCount));
+      }
+      return nextEnabled;
+    });
+  }
+
+  function toggleCourtNumber(courtNumber: string) {
+    if (isCompleted) return;
+    setSelectedCourtNumbers((current) => {
+      if (current.includes(courtNumber)) return current.filter((item) => item !== courtNumber);
+      if (current.length >= courtCount) {
+        window.alert(`코트는 ${courtCount}개까지만 선택할 수 있습니다.`);
+        return current;
+      }
+      return [...current, courtNumber];
+    });
+  }
+
+  function updateCourtCount(nextCount: number) {
+    setCourtCount(nextCount);
+    setSelectedCourtNumbers((current) => {
+      if (current.length >= nextCount) return current.slice(0, nextCount);
+      const next = [...current];
+      for (const option of COURT_NUMBER_OPTIONS) {
+        if (next.length >= nextCount) break;
+        if (!next.includes(option)) next.push(option);
+      }
+      return next;
+    });
+  }
+
+  function courtLabel(match: Match) {
+    return match.courtNumber ? `${match.courtNumber}번 코트` : "코트 미정";
   }
 
   function tournamentTeamLabel(ids: string[], fallback = "승자 대기") {
@@ -399,6 +490,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     }
     const groupId = `group-${Date.now()}`;
     const nextGroupNumber = state.groups.length + 1;
+    setCourtAssignmentEnabled(false);
     updateLocal({
       ...state,
       groups: [
@@ -497,15 +589,26 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       : "대진표를 생성할까요?";
     if (!window.confirm(message)) return;
 
-    const generated = state.groups.flatMap((group) =>
-      generateInitialMatches({
+    if (canUseCourtAssignment && courtAssignmentEnabled && selectedCourtNumbers.length < courtCount) {
+      window.alert(`${courtCount}개 코트를 사용하려면 코트 번호 ${courtCount}개를 선택해주세요.`);
+      return;
+    }
+
+    const courtNumbers = selectedCourtNumbersForSchedule();
+    let courtStartIndex = 0;
+    const generated = state.groups.flatMap((group) => {
+      const matches = generateInitialMatches({
         tournamentId: tournament.id,
         groupId: group.id,
         format: group.scheduleFormat,
         seedPlayerIds: group.seedPlayerIds,
-        participants: groupParticipants(group.id)
-      })
-    );
+        participants: groupParticipants(group.id),
+        courtNumbers,
+        courtStartIndex
+      });
+      courtStartIndex += matches.length;
+      return matches;
+    });
 
     persist({
       ...state,
@@ -537,7 +640,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
           sideAScore: null,
           sideBScore: null,
           status: "scheduled",
-          sortOrder: nextNumber
+          sortOrder: nextNumber,
+          courtNumber: selectedCourtNumbersForSchedule()[(nextNumber - 1) % Math.max(selectedCourtNumbersForSchedule().length, 1)] ?? null
         }
       ]
     });
@@ -592,25 +696,47 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function replacePlayer(matchId: string, side: "A" | "B", index: number, memberId: string) {
     if (isCompleted) return;
+    const selectedMatch = state.matches.find((match) => match.id === matchId);
+    if (!selectedMatch) return;
+
+    const sourceKey = side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
+    const sourceIds = [...selectedMatch[sourceKey]];
+    const sourceMemberId = sourceIds[index];
+    if (!sourceMemberId || sourceMemberId === memberId) return;
+
+    const targetSide = selectedMatch.sideAPlayerIds.includes(memberId)
+      ? "A"
+      : selectedMatch.sideBPlayerIds.includes(memberId)
+        ? "B"
+        : null;
+    if (!targetSide || targetSide === side) return;
+
+    const targetKey = targetSide === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
+    const targetIds = [...selectedMatch[targetKey]];
+    const targetIndex = targetIds.indexOf(memberId);
+    if (targetIndex === -1) return;
+
+    sourceIds[index] = memberId;
+    targetIds[targetIndex] = sourceMemberId;
+
+    const updatedMatch = {
+      ...selectedMatch,
+      sideAPlayerIds: sourceKey === "sideAPlayerIds" ? sourceIds : targetIds,
+      sideBPlayerIds: sourceKey === "sideBPlayerIds" ? sourceIds : targetIds
+    };
+
     updateLocal({
       ...state,
-      matches: state.matches.map((match) => {
-        if (match.id !== matchId) return match;
-        const key = side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
-        const nextIds = [...match[key]];
-        nextIds[index] = memberId;
-        return { ...match, [key]: nextIds };
-      })
+      matches: state.matches.map((match) => match.id === matchId ? updatedMatch : match)
     });
   }
 
-  function availableMembersForMatch(match: Match, selected?: string) {
-    const groupIds = state.groupMemberIds[match.groupId] ?? [];
-    const used = new Set([...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => id !== selected));
-    return groupIds
+  function assignedMembersForMatch(match: Match, side: "A" | "B", selected?: string) {
+    const opposingIds = side === "A" ? match.sideBPlayerIds : match.sideAPlayerIds;
+    return [selected, ...opposingIds]
+      .filter((id): id is string => Boolean(id))
       .map((id) => membersById.get(id))
-      .filter((member): member is typeof state.members[number] => Boolean(member))
-      .filter((member) => !used.has(member.id));
+      .filter((member): member is typeof state.members[number] => Boolean(member));
   }
 
   function selectableMembersForGroup(groupId: string) {
@@ -643,6 +769,27 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const hasInvalidGroup = state.groups.some((group) => groupValidation(group));
   const visibleDrawGroups = useMemo(() => state.groups.filter((group) => state.groups.length === 1 || group.id === drawGroupId), [drawGroupId, state.groups]);
   const visibleRankingGroups = useMemo(() => rankings.filter(({ group }) => state.groups.length === 1 || group.id === rankingGroupId), [rankingGroupId, rankings, state.groups.length]);
+  const duplicateTeamsByGroupId = useMemo(() => {
+    return new Map(state.groups.map((group) => {
+      const teams = new Map<string, { label: string; matchOrders: number[] }>();
+      for (const match of [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)) {
+        for (const playerIds of [match.sideAPlayerIds, match.sideBPlayerIds]) {
+          if (playerIds.length !== 2) continue;
+          const key = [...playerIds].sort().join(":");
+          const existing = teams.get(key);
+          if (existing) {
+            existing.matchOrders.push(match.sortOrder);
+          } else {
+            teams.set(key, {
+              label: playerIds.map((id) => membersById.get(id)?.name ?? "미정").join(" · "),
+              matchOrders: [match.sortOrder]
+            });
+          }
+        }
+      }
+      return [group.id, [...teams.values()].filter((team) => team.matchOrders.length > 1)] as const;
+    }));
+  }, [matchesByGroupId, membersById, state.groups]);
 
   return (
     <AppShell title="대회 상세관리" subtitle="참가자 편성, 대진표, 순위를 관리합니다" active="tournaments" clubSlug={clubSlug}>
@@ -682,7 +829,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
               <strong className="section-head">대회 기본정보</strong>
               <label className="field boxed-field">
                 <span>대회명</span>
-                <input disabled={isCompleted} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
+                <input disabled={isCompleted} onBlur={(event) => persistName(tournament.id, event.target.value)} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
               </label>
               <label className="field boxed-field">
                 <span>날짜</span>
@@ -861,6 +1008,54 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   </div>
                 );
               })}
+              {canUseCourtAssignment && (
+                <div className="court-assignment-box">
+                  <div className="court-toggle-row">
+                    <div>
+                      <strong>코트 배정</strong>
+                      <p className="notice-text">사용함을 켜면 경기 순서대로 코트 번호가 자동 배정됩니다.</p>
+                    </div>
+                    <button
+                      className={`toggle-pill ${courtAssignmentEnabled ? "active" : ""}`}
+                      disabled={isCompleted}
+                      onClick={toggleCourtAssignment}
+                      type="button"
+                    >
+                      {courtAssignmentEnabled ? "사용함" : "사용안함"}
+                    </button>
+                  </div>
+                  {courtAssignmentEnabled && (
+                    <div className="court-assignment-detail">
+                      <label className="mini-select-field court-count-field">
+                        <span>코트 개수</span>
+                        <select className="select-input" disabled={isCompleted} onChange={(event) => updateCourtCount(Number(event.target.value))} value={courtCount}>
+                          {COURT_COUNT_OPTIONS.map((count) => (
+                            <option key={count} value={count}>{count}개</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="court-number-grid" aria-label="코트 번호 선택">
+                        {COURT_NUMBER_OPTIONS.map((courtNumber) => {
+                          const selectedIndex = selectedCourtNumbers.indexOf(courtNumber);
+                          const selected = selectedIndex >= 0;
+                          return (
+                            <button
+                              className={`court-number-option ${selected ? "active" : ""}`}
+                              disabled={isCompleted}
+                              key={courtNumber}
+                              onClick={() => toggleCourtNumber(courtNumber)}
+                              type="button"
+                            >
+                              <strong>{courtNumber}</strong>
+                              <small>{selected ? `${selectedIndex + 1}순서` : "선택"}</small>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {state.matches.length > 0 && (
                 <p className="notice-text">대진표 생성을 다시 누르면 기존 경기결과는 초기화되고 새로운 대진표가 만들어집니다.</p>
               )}
@@ -914,12 +1109,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         </div>
                       )}
                     <div className="match-edit-card stack" id={`match-${match.id}`}>
-                      {isTournamentFormat(group) && (
-                        <div className="tournament-round-head">
-                          <span>{tournamentMatchRoundLabel(group, match)}</span>
-                          <strong>경기 {match.sortOrder}</strong>
-                        </div>
-                      )}
+                      <div className="tournament-round-head match-edit-head">
+                        <span>{isTournamentFormat(group) ? tournamentMatchRoundLabel(group, match) : displayGroupName(group)}</span>
+                        <strong>경기 {match.sortOrder}</strong>
+                        {match.courtNumber && <em className="court-badge tournament-round-court">{courtLabel(match)}</em>}
+                      </div>
                       <div className="score-panel vertical">
                         <label>
                           <span>{isTournamentFormat(group) ? tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A")) : teamLabel(match.sideAPlayerIds)}</span>
@@ -954,8 +1148,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                               <label className="mini-select-field" key={`${side}-${sideIndex}`}>
                                 <span>{side === "A" ? "위쪽" : "아래쪽"} {sideIndex + 1}</span>
                                 <select className="select-input" disabled={isCompleted} onChange={(event) => replacePlayer(match.id, side, sideIndex, event.target.value)} value={selected ?? ""}>
-                                  <option value="">선택</option>
-                                  {availableMembersForMatch(match, selected).map((member) => (
+                                  {assignedMembersForMatch(match, side, selected).map((member) => (
                                     <option key={member.id} value={member.id}>{member.name}</option>
                                   ))}
                                 </select>
@@ -972,6 +1165,19 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     </div>
                   );
                   })}
+                {(duplicateTeamsByGroupId.get(group.id) ?? []).length > 0 && (
+                  <div className="notice-text duplicate-team-notice" role="status">
+                    <strong>중복 팀 안내</strong>
+                    <p>같은 팀이 여러 경기에 배정되어 있습니다.</p>
+                    <ul>
+                      {(duplicateTeamsByGroupId.get(group.id) ?? []).map((team) => (
+                        <li key={`${team.label}-${team.matchOrders.join("-")}`}>
+                          {team.label} — {team.matchOrders.map((order) => `경기 ${order}`).join(", ")}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </section>

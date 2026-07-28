@@ -30,6 +30,18 @@ function matchTemplates(count: number) {
 }
 
 describe("generateInitialMatches", () => {
+  it("assigns optional court numbers in generated match order", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "kdk-v2010",
+      participants: makeMembers(5),
+      courtNumbers: ["4", "5", "6"]
+    });
+
+    expect(matches.map((match) => match.courtNumber)).toEqual(["4", "5", "6", "4", "5"]);
+  });
+
   it("KDK-V2010 이미지 표의 seed_no 대진을 사용한다", () => {
     const matches = generateInitialMatches({
       tournamentId: "t1",
