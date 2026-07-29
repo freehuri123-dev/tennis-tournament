@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { ConfirmActionForm, FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
+import { normalizeTeamGrade } from "@/lib/domain/team-battle";
 import type { Member } from "@/lib/domain/types";
 import { deleteMemberAction, saveMemberAction } from "@/lib/server/actions/member-actions";
 
@@ -33,6 +34,15 @@ export function MemberForm({ member, clubSlug = "stc" }: MemberFormProps) {
               <select defaultValue={member?.gender ?? "male"} name="gender">
                 <option value="male">남성</option>
                 <option value="female">여성</option>
+              </select>
+            </label>
+            <label className="field boxed-field">
+              <span>등급</span>
+              <select defaultValue={normalizeTeamGrade(member?.level)} name="level">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
               </select>
             </label>
             <label className="field boxed-field">

@@ -16,16 +16,20 @@ const FORMAT_LABELS: Record<ScheduleFormat, string> = {
   "kdk-v2010": "KDK-V2010",
   "hanul-aa": "한울AA방식 KDK",
   random: "랜덤 KDK 방식",
+  "fixed-pair-league": "고정 페어 리그",
   "fixed-pair-tournament": "복식 토너먼트",
-  "single-tournament": "단식 토너먼트"
+  "single-tournament": "단식 토너먼트",
+  "team-battle": "청백전 단체전"
 };
 
 const MIN_MAX: Record<ScheduleFormat, { min: number; max: number }> = {
   "kdk-v2010": { min: 5, max: 10 },
   "hanul-aa": { min: 5, max: 16 },
   random: { min: 4, max: Number.POSITIVE_INFINITY },
+  "fixed-pair-league": { min: 10, max: 10 },
   "fixed-pair-tournament": { min: 4, max: Number.POSITIVE_INFINITY },
-  "single-tournament": { min: 2, max: Number.POSITIVE_INFINITY }
+  "single-tournament": { min: 2, max: Number.POSITIVE_INFINITY },
+  "team-battle": { min: 4, max: Number.POSITIVE_INFINITY }
 };
 
 const KDK_TEMPLATES: Record<number, string[]> = {
@@ -73,12 +77,18 @@ export function getScheduleRequirement(format: ScheduleFormat) {
 
 export function validateScheduleParticipants(format: ScheduleFormat, count: number) {
   const requirement = getScheduleRequirement(format);
+  if (format === "fixed-pair-league") {
+    return count === 10 ? "" : `${requirement.label} 방식은 10명(5페어)일 때 대진표를 생성할 수 있습니다.`;
+  }
   if (format === "fixed-pair-tournament") {
     if (count < requirement.min) return `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.`;
     return count % 2 === 1 ? `${requirement.label} 방식은 2명씩 페어를 만들어야 하므로 참가자 수가 짝수여야 합니다.` : "";
   }
   if (format === "single-tournament") {
     return count < requirement.min ? `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.` : "";
+  }
+  if (format === "team-battle") {
+    return count < requirement.min ? "청백전은 청팀과 백팀에 각각 2명 이상 필요합니다." : "";
   }
   if (format === "random") {
     return count < requirement.min ? `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.` : "";
@@ -105,7 +115,9 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   const participantCount = input.participants.length;
   const validationMessage = validateScheduleParticipants(input.format, participantCount);
   if (validationMessage) return [];
+  if (input.format === "team-battle") return [];
   if (input.format === "random") return assignCourtNumbers(generateRandomMatches(input), input.courtNumbers, input.courtStartIndex);
+  if (input.format === "fixed-pair-league") return assignCourtNumbers(generateFixedPairLeagueMatches(input), input.courtNumbers, input.courtStartIndex);
   if (input.format === "fixed-pair-tournament") return assignCourtNumbers(generateTournamentMatches(input, 2), input.courtNumbers, input.courtStartIndex);
   if (input.format === "single-tournament") return assignCourtNumbers(generateTournamentMatches(input, 1), input.courtNumbers, input.courtStartIndex);
 
@@ -128,6 +140,24 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
       courtNumber: null
     };
   }), input.courtNumbers, input.courtStartIndex);
+}
+
+function generateFixedPairLeagueMatches(input: GenerateInitialMatchesInput): Match[] {
+  const teams = createTournamentTeams(input.participants, 2);
+  const rotation: Array<string[] | null> = [...teams, null];
+  const matches: Match[] = [];
+
+  for (let round = 0; round < rotation.length - 1; round += 1) {
+    for (let index = 0; index < rotation.length / 2; index += 1) {
+      const sideA = rotation[index];
+      const sideB = rotation[rotation.length - 1 - index];
+      if (!sideA || !sideB) continue;
+      matches.push(createMatch(input, matches.length + 1, sideA, sideB));
+    }
+    rotation.splice(1, 0, rotation.pop() ?? null);
+  }
+
+  return matches;
 }
 
 function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {

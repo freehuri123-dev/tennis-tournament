@@ -1,10 +1,10 @@
-import type { ScheduleFormat } from "@prisma/client";
+import type { ScheduleFormat, TeamSide as DbTeamSide, TournamentType as DbTournamentType } from "@prisma/client";
 import type { z } from "zod";
 import type { ClubSlug } from "../../domain/club";
 import { createTournamentSlug } from "../../domain/public-access";
 import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "../../domain/sample-data";
 import { withDateStatus } from "../../domain/tournament-status";
-import type { Match, Member, Tournament, TournamentGroup } from "../../domain/types";
+import type { Match, Member, TeamSide, Tournament, TournamentGroup, TournamentType } from "../../domain/types";
 import type { TournamentState } from "../../store/tournament-store";
 import type { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "../validation";
 
@@ -25,10 +25,14 @@ export function toDbScheduleFormat(value: TournamentGroup["scheduleFormat"]): Sc
       return "kdk_v2010";
     case "random":
       return "random";
+    case "fixed-pair-league":
+      return "fixed_pair_league";
     case "fixed-pair-tournament":
       return "fixed_pair_tournament";
     case "single-tournament":
       return "single_tournament";
+    case "team-battle":
+      return "team_battle";
     default:
       return assertNever(value);
   }
@@ -42,13 +46,29 @@ export function fromDbScheduleFormat(value: ScheduleFormat): TournamentGroup["sc
       return "kdk-v2010";
     case "random":
       return "random";
+    case "fixed_pair_league":
+      return "fixed-pair-league";
     case "fixed_pair_tournament":
       return "fixed-pair-tournament";
     case "single_tournament":
       return "single-tournament";
+    case "team_battle":
+      return "team-battle";
     default:
       return assertNever(value);
   }
+}
+
+function toDbTournamentType(value: TournamentType | undefined): DbTournamentType {
+  return value === "team-battle" ? "team_battle" : value === "tournament" ? "tournament" : "general";
+}
+
+function fromDbTournamentType(value: DbTournamentType): TournamentType {
+  return value === "team_battle" ? "team-battle" : value;
+}
+
+function fromDbTeamSide(value: DbTeamSide | null): TeamSide | undefined {
+  return value ?? undefined;
 }
 
 export function toDomainDate(value: Date): string {
@@ -113,13 +133,15 @@ function toDomainTournament(tournament: {
   date: Date;
   publicSlug: string;
   status: "draft" | "active" | "completed";
+  type: DbTournamentType;
 }): Tournament {
   return withDateStatus({
     id: tournament.id,
     name: tournament.name,
     date: toDomainDate(tournament.date),
     publicSlug: createTournamentSlug(tournament.id),
-    status: tournament.status
+    status: tournament.status,
+    type: fromDbTournamentType(tournament.type),
   });
 }
 
@@ -191,7 +213,7 @@ function toDomainMatch(match: {
 
 function emptyTournamentState(members: Member[]): TournamentState {
   return {
-    version: 8,
+    version: 9,
     adminUnlocked: false,
     members,
     tournaments: [],
@@ -201,11 +223,13 @@ function emptyTournamentState(members: Member[]): TournamentState {
       name: "?�???�음",
       date: toDomainDate(new Date()),
       publicSlug: "empty",
-      status: "draft"
+      status: "draft",
+      type: "general"
     },
     groups: [],
     tournamentParticipantIds: {},
     groupMemberIds: {},
+    teamAssignments: {},
     matches: [],
     deletedPublicSlugs: []
   };
@@ -226,7 +250,7 @@ function shouldUseLocalSampleData() {
 
 function localSampleState(): TournamentState {
   return {
-    version: 8,
+    version: 9,
     adminUnlocked: false,
     members: sampleMembers,
     tournaments: sampleTournaments.map((tournament) => withDateStatus(tournament)),
@@ -235,6 +259,7 @@ function localSampleState(): TournamentState {
     groups: sampleGroups,
     tournamentParticipantIds: { [sampleTournament.id]: Array.from(new Set(Object.values(sampleGroupMemberIds).flat())) },
     groupMemberIds: sampleGroupMemberIds,
+    teamAssignments: {},
     matches: createSampleMatches(),
     deletedPublicSlugs: []
   };
@@ -319,7 +344,8 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
   const data = {
     name: input.name,
     date: toDbDate(input.date),
-    publicSlug: input.publicSlug
+    publicSlug: input.publicSlug,
+    type: toDbTournamentType(input.type),
   };
 
   if (!input.id) {
@@ -372,7 +398,7 @@ export async function updateTournamentDate(clubSlug: ClubSlug, tournamentId: str
   const club = await getClubOrThrow(clubSlug);
   const existing = await prisma.tournament.findFirst({
     where: { id: tournamentId, clubId: club.id },
-    select: { id: true, name: true, publicSlug: true, status: true }
+    select: { id: true, name: true, publicSlug: true, status: true, type: true }
   });
   if (!existing) throw new Error(`Tournament not found: ${tournamentId}`);
 
@@ -381,7 +407,8 @@ export async function updateTournamentDate(clubSlug: ClubSlug, tournamentId: str
     name: existing.name,
     date,
     publicSlug: existing.publicSlug,
-    status: existing.status
+    status: existing.status,
+    type: fromDbTournamentType(existing.type)
   });
 
   return toDomainTournament(
@@ -473,7 +500,7 @@ export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members:
       orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
     }),
     prisma.match.findMany({
-      where: { tournament: { clubId: club.id } },
+      where: { tournament: { clubId: club.id, type: { not: "team_battle" } } },
       orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
     })
   ]);
@@ -526,9 +553,15 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
   const groupMemberIds = Object.fromEntries(
     selectedTournament.groups.map((group) => [group.id, group.members.map((member) => member.memberId)])
   );
+  const teamAssignments = {
+    [selectedTournament.id]: Object.fromEntries(selectedTournament.participants.flatMap((participant) => {
+      const side = fromDbTeamSide(participant.teamSide);
+      return side ? [[participant.memberId, side]] : [];
+    }))
+  };
 
   return {
-    version: 8,
+    version: 9,
     adminUnlocked: false,
     members: domainMembers,
     tournaments: tournaments.map(toDomainTournament),
@@ -537,6 +570,7 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
     groups,
     tournamentParticipantIds,
     groupMemberIds,
+    teamAssignments,
     matches: selectedTournament.matches.map(toDomainMatch),
     deletedPublicSlugs: []
   };
@@ -588,7 +622,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
       const groupMemberIds = new Set(state.groupMemberIds[match.groupId] ?? []);
       const playerIds = matchPlayerIds(match);
       assertAllowedIds(playerIds, clubMemberIds, "Match player is not an active club member");
-      assertAllowedIds(playerIds, groupMemberIds, "Match player is not assigned to group");
+      const isHistoricalTeamBattleMatch = tournament.type === "team-battle" && match.status === "completed";
+      if (!isHistoricalTeamBattleMatch) assertAllowedIds(playerIds, groupMemberIds, "Match player is not assigned to group");
     }
 
     await tx.tournament.update({
@@ -597,7 +632,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
         name: tournament.name,
         date: toDbDate(tournament.date),
         publicSlug: tournament.publicSlug,
-        status: tournament.status
+        status: tournament.status,
+        type: toDbTournamentType(tournament.type),
       }
     });
 
@@ -613,7 +649,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
         data: participantIds.map((memberId, index) => ({
           tournamentId: tournament.id,
           memberId,
-          sortOrder: index + 1
+          sortOrder: index + 1,
+          teamSide: state.teamAssignments?.[tournament.id]?.[memberId] ?? null
         }))
       });
     }
@@ -712,9 +749,15 @@ export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: 
   const groupMemberIds = Object.fromEntries(
     selectedTournament.groups.map((group) => [group.id, group.members.map((member) => member.memberId)])
   );
+  const teamAssignments = {
+    [selectedTournament.id]: Object.fromEntries(selectedTournament.participants.flatMap((participant) => {
+      const side = fromDbTeamSide(participant.teamSide);
+      return side ? [[participant.memberId, side]] : [];
+    }))
+  };
 
   return {
-    version: 8,
+    version: 9,
     adminUnlocked: false,
     members: members.map(toPublicDomainMember),
     tournaments: [tournament],
@@ -723,6 +766,7 @@ export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: 
     groups,
     tournamentParticipantIds,
     groupMemberIds,
+    teamAssignments,
     matches: selectedTournament.matches.map(toDomainMatch),
     deletedPublicSlugs: []
   };

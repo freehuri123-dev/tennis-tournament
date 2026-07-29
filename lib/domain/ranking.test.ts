@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateRankings } from "./ranking";
+import { calculateFixedPairRankings, calculateRankings } from "./ranking";
 import type { Match, Member } from "./types";
 
 const members: Member[] = [
@@ -66,5 +66,41 @@ describe("calculateRankings", () => {
       { memberId: "m1", name: "김철수", rank: 1, wins: 0, draws: 0, losses: 0, rankingPoints: 0, pointsFor: 0, pointsAgainst: 0, pointDiff: 0 },
       { memberId: "m2", name: "박영희", rank: 1, wins: 0, draws: 0, losses: 0, rankingPoints: 0, pointsFor: 0, pointsAgainst: 0, pointDiff: 0 }
     ]);
+  });
+});
+
+describe("calculateFixedPairRankings head-to-head", () => {
+  const pairMembers: Member[] = Array.from({ length: 8 }, (_, index) => ({ id: `p${index + 1}`, name: `선수 ${index + 1}`, notes: "" }));
+
+  function completedMatch(id: string, sideAPlayerIds: string[], sideBPlayerIds: string[], sideAScore: number, sideBScore: number): Match {
+    const order = Number(id.replace(/\D/g, ""));
+    return { id, tournamentId: "t1", groupId: "g1", matchNumber: order, sideAPlayerIds, sideBPlayerIds, sideAScore, sideBScore, status: "completed", sortOrder: order };
+  }
+
+  it("uses the direct match when exactly two teams have the same win count", () => {
+    const matches = [
+      completedMatch("match-1", ["p3", "p4"], ["p1", "p2"], 6, 5),
+      completedMatch("match-2", ["p1", "p2"], ["p5", "p6"], 6, 0),
+      completedMatch("match-3", ["p1", "p2"], ["p7", "p8"], 6, 0),
+      completedMatch("match-4", ["p3", "p4"], ["p5", "p6"], 6, 4),
+      completedMatch("match-5", ["p7", "p8"], ["p3", "p4"], 6, 0)
+    ];
+    const rows = calculateFixedPairRankings(pairMembers, matches);
+
+    expect(rows.slice(0, 2).map((row) => row.memberIds)).toEqual([["p3", "p4"], ["p1", "p2"]]);
+    expect(rows.slice(0, 2).map((row) => row.wins)).toEqual([2, 2]);
+    expect(rows.slice(0, 2).map((row) => row.rank)).toEqual([1, 2]);
+  });
+
+  it("uses game differential instead of pairwise results for a three-team win tie", () => {
+    const matches = [
+      completedMatch("match-1", ["p1", "p2"], ["p3", "p4"], 6, 0),
+      completedMatch("match-2", ["p5", "p6"], ["p1", "p2"], 6, 0),
+      completedMatch("match-3", ["p3", "p4"], ["p5", "p6"], 6, 4)
+    ];
+    const rows = calculateFixedPairRankings(pairMembers.slice(0, 6), matches);
+
+    expect(rows.map((row) => row.memberIds)).toEqual([["p5", "p6"], ["p1", "p2"], ["p3", "p4"]]);
+    expect(rows.map((row) => row.pointDiff)).toEqual([4, 0, -4]);
   });
 });

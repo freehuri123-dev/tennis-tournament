@@ -66,7 +66,8 @@ describe("server action validation", () => {
       clubSlug: "stc",
       name: "Spring Tournament",
       date: "2026-05-24",
-      publicSlug: "spring-open"
+      publicSlug: "spring-open",
+      type: "general",
     });
   });
 
@@ -113,7 +114,8 @@ describe("server action validation", () => {
       clubSlug: "otc",
       name: "새 대회",
       date: "2026-05-17",
-      publicSlug: expect.stringMatching(/^\d{4}$/)
+      publicSlug: expect.stringMatching(/^\d{4}$/),
+      type: "general",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments");
 

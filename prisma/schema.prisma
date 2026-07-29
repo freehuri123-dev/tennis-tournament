@@ -17,12 +17,25 @@ enum TournamentStatus {
   completed
 }
 
+enum TournamentType {
+  general
+  team_battle
+  tournament
+}
+
+enum TeamSide {
+  blue
+  white
+}
+
 enum ScheduleFormat {
   hanul_aa
   kdk_v2010
   random
+  fixed_pair_league
   fixed_pair_tournament
   single_tournament
+  team_battle
 }
 
 enum MatchStatus {
@@ -67,6 +80,8 @@ model Tournament {
   date       DateTime
   publicSlug String
   status     TournamentStatus        @default(draft)
+  type       TournamentType          @default(general)
+  femaleTeamAllowed Boolean          @default(true)
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
   club       Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
@@ -83,6 +98,7 @@ model TournamentParticipant {
   tournamentId String
   memberId     String
   sortOrder    Int        @default(0)
+  teamSide     TeamSide?
   createdAt    DateTime   @default(now())
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   member       Member     @relation(fields: [memberId], references: [id], onDelete: Restrict)

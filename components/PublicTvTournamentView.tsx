@@ -116,9 +116,9 @@ export function PublicTvTournamentView({ state, clubSlug }: { state: TournamentS
                     </span>
                   </div>
                   <div className="tv-group-board-matches">
-                    <TvCompactMatchPanel label="현재" match={summary.currentMatch} membersById={membersById} highlight />
-                    <TvCompactMatchPanel label="다음" match={summary.nextMatch} membersById={membersById} />
-                    <TvCompactMatchPanel label="다다음" match={summary.thirdMatch} membersById={membersById} />
+                    <TvCompactMatchPanel label="현재" match={summary.currentMatch} membersById={membersById} teamBattle={summary.group.scheduleFormat === "team-battle"} highlight />
+                    <TvCompactMatchPanel label="다음" match={summary.nextMatch} membersById={membersById} teamBattle={summary.group.scheduleFormat === "team-battle"} />
+                    <TvCompactMatchPanel label="다다음" match={summary.thirdMatch} membersById={membersById} teamBattle={summary.group.scheduleFormat === "team-battle"} />
                   </div>
                 </article>
               ))}
@@ -169,11 +169,13 @@ function TvCompactMatchPanel({
   label,
   match,
   membersById,
+  teamBattle = false,
   highlight = false
 }: {
   label: string;
   match: Match | null;
   membersById: Map<string, Member>;
+  teamBattle?: boolean;
   highlight?: boolean;
 }) {
   return (
@@ -184,9 +186,9 @@ function TvCompactMatchPanel({
       </div>
       {match ? (
         <div className="tv-compact-teams">
-          <TvTeam names={match.sideAPlayerIds.map((id) => membersById.get(id)?.name ?? "미정")} />
+          <TvTeam label={teamBattle ? "청팀" : undefined} side="blue" names={match.sideAPlayerIds.map((id) => membersById.get(id)?.name ?? "미정")} />
           <div className="tv-compact-vs">VS</div>
-          <TvTeam names={match.sideBPlayerIds.map((id) => membersById.get(id)?.name ?? "미정")} />
+          <TvTeam label={teamBattle ? "백팀" : undefined} side="white" names={match.sideBPlayerIds.map((id) => membersById.get(id)?.name ?? "미정")} />
         </div>
       ) : (
         <div className="tv-compact-empty">대기 경기 없음</div>
@@ -195,9 +197,10 @@ function TvCompactMatchPanel({
   );
 }
 
-function TvTeam({ names }: { names: string[] }) {
+function TvTeam({ names, label, side }: { names: string[]; label?: string; side: "blue" | "white" }) {
   return (
     <div className="tv-team">
+      {label && <em className={`team-side-badge ${side}`}>{label}</em>}
       {names.length > 0 ? names.map((name, index) => <strong key={`${name}-${index}`}>{name}</strong>) : <strong>선수 미정</strong>}
     </div>
   );

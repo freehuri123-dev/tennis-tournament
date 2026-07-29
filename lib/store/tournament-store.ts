@@ -2,7 +2,7 @@
 
 import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "../domain/sample-data";
 import { withDateStatus } from "../domain/tournament-status";
-import type { Match, Member, Tournament, TournamentGroup } from "../domain/types";
+import type { Match, Member, TeamSide, Tournament, TournamentGroup, TournamentType } from "../domain/types";
 import type { ClubSlug } from "../domain/club";
 
 export type TournamentState = {
@@ -15,13 +15,27 @@ export type TournamentState = {
   groups: TournamentGroup[];
   tournamentParticipantIds: Record<string, string[]>;
   groupMemberIds: Record<string, string[]>;
+  teamAssignments?: Record<string, Record<string, TeamSide>>;
   matches: Match[];
   deletedPublicSlugs: string[];
 };
 
 const STORAGE_KEY = "tennis-monthly-tournament-state";
 const ADMIN_PASSWORD = "1234";
-const STORAGE_VERSION = 7;
+const STORAGE_VERSION = 9;
+
+export function inferTournamentType(tournament: Partial<Tournament>, groups: TournamentGroup[]): TournamentType {
+  if (tournament.type) return tournament.type;
+  return groups.some((group) => group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament")
+    ? "tournament"
+    : groups.some((group) => group.scheduleFormat === "team-battle")
+      ? "team-battle"
+      : "general";
+}
+
+function normalizeTournamentType(tournament: Tournament, groups: TournamentGroup[]): Tournament {
+  return { ...tournament, type: inferTournamentType(tournament, groups.filter((group) => group.tournamentId === tournament.id)) };
+}
 
 function collectParticipantIds(groupMemberIds: Record<string, string[]>) {
   return Array.from(new Set(Object.values(groupMemberIds).flat()));
@@ -42,6 +56,7 @@ export function createInitialState(): TournamentState {
     groups: sampleGroups,
     tournamentParticipantIds: { [sampleTournament.id]: collectParticipantIds(sampleGroupMemberIds) },
     groupMemberIds: sampleGroupMemberIds,
+    teamAssignments: {},
     matches: createSampleMatches(),
     deletedPublicSlugs: []
   };
@@ -57,9 +72,11 @@ export function loadTournamentState(clubSlug?: ClubSlug): TournamentState {
   if (!saved) return createInitialState();
   const parsed = JSON.parse(saved) as Partial<TournamentState>;
   const initial = createInitialState();
-  const tournaments = (parsed.tournaments ?? [parsed.tournament ?? initial.tournament, ...initial.tournaments.filter((item) => item.id !== (parsed.tournament ?? initial.tournament).id)]).map((tournament) => withDateStatus(tournament));
+  const loadedGroups = parsed.groups ?? initial.groups;
+  const tournaments = (parsed.tournaments ?? [parsed.tournament ?? initial.tournament, ...initial.tournaments.filter((item) => item.id !== (parsed.tournament ?? initial.tournament).id)])
+    .map((tournament) => normalizeTournamentType(withDateStatus(tournament), loadedGroups));
   const currentTournamentId = parsed.currentTournamentId ?? (parsed.tournament ?? initial.tournament).id;
-  const tournament = withDateStatus(parsed.tournament ?? tournaments.find((item) => item.id === currentTournamentId) ?? initial.tournament);
+  const tournament = normalizeTournamentType(withDateStatus(parsed.tournament ?? tournaments.find((item) => item.id === currentTournamentId) ?? initial.tournament), loadedGroups);
 
   return {
     ...initial,
@@ -68,11 +85,12 @@ export function loadTournamentState(clubSlug?: ClubSlug): TournamentState {
     tournaments,
     currentTournamentId,
     tournament,
-    groups: parsed.groups ?? initial.groups,
+    groups: loadedGroups,
     tournamentParticipantIds: parsed.tournamentParticipantIds ?? {
       [currentTournamentId]: collectParticipantIds(parsed.groupMemberIds ?? initial.groupMemberIds)
     },
     groupMemberIds: parsed.groupMemberIds ?? initial.groupMemberIds,
+    teamAssignments: parsed.teamAssignments ?? {},
     matches: parsed.matches ?? initial.matches,
     members: parsed.members ?? initial.members,
     deletedPublicSlugs: parsed.deletedPublicSlugs ?? []

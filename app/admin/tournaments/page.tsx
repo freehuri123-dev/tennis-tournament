@@ -1,8 +1,7 @@
-import { CalendarPlus } from "lucide-react";
-import { FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TournamentCreateForm } from "@/components/TournamentCreateForm";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import { createTournamentAction } from "@/lib/server/actions/tournament-actions";
@@ -64,7 +63,7 @@ async function TournamentListPage({ clubSlug = "stc", tab = "current" }: Tournam
                   </div>
                   <div className="list-card-meta">
                     <span>{tournament.date}</span>
-                    <span>{tournament.status === "completed" ? "결과 조회" : "상세 관리로 이동"}</span>
+                    <span>{tournament.type === "team-battle" ? "청백전 · 단체전" : tournament.type === "tournament" ? "토너먼트" : "일반 대회"}</span>
                   </div>
                 </PendingLink>
               </div>
@@ -73,13 +72,7 @@ async function TournamentListPage({ clubSlug = "stc", tab = "current" }: Tournam
           </div>
         </section>
 
-        <form action={createTournamentAction} className="sticky-footer single action-form">
-          <FormPendingOverlay label="대회 만드는 중..." />
-          <input name="clubSlug" type="hidden" value={clubSlug} />
-          <PendingButton className="primary-button" pendingLabel="대회 만드는 중...">
-            <CalendarPlus size={20} />새 대회 만들기
-          </PendingButton>
-        </form>
+        <TournamentCreateForm action={createTournamentAction} clubSlug={clubSlug} />
       </div>
     </AppShell>
   );

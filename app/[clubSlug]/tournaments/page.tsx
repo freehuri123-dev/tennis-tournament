@@ -1,9 +1,10 @@
-import { CalendarPlus, Trash2 } from "lucide-react";
-import { ConfirmActionForm, FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
+import { Trash2 } from "lucide-react";
+import { ConfirmActionForm, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { InvalidClubPage } from "@/components/InvalidClubPage";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TournamentCreateForm } from "@/components/TournamentCreateForm";
 import { buildClubPath, isKnownClubSlug, type ClubSlug } from "@/lib/domain/club";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import { createTournamentAction, deleteTournamentAction } from "@/lib/server/actions/tournament-actions";
@@ -55,7 +56,7 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
                   </div>
                   <div className="list-card-meta">
                     <span>{tournament.date}</span>
-                    <span>{tournament.status === "completed" ? "결과 조회" : "상세 관리로 이동"}</span>
+                    <span>{tournament.type === "team-battle" ? "청백전 · 단체전" : tournament.type === "tournament" ? "토너먼트" : "일반 대회"}</span>
                   </div>
                 </PendingLink>
                 <ConfirmActionForm action={deleteTournamentAction} confirmMessage="대회를 삭제하시겠습니까?" pendingLabel="대회 삭제 중...">
@@ -71,13 +72,7 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
           </div>
         </section>
 
-        <form action={createTournamentAction} className="sticky-footer single action-form">
-          <FormPendingOverlay label="대회 만드는 중..." />
-          <input name="clubSlug" type="hidden" value={clubSlug} />
-          <PendingButton className="primary-button" pendingLabel="대회 만드는 중...">
-            <CalendarPlus size={20} />새 대회 만들기
-          </PendingButton>
-        </form>
+        <TournamentCreateForm action={createTournamentAction} clubSlug={clubSlug} />
       </div>
     </AppShell>
   );

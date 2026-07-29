@@ -31,10 +31,11 @@ export const tournamentInputSchema = z.object({
   clubSlug: clubSlugSchema,
   name: z.string().trim().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  publicSlug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/)
+  publicSlug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/),
+  type: z.enum(["general", "team-battle", "tournament"]).default("general")
 });
 
-export const scheduleFormatSchema = z.enum(["hanul-aa", "kdk-v2010", "random", "fixed-pair-tournament", "single-tournament"]);
+export const scheduleFormatSchema = z.enum(["hanul-aa", "kdk-v2010", "random", "fixed-pair-league", "fixed-pair-tournament", "single-tournament", "team-battle"]);
 
 export const matchScoreInputSchema = z.object({
   matchId: z.string().trim().min(1),

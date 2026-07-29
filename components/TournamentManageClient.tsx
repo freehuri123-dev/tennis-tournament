@@ -5,15 +5,18 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { RankingTable } from "@/components/RankingTable";
+import { TeamRankingTable } from "@/components/TeamRankingTable";
+import { TeamBattleContributionDetails, TeamBattleRoster } from "@/components/TeamBattleDetails";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { ClubSlug } from "@/lib/domain/club";
-import { calculateRankings } from "@/lib/domain/ranking";
+import { calculateFixedPairRankings, calculateRankings } from "@/lib/domain/ranking";
 import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
+import { balanceTeamAssignments, calculateTeamBattleResult, calculateTeamBattleSideGamePlan, generateTeamBattleMatches, getTeamBattleTargetAppearances, groupTeamBattleMatchesByRound, normalizeTeamGrade } from "@/lib/domain/team-battle";
 import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
 import { withDateStatus } from "@/lib/domain/tournament-status";
-import type { Match, TournamentGroup } from "@/lib/domain/types";
+import type { Match, TeamSide, TournamentGroup } from "@/lib/domain/types";
 import { updateMatchScoreAction } from "@/lib/server/actions/match-actions";
 import { persistTournamentStateAction, updateTournamentDateAction, updateTournamentNameAction } from "@/lib/server/actions/tournament-actions";
 import type { TournamentState } from "@/lib/store/tournament-store";
@@ -23,7 +26,17 @@ type HelpImage = "kdk-v2010" | "hanul-aa" | null;
 type ScoreSaveStatus = "saving" | "saved" | "error";
 
 const COURT_NUMBER_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"];
-const COURT_COUNT_OPTIONS = [2, 3, 4, 5, 6];
+const COURT_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
+const TEAM_BATTLE_ROUND_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1);
+
+function teamBattleSelectionRule(memberCount: number, baseGames: number, extraGamePlayerCount: number) {
+  const selectLowerGamePlayers = extraGamePlayerCount > memberCount / 2;
+  return {
+    selectionCount: selectLowerGamePlayers ? memberCount - extraGamePlayerCount : extraGamePlayerCount,
+    selectedGames: selectLowerGamePlayers ? baseGames : baseGames + 1,
+    unselectedGames: selectLowerGamePlayers ? baseGames + 1 : baseGames
+  };
+}
 
 const helpImages = {
   "kdk-v2010": { src: "/KDK-V2010.png", title: "KDK-V2010 대진방식" },
@@ -48,6 +61,11 @@ type TournamentManageClientProps = {
 
 export function TournamentManageClient({ initialState, clubSlug }: TournamentManageClientProps) {
   const initialCourtNumbers = assignedCourtNumbersFromMatches(initialState.matches);
+  const initialIsTeamBattle = initialState.tournament.type === "team-battle"
+    || initialState.groups.some((group) => group.scheduleFormat === "team-battle");
+  const initialTeamBattleRoundCount = initialIsTeamBattle
+    ? groupTeamBattleMatchesByRound(initialState.matches).length
+    : 0;
   const [state, setState] = useState(initialState);
   const [, startTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
@@ -59,9 +77,12 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [openPlayerEditMatchId, setOpenPlayerEditMatchId] = useState<string | null>(null);
   const [draggingMember, setDraggingMember] = useState<{ groupId: string; memberId: string } | null>(null);
   const [scoreSaveStatusByMatchId, setScoreSaveStatusByMatchId] = useState<Record<string, ScoreSaveStatus>>({});
-  const [courtAssignmentEnabled, setCourtAssignmentEnabled] = useState(initialState.groups.length === 1 && initialCourtNumbers.length > 0);
-  const [courtCount, setCourtCount] = useState(Math.min(6, Math.max(2, initialCourtNumbers.length || 2)));
-  const [selectedCourtNumbers, setSelectedCourtNumbers] = useState<string[]>(initialCourtNumbers);
+  const [courtAssignmentEnabled, setCourtAssignmentEnabled] = useState(initialIsTeamBattle || (initialState.groups.length === 1 && initialCourtNumbers.length > 0));
+  const [courtCount, setCourtCount] = useState(Math.min(6, Math.max(1, initialCourtNumbers.length || (initialIsTeamBattle ? 3 : 2))));
+  const [teamBattleRoundCount, setTeamBattleRoundCount] = useState(initialTeamBattleRoundCount || 5);
+  const [selectedCourtNumbers, setSelectedCourtNumbers] = useState<string[]>(initialCourtNumbers.length > 0 ? initialCourtNumbers : initialIsTeamBattle ? ["1", "2", "3"] : []);
+  const [teamBattleExtraGamePlayerIds, setTeamBattleExtraGamePlayerIds] = useState<Record<TeamSide, string[]>>({ blue: [], white: [] });
+  const [teamBattleScheduleError, setTeamBattleScheduleError] = useState("");
   const pendingScrollMatchId = useRef<string | null>(null);
   const saveQueueRef = useRef(Promise.resolve());
   const scoreSaveTimersRef = useRef(new Map<string, number>());
@@ -85,15 +106,84 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     }));
   }, [membersById, state.groupMemberIds, state.groups]);
   const tournament = withDateStatus(state.tournament);
+  const tournamentType = tournament.type ?? (state.groups.some((group) => group.scheduleFormat === "team-battle")
+    ? "team-battle"
+    : state.groups.some((group) => group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament")
+      ? "tournament"
+      : "general");
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
-  const canUseCourtAssignment = state.groups.length === 1;
+  const canUseCourtAssignment = tournamentType === "team-battle" || state.groups.length === 1;
+
   const tournamentParticipants = useMemo(
     () => tournamentParticipantIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member)),
     [membersById, tournamentParticipantIds]
   );
+  const teamAssignment = state.teamAssignments?.[tournament.id] ?? {};
+  const blueTeamMembers = tournamentParticipants.filter((member) => teamAssignment[member.id] === "blue");
+  const whiteTeamMembers = tournamentParticipants.filter((member) => teamAssignment[member.id] === "white");
+  const unassignedTeamMembers = tournamentParticipants.filter((member) => !teamAssignment[member.id]);
+  const teamBattleTotalAppearances = getTeamBattleTargetAppearances(teamBattleRoundCount, courtCount);
+  const teamBattleSidePlans = {
+    blue: calculateTeamBattleSideGamePlan(blueTeamMembers.length, teamBattleTotalAppearances),
+    white: calculateTeamBattleSideGamePlan(whiteTeamMembers.length, teamBattleTotalAppearances)
+  };
+  const blueTeamRosterKey = blueTeamMembers.map((member) => member.id).join("|");
+  const whiteTeamRosterKey = whiteTeamMembers.map((member) => member.id).join("|");
+  const teamBattleSelectionComplete = (["blue", "white"] as const).every((side) => {
+    const members = side === "blue" ? blueTeamMembers : whiteTeamMembers;
+    const plan = teamBattleSidePlans[side];
+    return teamBattleExtraGamePlayerIds[side].length
+      === teamBattleSelectionRule(members.length, plan.baseGames, plan.extraGamePlayerCount).selectionCount;
+  });
+  const maximumTeamBattleCourtCount = Math.floor(Math.min(blueTeamMembers.length, whiteTeamMembers.length) / 2);
+  const teamBattleCourtCountValid = courtCount <= maximumTeamBattleCourtCount;
+  const teamBattleResult = useMemo(() => calculateTeamBattleResult(state.matches), [state.matches]);
   const drawGroupId = activeDrawGroupId && state.groups.some((group) => group.id === activeDrawGroupId) ? activeDrawGroupId : state.groups[0]?.id;
   const rankingGroupId = activeRankingGroupId && state.groups.some((group) => group.id === activeRankingGroupId) ? activeRankingGroupId : state.groups[0]?.id;
+
+  useEffect(() => {
+    const appearanceCounts = new Map<string, number>();
+    state.matches.forEach((match) => {
+      [...match.sideAPlayerIds, ...match.sideBPlayerIds].forEach((memberId) => appearanceCounts.set(memberId, (appearanceCounts.get(memberId) ?? 0) + 1));
+    });
+    setTeamBattleExtraGamePlayerIds((current) => {
+      const reconcile = (side: TeamSide, members: typeof tournamentParticipants) => {
+        const plan = teamBattleSidePlans[side];
+        const selectionRule = teamBattleSelectionRule(members.length, plan.baseGames, plan.extraGamePlayerCount);
+        const required = selectionRule.selectionCount;
+        const memberIds = new Set(members.map((member) => member.id));
+        const retained = current[side].filter((memberId) => memberIds.has(memberId)).slice(0, required);
+        const candidates = members
+          .filter((member) => !retained.includes(member.id))
+          .sort((left, right) => {
+            const leftGames = appearanceCounts.get(left.id) ?? 0;
+            const rightGames = appearanceCounts.get(right.id) ?? 0;
+            return Math.abs(leftGames - selectionRule.selectedGames) - Math.abs(rightGames - selectionRule.selectedGames)
+              || (selectionRule.selectedGames < selectionRule.unselectedGames ? leftGames - rightGames : rightGames - leftGames)
+              || left.id.localeCompare(right.id);
+          });
+        return [...retained, ...candidates.slice(0, Math.max(0, required - retained.length)).map((member) => member.id)];
+      };
+      return { blue: reconcile("blue", blueTeamMembers), white: reconcile("white", whiteTeamMembers) };
+    });
+    setTeamBattleScheduleError("");
+  // The roster keys intentionally reset selections only when participants move between teams.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blueTeamRosterKey, whiteTeamRosterKey, teamBattleSidePlans.blue.baseGames, teamBattleSidePlans.blue.extraGamePlayerCount, teamBattleSidePlans.white.baseGames, teamBattleSidePlans.white.extraGamePlayerCount]);
+
+  useEffect(() => {
+    if (tournamentType !== "team-battle" || maximumTeamBattleCourtCount <= 0 || courtCount <= maximumTeamBattleCourtCount) return;
+    setCourtCount(maximumTeamBattleCourtCount);
+    setSelectedCourtNumbers((current) => {
+      const next = current.slice(0, maximumTeamBattleCourtCount);
+      for (const courtNumber of COURT_NUMBER_OPTIONS) {
+        if (next.length >= maximumTeamBattleCourtCount) break;
+        if (!next.includes(courtNumber)) next.push(courtNumber);
+      }
+      return next;
+    });
+  }, [courtCount, maximumTeamBattleCourtCount, tournamentType]);
 
   useEffect(() => {
     if (!helpImage) return;
@@ -124,7 +214,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     return state.groups.map((group) => {
       const members = groupMembersByGroupId.get(group.id) ?? [];
       const matches = matchesByGroupId.get(group.id) ?? [];
-      return { group, rows: calculateRankings(members, matches) };
+      return {
+        group,
+        rows: group.scheduleFormat === "fixed-pair-league" ? [] : calculateRankings(members, matches),
+        teamRows: group.scheduleFormat === "fixed-pair-league" ? calculateFixedPairRankings(members, matches) : []
+      };
     });
   }, [groupMembersByGroupId, matchesByGroupId, state.groups]);
 
@@ -247,7 +341,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function displayGroupName(group: TournamentGroup) {
-    return state.groups.length === 1 ? "전체" : group.name;
+    return tournamentType === "team-battle" ? "청백전" : state.groups.length === 1 ? "전체" : group.name;
   }
 
   function groupParticipants(groupId: string) {
@@ -320,6 +414,14 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     return group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament";
   }
 
+  function isFixedPairLeagueFormat(group: TournamentGroup) {
+    return group.scheduleFormat === "fixed-pair-league";
+  }
+
+  function usesFixedPairs(group: TournamentGroup) {
+    return group.scheduleFormat === "fixed-pair-tournament" || isFixedPairLeagueFormat(group);
+  }
+
   function tournamentTeamSize(group: TournamentGroup) {
     return group.scheduleFormat === "single-tournament" ? 1 : 2;
   }
@@ -375,7 +477,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function tournamentSeedNote(group: TournamentGroup, memberIndex: number, memberCount: number) {
     const base = group.scheduleFormat === "single-tournament"
       ? `${memberIndex + 1}시드`
-      : group.scheduleFormat === "fixed-pair-tournament"
+      : usesFixedPairs(group)
         ? `${Math.floor(memberIndex / 2) + 1}페어`
         : group.scheduleFormat === "hanul-aa" && getHanulSeedSlots(memberCount).includes(orderSlotLabel(memberIndex))
           ? "자동 시드"
@@ -397,7 +499,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function openHelpImage(format: TournamentGroup["scheduleFormat"]) {
-    if (format === "random" || format === "fixed-pair-tournament" || format === "single-tournament") return;
+    if (format === "random" || format === "fixed-pair-league" || format === "fixed-pair-tournament" || format === "single-tournament" || format === "team-battle") return;
     setHelpImage(format);
   }
 
@@ -405,19 +507,23 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (isCompleted) return;
     const nextParticipantIdSet = new Set(participantIds);
     const removed = tournamentParticipantIds.some((id) => !nextParticipantIdSet.has(id));
-    if (removed && state.matches.length > 0 && !window.confirm("참가자를 제외하면 기존 대진표와 경기결과가 초기화됩니다. 계속할까요?")) return;
+    if (removed && state.matches.length > 0 && !window.confirm(tournamentType === "team-battle" ? "참가자를 제외하면 완료 경기는 유지되고 예정 대진만 다시 편성해야 합니다. 계속할까요?" : "참가자를 제외하면 기존 대진표와 경기결과가 초기화됩니다. 계속할까요?")) return;
     const synced = filterGroupMembersByTournamentParticipants({
       participantIds,
       groups: state.groups,
       groupMemberIds: state.groupMemberIds
     });
 
+    const nextAssignments = Object.fromEntries(
+      Object.entries(teamAssignment).filter(([memberId]) => nextParticipantIdSet.has(memberId))
+    );
     updateLocal({
       ...state,
       tournamentParticipantIds: { ...state.tournamentParticipantIds, [tournament.id]: participantIds },
       groups: synced.groups,
       groupMemberIds: synced.groupMemberIds,
-      matches: removed ? [] : state.matches
+      teamAssignments: { ...(state.teamAssignments ?? {}), [tournament.id]: nextAssignments },
+      matches: removed ? (tournamentType === "team-battle" ? state.matches.filter((match) => match.status === "completed") : []) : state.matches
     });
   }
 
@@ -439,6 +545,57 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     applyTournamentParticipantSelection(participantIds);
   }
 
+  function setTeamSide(memberId: string, side: TeamSide) {
+    if (isCompleted) return;
+    updateLocal({
+      ...state,
+      teamAssignments: {
+        ...(state.teamAssignments ?? {}),
+        [tournament.id]: { ...teamAssignment, [memberId]: side }
+      }
+    });
+  }
+
+  function autoBalanceTeams() {
+    if (isCompleted || tournamentParticipants.length < 4) return;
+    updateLocal({
+      ...state,
+      teamAssignments: {
+        ...(state.teamAssignments ?? {}),
+        [tournament.id]: balanceTeamAssignments(tournamentParticipants, teamAssignment)
+      }
+    });
+  }
+
+  function toggleTeamBattleExtraGamePlayer(side: TeamSide, memberId: string) {
+    if (isCompleted) return;
+    const members = side === "blue" ? blueTeamMembers : whiteTeamMembers;
+    const plan = teamBattleSidePlans[side];
+    const required = teamBattleSelectionRule(members.length, plan.baseGames, plan.extraGamePlayerCount).selectionCount;
+    setTeamBattleExtraGamePlayerIds((current) => {
+      const selected = current[side];
+      const next = selected.includes(memberId)
+        ? selected.filter((id) => id !== memberId)
+        : selected.length < required
+          ? [...selected, memberId]
+          : [...selected.slice(1), memberId];
+      return { ...current, [side]: next };
+    });
+    setTeamBattleScheduleError("");
+  }
+
+  function teamBattleTargetGames() {
+    return Object.fromEntries((["blue", "white"] as const).flatMap((side) => {
+      const members = side === "blue" ? blueTeamMembers : whiteTeamMembers;
+      const selectedIds = new Set(teamBattleExtraGamePlayerIds[side]);
+      const plan = teamBattleSidePlans[side];
+      const rule = teamBattleSelectionRule(members.length, plan.baseGames, plan.extraGamePlayerCount);
+      return members.map((member) => [
+        member.id,
+        selectedIds.has(member.id) ? rule.selectedGames : rule.unselectedGames
+      ] as const);
+    }));
+  }
   async function shareTournament() {
     const url = `${window.location.origin}/public/${clubSlug}/${tournament.publicSlug}`;
     const shareData = {
@@ -478,7 +635,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function addGroup() {
-    if (isCompleted) return;
+    if (isCompleted || tournamentType === "team-battle") return;
+    if (tournamentType === "tournament" && state.groups.length > 0) return;
     if (state.groups.some(isTournamentFormat)) {
       window.alert("토너먼트 방식은 한 그룹으로만 진행할 수 있습니다.");
       return;
@@ -498,8 +656,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         {
           id: groupId,
           tournamentId: tournament.id,
-          name: `${String.fromCharCode(64 + nextGroupNumber)}조`,
-                          scheduleFormat: "kdk-v2010",
+          name: tournamentType === "tournament" ? "전체" : `${String.fromCharCode(64 + nextGroupNumber)}조`,
+          scheduleFormat: tournamentType === "tournament" ? "fixed-pair-tournament" : "kdk-v2010",
           sortOrder: nextGroupNumber,
           seedPlayerIds: []
         }
@@ -525,6 +683,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (isCompleted) return;
     const targetGroup = state.groups.find((group) => group.id === groupId);
     const tournamentMode = scheduleFormat === "fixed-pair-tournament" || scheduleFormat === "single-tournament";
+    if (tournamentMode && state.groups.length > 1) return;
     const nextGroups = tournamentMode && targetGroup
       ? [{ ...targetGroup, scheduleFormat, seedPlayerIds: [], name: "전체", sortOrder: 1 }]
       : state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat, seedPlayerIds: [] } : group));
@@ -542,7 +701,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function randomizeTournamentSeeds(groupId: string) {
     if (isCompleted) return;
-    const shuffledIds = shuffle(selectableMembersForGroup(groupId).map((member) => member.id));
+    const shuffledIds = shuffle(state.groupMemberIds[groupId] ?? []);
     updateLocal({
       ...state,
       groupMemberIds: { ...state.groupMemberIds, [groupId]: shuffledIds },
@@ -582,6 +741,53 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function generateAllSchedules() {
     if (isCompleted) return;
+    if (tournamentType === "team-battle") {
+      if (blueTeamMembers.length < 2 || whiteTeamMembers.length < 2 || unassignedTeamMembers.length > 0) return;
+      if (!teamBattleCourtCountValid) {
+        setTeamBattleScheduleError(`현재 팀 인원으로는 한 라운드에 최대 ${maximumTeamBattleCourtCount}개 코트만 사용할 수 있습니다.`);
+        return;
+      }
+      const group: TournamentGroup = state.groups.find((item) => item.scheduleFormat === "team-battle") ?? {
+        id: `team-battle-${tournament.id}`,
+        tournamentId: tournament.id,
+        name: "청백전",
+        scheduleFormat: "team-battle",
+        sortOrder: 1,
+        seedPlayerIds: []
+      };
+      const message = state.matches.length > 0 ? "기존 청백전 대진과 경기 결과를 모두 초기화하고 새 대진을 만들까요?" : "청백전 대진표를 생성할까요?";
+      if (courtAssignmentEnabled && selectedCourtNumbers.length < courtCount) {
+        window.alert(`${courtCount}개 코트를 사용하려면 코트 번호 ${courtCount}개를 선택해주세요.`);
+        return;
+      }
+      if (!window.confirm(message)) return;
+      try {
+        const matches = generateTeamBattleMatches({
+          tournamentId: tournament.id,
+          groupId: group.id,
+          blueMembers: blueTeamMembers,
+          whiteMembers: whiteTeamMembers,
+          existingMatches: [],
+          targetGamesByMemberId: teamBattleTargetGames(),
+          courtNumbers: selectedCourtNumbersForSchedule(),
+          roundCount: teamBattleRoundCount
+        });
+        setTeamBattleScheduleError("");
+        persist({
+          ...state,
+          tournament: { ...tournament, type: "team-battle" },
+          groups: [group],
+          groupMemberIds: { [group.id]: tournamentParticipantIds },
+          matches
+        });
+      } catch (error) {
+        setTeamBattleScheduleError(error instanceof Error ? error.message : "선택한 경기 수로 대진을 만들 수 없습니다.");
+        return;
+      }
+      setActiveDrawGroupId(group.id);
+      setActiveTab("draw");
+      return;
+    }
     const invalid = state.groups.find((group) => groupValidation(group));
     if (invalid) return;
     const message = state.matches.length > 0
@@ -621,6 +827,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function addMatch(groupId: string) {
     if (isCompleted) return;
+    const group = state.groups.find((item) => item.id === groupId);
+    if (!group || isTournamentFormat(group) || isFixedPairLeagueFormat(group) || group.scheduleFormat === "team-battle") return;
     const groupMatches = matchesByGroupId.get(groupId) ?? [];
     const nextNumber = groupMatches.length + 1;
     const matchId = `${groupId}-manual-${Date.now()}`;
@@ -725,7 +933,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       sideBPlayerIds: sourceKey === "sideBPlayerIds" ? sourceIds : targetIds
     };
 
-    updateLocal({
+    persist({
       ...state,
       matches: state.matches.map((match) => match.id === matchId ? updatedMatch : match)
     });
@@ -739,6 +947,34 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       .filter((member): member is typeof state.members[number] => Boolean(member));
   }
 
+  function teamBattleReplacementCandidates(roundMatches: Match[], match: Match, side: "A" | "B", index: number, selected?: string) {
+    const playingIds = new Set(roundMatches.flatMap((roundMatch) => side === "A" ? roundMatch.sideAPlayerIds : roundMatch.sideBPlayerIds));
+    const teamMembers = side === "A" ? blueTeamMembers : whiteTeamMembers;
+    return [
+      ...(selected ? [membersById.get(selected)] : []),
+      ...teamMembers.filter((member) => !playingIds.has(member.id))
+    ].filter((member): member is typeof state.members[number] => Boolean(member));
+  }
+
+  function replaceTeamBattlePlayer(matchId: string, roundMatches: Match[], side: "A" | "B", index: number, memberId: string) {
+    if (isCompleted) return;
+    const selectedMatch = state.matches.find((match) => match.id === matchId);
+    if (!selectedMatch || selectedMatch.status === "completed") return;
+    const sourceKey = side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
+    const sourceIds = [...selectedMatch[sourceKey]];
+    const sourceMemberId = sourceIds[index];
+    if (!sourceMemberId || sourceMemberId === memberId) return;
+
+    const expectedTeam: TeamSide = side === "A" ? "blue" : "white";
+    const roundPlayingIds = new Set(roundMatches.flatMap((match) => side === "A" ? match.sideAPlayerIds : match.sideBPlayerIds));
+    if (teamAssignment[memberId] !== expectedTeam || roundPlayingIds.has(memberId)) return;
+
+    sourceIds[index] = memberId;
+    persist({
+      ...state,
+      matches: state.matches.map((match) => match.id === matchId ? { ...match, [sourceKey]: sourceIds } : match)
+    });
+  }
   function selectableMembersForGroup(groupId: string) {
     const selectedIds = state.groupMemberIds[groupId] ?? [];
     return state.members.filter((member) => tournamentParticipantIds.includes(member.id) && (!member.deleted || selectedIds.includes(member.id)));
@@ -826,7 +1062,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         {activeTab === "setup" && (
           <div className="tab-panel stack" key="setup">
             <section className="section-card stack">
-              <strong className="section-head">대회 기본정보</strong>
+              <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentType === "general" ? "일반 대회" : tournamentType === "team-battle" ? "청백전 · 단체전" : "토너먼트"}</span></div>
               <label className="field boxed-field">
                 <span>대회명</span>
                 <input disabled={isCompleted} onBlur={(event) => persistName(tournament.id, event.target.value)} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
@@ -835,6 +1071,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 <span>날짜</span>
                 <input onChange={(event) => updateTournament("date", event.target.value)} type="date" value={tournament.date} />
               </label>
+
             </section>
 
             <section className="section-card stack">
@@ -879,12 +1116,154 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
               )}
             </section>
 
-            <section className="section-card stack">
+            {tournamentType === "team-battle" && (
+              <section className="section-card stack team-battle-setup">
+                <div className="today-card-top team-battle-setup-head">
+                  <strong className="section-head">청백 팀 편성</strong>
+                  <button className="ghost-button team-balance-button" disabled={isCompleted || tournamentParticipants.length < 4} onClick={autoBalanceTeams} type="button">자동밸런스</button>
+                </div>
+                <p className="notice-text team-battle-setup-notice">회원 등급 A/B/C/D를 기준으로 전력을 맞춥니다. 설정한 라운드와 코트 수에 맞춰 모든 코트를 채웁니다.</p>
+                {unassignedTeamMembers.length > 0 && <p className="notice-text">미배정 {unassignedTeamMembers.length}명 · 자동 밸런스를 누르거나 아래에서 팀을 선택해주세요.</p>}
+                <div className="team-battle-grid">
+                  {(["blue", "white"] as const).map((side) => {
+                    const teamMembers = side === "blue" ? blueTeamMembers : whiteTeamMembers;
+                    return (
+                      <div className={`team-roster-card ${side}`} key={side}>
+                        <div className="today-card-top">
+                          <strong>{side === "blue" ? "청팀" : "백팀"}</strong>
+                          <span>{teamMembers.length}명</span>
+                        </div>
+                        <div className="participant-list">
+                          {teamMembers.map((member) => (
+                            <button className="participant-option active" disabled={isCompleted} key={member.id} onClick={() => setTeamSide(member.id, side === "blue" ? "white" : "blue")} type="button">
+                              <span className="order-badge">{normalizeTeamGrade(member.level)}</span>
+                              <strong>{member.name}</strong>
+                              <small>{side === "blue" ? "백팀으로 이동" : "청팀으로 이동"}</small>
+                            </button>
+                          ))}
+                          {teamMembers.length === 0 && <p className="notice-text">배정된 선수가 없습니다.</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="court-assignment-box">
+                  <div className="court-toggle-row">
+                    <div>
+                      <strong>코트 설정</strong>
+                      <p className="notice-text">선택한 라운드마다 모든 코트를 사용합니다. 같은 라운드에는 동일 선수가 중복 출전하지 않습니다.</p>
+                    </div>
+                  </div>
+                  <div className="court-assignment-detail">
+                    <div className="court-setting-fields">
+                      <label className="mini-select-field court-count-field">
+                        <span>라운드 수</span>
+                        <select aria-label="라운드 수" className="select-input" disabled={isCompleted} onChange={(event) => setTeamBattleRoundCount(Number(event.target.value))} value={teamBattleRoundCount}>
+                          {TEAM_BATTLE_ROUND_OPTIONS.map((count) => (
+                            <option key={count} value={count}>{count}라운드</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="mini-select-field court-count-field">
+                        <span>코트 개수</span>
+                        <select aria-label="코트 개수" className="select-input" disabled={isCompleted} onChange={(event) => updateCourtCount(Number(event.target.value))} value={courtCount}>
+                          {COURT_COUNT_OPTIONS.map((count) => (
+                            <option disabled={maximumTeamBattleCourtCount > 0 && count > maximumTeamBattleCourtCount} key={count} value={count}>{count}개</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <p className="notice-text">총 {teamBattleRoundCount * courtCount}경기 · 라운드마다 {courtCount}경기</p>
+                    <div className="court-number-grid" aria-label="코트 번호 선택">
+                      {COURT_NUMBER_OPTIONS.map((courtNumber) => {
+                        const selectedIndex = selectedCourtNumbers.indexOf(courtNumber);
+                        const selected = selectedIndex >= 0;
+                        return (
+                          <button
+                            aria-label={`코트 ${courtNumber} ${selected ? `${selectedIndex + 1}순서 선택됨` : "선택"}`}
+                            className={`court-number-option ${selected ? "active" : ""}`}
+                            disabled={isCompleted}
+                            key={courtNumber}
+                            onClick={() => toggleCourtNumber(courtNumber)}
+                            type="button"
+                          >
+                            <strong>{courtNumber}</strong>
+                            <small aria-hidden="true">{selected ? selectedIndex + 1 : ""}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="team-battle-game-plan">
+                  <div className="team-battle-game-plan-head">
+                    <div>
+                      <strong>개인별 경기 수</strong>
+                      <small>{teamBattleRoundCount}라운드 × {courtCount}코트 · 총 {teamBattleRoundCount * courtCount}경기</small>
+                    </div>
+                    <span>팀별 {teamBattleTotalAppearances}회 출전</span>
+                  </div>
+                  <div className="team-battle-game-plan-grid">
+                    {(["blue", "white"] as const).map((side) => {
+                      const members = side === "blue" ? blueTeamMembers : whiteTeamMembers;
+                      const plan = teamBattleSidePlans[side];
+                      const selectedIds = teamBattleExtraGamePlayerIds[side];
+                      const selectionRule = teamBattleSelectionRule(members.length, plan.baseGames, plan.extraGamePlayerCount);
+                      return (
+                        <div className={`team-game-selector ${side}`} key={side}>
+                          <div className="today-card-top">
+                            <strong>{side === "blue" ? "청팀" : "백팀"}</strong>
+                            <small>{selectionRule.selectionCount > 0 ? `${selectionRule.selectedGames}경기 선수 ${selectedIds.length}/${selectionRule.selectionCount}명 선택` : `전원 ${plan.baseGames}경기`}</small>
+                          </div>
+                          {selectionRule.selectionCount > 0 && (
+                            <>
+                              <p>{selectionRule.selectionCount}명을 선택하면 선택 선수는 {selectionRule.selectedGames}경기, 나머지는 {selectionRule.unselectedGames}경기를 출전합니다.</p>
+                              <div className="team-game-player-options">
+                                {members.map((member) => {
+                                  const selected = selectedIds.includes(member.id);
+                                  return (
+                                    <button aria-pressed={selected} className={selected ? "active" : ""} disabled={isCompleted} key={member.id} onClick={() => toggleTeamBattleExtraGamePlayer(side, member.id)} type="button">
+                                      <strong>{member.name}</strong>
+                                      <small>{selected ? `${selectionRule.selectedGames}경기` : `${selectionRule.unselectedGames}경기`}</small>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {unassignedTeamMembers.length > 0 && (
+                  <div className="participant-list">
+                    {unassignedTeamMembers.map((member) => (
+                      <div className="participant-option" key={member.id}>
+                        <span className="order-badge">{normalizeTeamGrade(member.level)}</span>
+                        <strong>{member.name}</strong>
+                        <span className="team-assign-actions">
+                          <button disabled={isCompleted} onClick={() => setTeamSide(member.id, "blue")} type="button">청팀</button>
+                          <button disabled={isCompleted} onClick={() => setTeamSide(member.id, "white")} type="button">백팀</button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {teamBattleScheduleError && <p className="notice-text error-text">{teamBattleScheduleError}</p>}
+                <button className="primary-button" disabled={isCompleted || blueTeamMembers.length < 2 || whiteTeamMembers.length < 2 || unassignedTeamMembers.length > 0 || !teamBattleSelectionComplete || !teamBattleCourtCountValid} onClick={generateAllSchedules} type="button">
+                  <ClipboardList size={18} />
+                  {state.matches.length > 0 ? "기존 대진 초기화 후 다시 생성" : "청백전 대진 생성"}
+                </button>
+              </section>
+            )}
+
+            {tournamentType !== "team-battle" && (<section className="section-card stack">
               <div className="today-card-top">
-                <strong className="section-head" style={{ marginBottom: 0 }}>그룹 편성</strong>
-                <button className="ghost-button" disabled={isCompleted || state.groups.some(isTournamentFormat)} onClick={addGroup} type="button">
+                <strong className="section-head" style={{ marginBottom: 0 }}>{tournamentType === "tournament" ? "토너먼트 구성" : "그룹 편성"}</strong>
+                <button className="ghost-button" disabled={isCompleted || (tournamentType === "tournament" && state.groups.length > 0)} onClick={addGroup} type="button">
                   <Plus size={18} />
-                  그룹 추가
+                  {tournamentType === "tournament" ? "토너먼트 구성" : "그룹 추가"}
                 </button>
               </div>
 
@@ -910,15 +1289,23 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     </div>
                     <div className="format-field">
                       <span>대진방식 선택</span>
-                      <div className={`format-row ${group.scheduleFormat === "random" || isTournamentFormat(group) ? "single" : ""}`}>
+                      <div className={`format-row ${group.scheduleFormat === "random" || isFixedPairLeagueFormat(group) || isTournamentFormat(group) ? "single" : ""}`}>
                       <select className="select-input" disabled={isCompleted} onChange={(event) => updateGroupFormat(group.id, event.target.value as TournamentGroup["scheduleFormat"])} value={group.scheduleFormat}>
-                        <option value="kdk-v2010">KDK-V2010 방식</option>
-                        <option value="hanul-aa">한울AA KDK 방식</option>
-                        <option value="random">랜덤 KDK 방식</option>
-                        <option value="fixed-pair-tournament">복식 토너먼트</option>
-                        <option value="single-tournament">단식 토너먼트</option>
+                        {tournamentType === "tournament" ? (
+                          <>
+                            <option value="fixed-pair-tournament">복식 토너먼트</option>
+                            <option value="single-tournament">단식 토너먼트</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="kdk-v2010">KDK-V2010 방식</option>
+                            <option value="hanul-aa">한울AA KDK 방식</option>
+                            <option value="random">랜덤 KDK 방식</option>
+                            <option value="fixed-pair-league">고정 페어 리그</option>
+                          </>
+                        )}
                       </select>
-                      {group.scheduleFormat !== "random" && !isTournamentFormat(group) && (
+                      {group.scheduleFormat !== "random" && !isFixedPairLeagueFormat(group) && !isTournamentFormat(group) && (
                         <button className="icon-help-button" aria-label="대진방식 보기" onClick={() => openHelpImage(group.scheduleFormat)} type="button">
                           <HelpCircle size={20} />
                         </button>
@@ -933,10 +1320,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     {group.scheduleFormat === "hanul-aa" && seedSlots.size > 0 && (
                       <p className="notice-text">한울AA 시드 자리: {[...seedSlots].join(", ")}번. 해당 순번 위치가 자동 시드자로 적용됩니다.</p>
                     )}
-                    {isTournamentFormat(group) && (
+                    {(isTournamentFormat(group) || isFixedPairLeagueFormat(group)) && (
                       <div className="fixed-pair-tools">
-                        <button className="ghost-button" disabled={isCompleted || tournamentParticipantIds.length < (group.scheduleFormat === "single-tournament" ? 2 : 4)} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
-                          {group.scheduleFormat === "single-tournament" ? "랜덤 시드 생성" : "랜덤 페어 생성"}
+                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? selectedMembers.length !== 10 : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
+                          {group.scheduleFormat === "single-tournament" ? "랜덤 시드 생성" : "랜덤 페어 구성"}
                         </button>
                         <p className="notice-text">
                           {group.scheduleFormat === "single-tournament"
@@ -983,7 +1370,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         );
                       })}
                     </div>
-                    {isTournamentFormat(group) && selectedMembers.length > 0 && (
+                    {(isTournamentFormat(group) || isFixedPairLeagueFormat(group)) && selectedMembers.length > 0 && (
                       <div className="fixed-pair-preview">
                         {Array.from({ length: Math.ceil(selectedMembers.length / tournamentTeamSize(group)) }, (_, index) => {
                           const pair = selectedMembers.slice(index * tournamentTeamSize(group), index * tournamentTeamSize(group) + tournamentTeamSize(group));
@@ -1040,6 +1427,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           const selected = selectedIndex >= 0;
                           return (
                             <button
+                              aria-label={`코트 ${courtNumber} ${selected ? `${selectedIndex + 1}순서 선택됨` : "선택"}`}
                               className={`court-number-option ${selected ? "active" : ""}`}
                               disabled={isCompleted}
                               key={courtNumber}
@@ -1047,7 +1435,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                               type="button"
                             >
                               <strong>{courtNumber}</strong>
-                              <small>{selected ? `${selectedIndex + 1}순서` : "선택"}</small>
+                              <small aria-hidden="true">{selected ? selectedIndex + 1 : ""}</small>
                             </button>
                           );
                         })}
@@ -1063,7 +1451,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 <ClipboardList size={18} />
                 대진표 생성
               </button>
-            </section>
+            </section>)}
           </div>
         )}
 
@@ -1074,15 +1462,30 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
             {visibleDrawGroups.map((group) => (
               <div className="stack" key={group.id}>
                 <div className="today-card-top">
-                  <strong>{displayGroupName(group)}</strong>
-                  {!isTournamentFormat(group) && <button className="ghost-button" disabled={isCompleted} onClick={() => addMatch(group.id)} type="button">
+                  <div className="draw-group-title">
+                    <strong>{displayGroupName(group)}</strong>
+                    <span className="group-format-badge">{getScheduleFormatLabel(group.scheduleFormat)}</span>
+                  </div>
+                  {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <button className="ghost-button" disabled={isCompleted} onClick={() => addMatch(group.id)} type="button">
                     <Plus size={18} />
                     경기 추가
                   </button>}
                 </div>
-                {[...(matchesByGroupId.get(group.id) ?? [])]
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((match) => {
+                {group.scheduleFormat === "team-battle" && <TeamBattleRoster blueMembers={blueTeamMembers} whiteMembers={whiteTeamMembers} />}
+                {(group.scheduleFormat === "team-battle"
+                  ? groupTeamBattleMatchesByRound(matchesByGroupId.get(group.id) ?? [])
+                  : [{ roundNumber: 0, matches: [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) }]
+                ).map((round) => (
+                  <section className={group.scheduleFormat === "team-battle" ? "team-battle-round-card admin-team-battle-round-card" : "stack"} key={`round-${round.roundNumber}`}>
+                    {group.scheduleFormat === "team-battle" && (
+                      <div className="team-battle-round-card-head">
+                        <span>ROUND {String(round.roundNumber).padStart(2, "0")}</span>
+                        <strong>{round.roundNumber}라운드</strong>
+                        <small>{round.matches.length}경기</small>
+                      </div>
+                    )}
+                    <div className={group.scheduleFormat === "team-battle" ? "team-battle-round-match-list" : "stack"}>
+                    {round.matches.map((match) => {
                     const byeSelection = isTournamentFormat(group) ? tournamentByeSelections(group).find((selection) => selection.byeMatchId === match.id) : undefined;
                     return (
                     <div className="stack" key={match.id}>
@@ -1110,13 +1513,13 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       )}
                     <div className="match-edit-card stack" id={`match-${match.id}`}>
                       <div className="tournament-round-head match-edit-head">
-                        <span>{isTournamentFormat(group) ? tournamentMatchRoundLabel(group, match) : displayGroupName(group)}</span>
+                        <span>{group.scheduleFormat === "team-battle" ? `${round.roundNumber}라운드` : isTournamentFormat(group) ? tournamentMatchRoundLabel(group, match) : displayGroupName(group)}</span>
                         <strong>경기 {match.sortOrder}</strong>
                         {match.courtNumber && <em className="court-badge tournament-round-court">{courtLabel(match)}</em>}
                       </div>
                       <div className="score-panel vertical">
                         <label>
-                          <span>{isTournamentFormat(group) ? tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A")) : teamLabel(match.sideAPlayerIds)}</span>
+                          <span className="team-battle-side-name">{group.scheduleFormat === "team-battle" && <em className="team-side-badge blue">청팀</em>}{isTournamentFormat(group) ? tournamentTeamLabel(match.sideAPlayerIds, tournamentSideFallback(group, match, "A")) : teamLabel(match.sideAPlayerIds)}</span>
                           <div className="score-entry">
                             <small>점수</small>
                             <input aria-label="위쪽 팀 점수" className="score-input" disabled={isCompleted || (isTournamentFormat(group) && !canEnterMatchScore(match))} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideAScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideAScore ?? ""} />
@@ -1124,21 +1527,49 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         </label>
                         <div className="score-vs-label">VS</div>
                         <label>
-                          <span>{isTournamentFormat(group) ? tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B")) : teamLabel(match.sideBPlayerIds)}</span>
+                          <span className="team-battle-side-name">{group.scheduleFormat === "team-battle" && <em className="team-side-badge white">백팀</em>}{isTournamentFormat(group) ? tournamentTeamLabel(match.sideBPlayerIds, tournamentSideFallback(group, match, "B")) : teamLabel(match.sideBPlayerIds)}</span>
                           <div className="score-entry">
                             <small>점수</small>
                             <input aria-label="아래쪽 팀 점수" className="score-input" disabled={isCompleted || (isTournamentFormat(group) && !canEnterMatchScore(match))} inputMode="numeric" max={6} min={0} onBlur={() => flushScoreSave(match.id)} onChange={(event) => updateMatch(match.id, { sideBScore: normalizeMatchScore(event.target.value), status: "completed" })} placeholder="0" type="number" value={match.sideBScore ?? ""} />
                           </div>
                         </label>
                       </div>
-                      {scoreSaveStatusByMatchId[match.id] && (
+                      {group.scheduleFormat === "team-battle" && match.status !== "completed" && (
+                        <details className="player-edit-box team-battle-player-edit" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
+                          <summary>선수 변경</summary>
+                          <p className="notice-text">같은 팀의 이번 라운드 휴식 선수와 교체할 수 있습니다.</p>
+                          <div className="score-input-grid compact">
+                            {(["A", "A", "B", "B"] as const).map((side, slotIndex) => {
+                              const sideIndex = slotIndex % 2;
+                              const selected = side === "A" ? match.sideAPlayerIds[sideIndex] : match.sideBPlayerIds[sideIndex];
+                              const candidates = teamBattleReplacementCandidates(round.matches, match, side, sideIndex, selected);
+                              return (
+                                <label className="mini-select-field" key={`${side}-${sideIndex}`}>
+                                  <span>{side === "A" ? "청팀" : "백팀"} {sideIndex + 1}</span>
+                                  <select
+                                    aria-label={`${side === "A" ? "청팀" : "백팀"} ${sideIndex + 1} 선수 변경`}
+                                    className="select-input"
+                                    disabled={isCompleted || candidates.length <= 1}
+                                    onChange={(event) => replaceTeamBattlePlayer(match.id, round.matches, side, sideIndex, event.target.value)}
+                                    value={selected ?? ""}
+                                  >
+                                    {candidates.map((member) => (
+                                      <option key={member.id} value={member.id}>{member.name}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      )}                      {scoreSaveStatusByMatchId[match.id] && (
                         <p className={`notice-text score-save-status ${scoreSaveStatusByMatchId[match.id]}`}>
                           {scoreSaveStatusByMatchId[match.id] === "saving" && "점수 저장 중..."}
                           {scoreSaveStatusByMatchId[match.id] === "saved" && "점수 저장됨"}
                           {scoreSaveStatusByMatchId[match.id] === "error" && "점수 저장 실패. 다시 입력하면 재시도됩니다."}
                         </p>
                       )}
-                      {!isTournamentFormat(group) && <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
+                      {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                         <summary>선수 변경</summary>
                         <div className="score-input-grid compact">
                           {(["A", "A", "B", "B"] as const).map((side, index) => {
@@ -1157,7 +1588,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           })}
                         </div>
                       </details>}
-                      {!isTournamentFormat(group) && <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
+                      {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
                         <Trash2 size={18} />
                         경기 삭제
                       </button>}
@@ -1165,7 +1596,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     </div>
                   );
                   })}
-                {(duplicateTeamsByGroupId.get(group.id) ?? []).length > 0 && (
+                    </div>
+                  </section>
+                ))}
+                {!isFixedPairLeagueFormat(group) && (duplicateTeamsByGroupId.get(group.id) ?? []).length > 0 && (
                   <div className="notice-text duplicate-team-notice" role="status">
                     <strong>중복 팀 안내</strong>
                     <p>같은 팀이 여러 경기에 배정되어 있습니다.</p>
@@ -1185,12 +1619,22 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
         {activeTab === "ranking" && (
           <section className="section-card stack tab-panel" key="ranking">
-            <strong className="section-head">{visibleRankingGroups.some(({ group }) => isTournamentFormat(group)) ? "토너먼트 결과" : "순위"}</strong>
-            {renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
-            {visibleRankingGroups.map(({ group, rows }) => (
+            <strong className="section-head">{tournamentType === "team-battle" ? "청백전 팀 스코어" : visibleRankingGroups.some(({ group }) => isTournamentFormat(group)) ? "토너먼트 결과" : "순위"}</strong>
+            {tournamentType !== "team-battle" && renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
+            {visibleRankingGroups.map(({ group, rows, teamRows }) => (
               <div className="stack" key={group.id}>
                 <strong>{displayGroupName(group)}</strong>
-                {isTournamentFormat(group) ? (
+                {tournamentType === "team-battle" ? (
+                  <div className="stack">
+                    <div className="team-battle-scoreboard">
+                      <div className="team-score"><span>청팀</span><b>{teamBattleResult.blueWins}</b></div>
+                      <strong>:</strong>
+                      <div className="team-score"><span>백팀</span><b>{teamBattleResult.whiteWins}</b></div>
+                    </div>
+                    <p className="notice-text">완료 {teamBattleResult.completedMatches}경기{teamBattleResult.draws > 0 ? ` · 무승부 ${teamBattleResult.draws}경기` : ""}</p>
+                    <TeamBattleContributionDetails blueMembers={blueTeamMembers} whiteMembers={whiteTeamMembers} matches={state.matches} />
+                  </div>
+                ) : isTournamentFormat(group) ? (
                   <div className="tournament-result-board">
                     {tournamentRoundSections(group).map((round) => (
                       <div className="tournament-result-round" key={round.label}>
@@ -1205,6 +1649,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       </div>
                     ))}
                   </div>
+                ) : isFixedPairLeagueFormat(group) ? (
+                  <TeamRankingTable rows={teamRows} />
                 ) : (
                   <RankingTable rows={rows} />
                 )}

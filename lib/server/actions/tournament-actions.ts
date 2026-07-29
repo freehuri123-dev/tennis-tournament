@@ -38,7 +38,8 @@ export async function saveTournamentAction(formData: FormData) {
     clubSlug: formString(formData, "clubSlug"),
     name: formString(formData, "name"),
     date: formString(formData, "date"),
-    publicSlug: formString(formData, "publicSlug")
+    publicSlug: formString(formData, "publicSlug"),
+    type: formString(formData, "type"),
   });
 
   await requireAdmin(input.clubSlug);
@@ -92,7 +93,8 @@ export async function createTournamentAction(formData: FormData) {
     clubSlug,
     name: "새 대회",
     date: tomorrowDateString(),
-    publicSlug: createTournamentSlug(idSeed)
+    publicSlug: createTournamentSlug(idSeed),
+    type: formString(formData, "type") ?? "general",
   });
 
   const tournament = await upsertTournament(input);
