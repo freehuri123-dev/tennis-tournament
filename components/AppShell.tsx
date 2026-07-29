@@ -9,9 +9,28 @@ type AppShellProps = {
   children: React.ReactNode;
   active?: "home" | "members" | "tournaments" | "records";
   clubSlug?: ClubSlug;
+  brandTitle?: boolean;
 };
 
-export function AppShell({ title, subtitle = "월례대회 운영 관리", children, active = "home", clubSlug = "stc" }: AppShellProps) {
+function HeaderTitle({ title, brandTitle = false }: Pick<AppShellProps, "title" | "brandTitle">) {
+  return (
+    <strong className={`header-title ${brandTitle ? "tennis-matchup-wordmark" : ""}`}>
+      {brandTitle ? <span>{title}</span> : title}
+    </strong>
+  );
+}
+
+function PublicBrand({ clubName }: { clubName: string }) {
+  return (
+    <div className="public-brand-lockup">
+      <span className="tennis-matchup-mini-brand">테니스매치업</span>
+      <span aria-hidden="true">·</span>
+      <span className="header-brand">{clubName}</span>
+    </div>
+  );
+}
+
+export function AppShell({ title, subtitle = "월례대회 운영 관리", children, active = "home", clubSlug = "stc", brandTitle = false }: AppShellProps) {
   const club = getClubBySlug(clubSlug);
   const navItems = [
     { key: "home", href: buildClubPath(clubSlug), label: "홈", icon: Home },
@@ -26,7 +45,7 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
       <div className="mobile-frame">
         <header className="app-header">
           <span className="header-brand">{club?.name ?? "테니스 클럽"}</span>
-          <strong className="header-title">{title}</strong>
+          <HeaderTitle brandTitle={brandTitle} title={title} />
           <p className="header-subtitle">{subtitle}</p>
         </header>
         <main className="app-main">{children}</main>
@@ -47,7 +66,7 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
   );
 }
 
-export function PublicShell({ title, subtitle, children, clubSlug = "stc" }: Omit<AppShellProps, "active">) {
+export function PublicShell({ title, subtitle, children, clubSlug = "stc", brandTitle = false }: Omit<AppShellProps, "active">) {
   const club = getClubBySlug(clubSlug);
 
   return (
@@ -55,8 +74,8 @@ export function PublicShell({ title, subtitle, children, clubSlug = "stc" }: Omi
       <SplashScreen clubSlug={clubSlug} startLabel="대진표 확인하기" />
       <div className="mobile-frame public-mobile-frame">
         <header className="app-header">
-          <span className="header-brand">{club?.name ?? "테니스 클럽"}</span>
-          <strong className="header-title">{title}</strong>
+          <PublicBrand clubName={club?.name ?? "테니스 클럽"} />
+          <HeaderTitle brandTitle={brandTitle} title={title} />
           {subtitle && <p className="header-subtitle">{subtitle}</p>}
         </header>
         <main className="app-main">{children}</main>

@@ -10,7 +10,7 @@ export default async function ClubHomePage({ params }: { params: Promise<{ clubS
   const tournaments = await listTournamentsByClub(clubSlug);
 
   return (
-    <AppShell title="메인페이지" subtitle="회원관리와 대회관리를 선택하세요" active="home" clubSlug={clubSlug}>
+    <AppShell title="테니스매치업" subtitle="동호회 대진표와 대회를 한곳에서 관리하세요" active="home" clubSlug={clubSlug} brandTitle>
       <HomeDashboard clubSlug={clubSlug} tournaments={tournaments} />
     </AppShell>
   );

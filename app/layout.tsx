@@ -17,8 +17,8 @@ const notoSerifKr = Noto_Serif_KR({
 });
 
 export const metadata: Metadata = {
-  title: "Tennis Tournament Management System",
-  description: "Tennis tournament draw and ranking management system"
+  title: "테니스매치업",
+  description: "테니스 동호회를 위한 대진표 및 대회 관리 서비스"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -108,6 +108,84 @@ textarea:focus-visible {
   line-height: 1.18;
   letter-spacing: -0.03em;
 }
+.tennis-matchup-wordmark {
+  position: relative;
+  width: fit-content;
+  min-height: 40px;
+  padding: 1px 2px 8px;
+  font-family: var(--font-noto-sans-kr), "Malgun Gothic", sans-serif;
+  color: #075b55;
+  font-size: 29px;
+  font-weight: 900;
+  letter-spacing: -0.075em;
+}
+
+.tennis-matchup-wordmark::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 15%;
+  bottom: 5px;
+  width: 46%;
+  height: 11px;
+  border-bottom: 4px solid #59c9b2;
+  border-radius: 0 0 70% 60%;
+  transform: rotate(-3deg);
+}
+
+.tennis-matchup-wordmark::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  left: 48%;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: #c8df38;
+  box-shadow: 0 3px 7px rgba(77, 125, 39, 0.2);
+}
+
+.tennis-matchup-wordmark > span {
+  position: relative;
+  z-index: 1;
+}
+
+.public-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #7c9b94;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.public-brand-lockup .header-brand {
+  color: #63817a;
+  font-size: 11px;
+}
+
+.tennis-matchup-mini-brand {
+  position: relative;
+  padding-left: 14px;
+  color: #176b5a;
+  font-weight: 950;
+  letter-spacing: -0.035em;
+}
+
+.tennis-matchup-mini-brand::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #bcd93b;
+  box-shadow: inset -2px 0 rgba(255, 255, 255, 0.65);
+  transform: translateY(-50%);
+}
 
 .header-subtitle {
   margin: 6px 0 0;

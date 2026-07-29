@@ -8,7 +8,7 @@ export default async function AdminHomePage() {
   const tournaments = await listTournamentsByClub("stc");
 
   return (
-    <AppShell title="관리자 홈" subtitle="회원관리와 대회관리를 선택하세요." active="home">
+    <AppShell title="테니스매치업" subtitle="동호회 대진표와 대회를 한곳에서 관리하세요" active="home" brandTitle>
       <HomeDashboard clubSlug="stc" tournaments={tournaments} />
     </AppShell>
   );

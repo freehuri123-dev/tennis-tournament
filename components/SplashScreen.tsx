@@ -47,7 +47,7 @@ export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: 
 
   return (
     <div className={`splash-screen ${leaving ? "leaving" : ""}`}>
-      <img alt="Tennis Tournament Management System intro" src={introImages[clubSlug]} />
+      <img alt="테니스매치업 시작 화면" src={introImages[clubSlug]} />
       <button className="splash-start-button" onClick={startApp} type="button">
         {startLabel}
       </button>
