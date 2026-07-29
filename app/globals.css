@@ -3887,7 +3887,7 @@ body,
 
 .team-battle-roster-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -4035,14 +4035,17 @@ body,
 
 .team-battle-contribution-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 0 12px 8px;
 }
 
 .team-contribution-card {
+  min-width: 0;
   display: grid;
+  align-content: start;
   gap: 12px;
-  padding: 14px;
+  padding: 12px 10px;
   border-radius: 16px;
   border: 1px solid var(--line);
   background: #fff;
@@ -4071,8 +4074,13 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.team-contribution-member-head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .team-contribution-member-head b {

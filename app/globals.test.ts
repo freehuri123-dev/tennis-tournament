@@ -47,4 +47,11 @@ describe("mobile app frame styles", () => {
     expect(css).toMatch(/\.invalid-access-page\s*\{[^}]*font-family:\s*var\(--font-noto-sans-kr\)/s);
     expect(css).toMatch(/\.header-title,[\s\S]*\.section-head,[\s\S]*font-family:\s*var\(--font-noto-serif-kr\)/);
   });
+  it("stacks the blue and white team rosters vertically", () => {
+    expect(css).toMatch(/\.team-battle-roster-summary\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s);
+  });
+  it("places blue and white contribution cards side by side", () => {
+    expect(css).toMatch(/\.team-battle-contribution-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/s);
+    expect(css).toMatch(/\.team-contribution-card\s*\{[^}]*align-content:\s*start;/s);
+  });
 });
