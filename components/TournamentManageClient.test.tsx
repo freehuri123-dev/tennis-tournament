@@ -611,6 +611,9 @@ it("creates and saves a five-pair round robin league", async () => {
 
     const firstView = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
     expect(screen.getByText("5라운드 × 3코트 · 총 15경기")).toBeTruthy();
+    expect(screen.getByText("사용할 코트 번호 선택")).toBeTruthy();
+    expect(screen.getByText("3/3개 선택")).toBeTruthy();
+    expect(screen.getByText("아래 번호를 눌러 실제 사용할 코트를 선택하세요.")).toBeTruthy();
     const replacement = await screen.findByRole("button", { name: /청5 4경기/ });
     fireEvent.click(replacement);
     expect(screen.getByRole("button", { name: /청5 3경기/ })).toBeTruthy();

@@ -3132,6 +3132,38 @@ textarea:focus-visible {
   min-width: 112px;
 }
 
+.court-number-selection-head {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.court-number-selection-head strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.court-number-selection-head span {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #dff3ed;
+  color: #176b5a;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.court-number-selection-guide {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .court-number-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));

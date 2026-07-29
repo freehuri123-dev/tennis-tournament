@@ -1174,6 +1174,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       </label>
                     </div>
                     <p className="notice-text">총 {teamBattleRoundCount * courtCount}경기 · 라운드마다 {courtCount}경기</p>
+                    <div className="court-number-selection-head">
+                      <strong>사용할 코트 번호 선택</strong>
+                      <span>{selectedCourtNumbers.length}/{courtCount}개 선택</span>
+                    </div>
+                    <p className="court-number-selection-guide">아래 번호를 눌러 실제 사용할 코트를 선택하세요.</p>
                     <div className="court-number-grid" aria-label="코트 번호 선택">
                       {COURT_NUMBER_OPTIONS.map((courtNumber) => {
                         const selectedIndex = selectedCourtNumbers.indexOf(courtNumber);
@@ -1421,6 +1426,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           ))}
                         </select>
                       </label>
+                      <div className="court-number-selection-head">
+                        <strong>사용할 코트 번호 선택</strong>
+                        <span>{selectedCourtNumbers.length}/{courtCount}개 선택</span>
+                      </div>
+                      <p className="court-number-selection-guide">아래 번호를 눌러 실제 사용할 코트를 선택하세요.</p>
                       <div className="court-number-grid" aria-label="코트 번호 선택">
                         {COURT_NUMBER_OPTIONS.map((courtNumber) => {
                           const selectedIndex = selectedCourtNumbers.indexOf(courtNumber);
