@@ -12,15 +12,13 @@ function createPrismaClient() {
   return new PrismaClient({
     adapter: new PrismaPg({
       connectionString: databaseUrl,
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 30_000,
-      max: 5
+      max: 1
     })
   });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;

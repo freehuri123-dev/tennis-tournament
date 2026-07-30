@@ -10,9 +10,10 @@ type PendingLinkProps = {
   children: ReactNode;
   className?: string;
   showPending?: boolean;
+  prefetch?: boolean;
 };
 
-export function PendingLink({ href, children, className, showPending = true }: PendingLinkProps) {
+export function PendingLink({ href, children, className, showPending = true, prefetch = false }: PendingLinkProps) {
   const [pending, setPending] = useState(false);
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
@@ -25,7 +26,7 @@ export function PendingLink({ href, children, className, showPending = true }: P
   return (
     <>
       {pending ? <LoadingOverlay label="이동 중..." /> : null}
-      <Link className={className} href={href} onClick={handleClick}>
+      <Link className={className} href={href} onClick={handleClick} prefetch={prefetch}>
         {children}
       </Link>
     </>

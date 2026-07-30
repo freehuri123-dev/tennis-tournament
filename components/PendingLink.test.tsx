@@ -4,9 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { PendingLink } from "./PendingLink";
 
 vi.mock("next/link", () => ({
-  default: ({ children, onClick, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { children: ReactNode }) => (
+  default: ({
+    children,
+    onClick,
+    prefetch,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { children: ReactNode; prefetch?: boolean }) => (
     <a
       {...props}
+      data-prefetch={String(prefetch)}
       onClick={(event) => {
         onClick?.(event);
         event.preventDefault();
@@ -18,6 +24,12 @@ vi.mock("next/link", () => ({
 }));
 
 describe("PendingLink", () => {
+  it("does not prefetch database-backed routes by default", () => {
+    render(<PendingLink href="/stc/members">Members</PendingLink>);
+
+    expect(screen.getByRole("link", { name: "Members" }).getAttribute("data-prefetch")).toBe("false");
+  });
+
   it("shows a loading overlay for page navigation links", () => {
     render(<PendingLink href="/stc/tournaments/manage?tournamentId=t1">상세 이동</PendingLink>);
 
