@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { deleteMemberAction } from "./actions/member-actions";
-import { updateMatchScoreAction } from "./actions/match-actions";
+import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "./actions/match-actions";
 import { createTournamentAction, deleteTournamentAction, persistTournamentStateAction } from "./actions/tournament-actions";
 import type { TournamentState } from "../store/tournament-store";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
-const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, upsertTournament } = vi.hoisted(() => ({
+const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, updateTournamentMatchStates, upsertTournament } = vi.hoisted(() => ({
   deleteTournament: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
@@ -15,6 +15,7 @@ const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournam
   replaceTournamentState: vi.fn(),
   softDeleteMember: vi.fn(),
   updateMatchScore: vi.fn(),
+  updateTournamentMatchStates: vi.fn(),
   upsertTournament: vi.fn()
 }));
 
@@ -26,6 +27,7 @@ vi.mock("./repositories/tournament-repository", () => ({
   replaceTournamentState,
   softDeleteMember,
   updateMatchScore,
+  updateTournamentMatchStates,
   upsertMember: vi.fn(),
   upsertTournament
 }));
@@ -188,4 +190,22 @@ describe("server action validation", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/otc/tournaments/manage");
     expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");
   });
-});
+
+  it("saves only changed tournament matches and revalidates the public page", async () => {
+    const matches = [{
+      matchId: "match-1",
+      sideAPlayerIds: ["member-1", "member-2"],
+      sideBPlayerIds: ["member-3", "member-4"],
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed" as const
+    }];
+
+    await expect(updateTournamentMatchStatesAction({ publicSlug: "1234", matches }, "stc")).resolves.toBeUndefined();
+
+    expect(requireAdmin).toHaveBeenCalledWith("stc");
+    expect(updateTournamentMatchStates).toHaveBeenCalledWith("stc", matches);
+    expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments/manage");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");
+    expect(revalidatePath).toHaveBeenCalledWith("/public/stc/1234");
+  });});

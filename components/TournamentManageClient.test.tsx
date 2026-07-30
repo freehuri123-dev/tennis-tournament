@@ -1,13 +1,14 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TournamentManageClient } from "./TournamentManageClient";
 import type { TournamentState } from "@/lib/store/tournament-store";
-import { updateMatchScoreAction } from "@/lib/server/actions/match-actions";
+import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "@/lib/server/actions/match-actions";
 import { persistTournamentStateAction, updateTournamentDateAction, updateTournamentNameAction } from "@/lib/server/actions/tournament-actions";
 import { applyTournamentAdvancement, generateInitialMatches } from "@/lib/domain/schedule";
 
 vi.mock("@/lib/server/actions/match-actions", () => ({
-  updateMatchScoreAction: vi.fn(() => Promise.resolve())
+  updateMatchScoreAction: vi.fn(() => Promise.resolve()),
+  updateTournamentMatchStatesAction: vi.fn(() => Promise.resolve())
 }));
 
 vi.mock("@/lib/server/actions/tournament-actions", () => ({
@@ -307,6 +308,7 @@ describe("TournamentManageClient save timing", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "그룹 추가" }));
 
+    expect(screen.getByRole("tab", { name: /B조.*0명/ }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByText("코트 배정")).toBeNull();
     expect(screen.queryByRole("button", { name: "사용불가" })).toBeNull();
     expect(screen.queryByLabelText("코트 개수")).toBeNull();
@@ -401,63 +403,59 @@ describe("TournamentManageClient save timing", () => {
     expect(screen.queryByText(/자동 시드/)).toBeNull();
   });
 
-  it("auto-saves score edits after the user pauses typing", async () => {
-    vi.useFakeTimers();
+  it("saves a completed match only after the input complete button is pressed", async () => {
     render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const completeButton = screen.getByRole("button", { name: "점수 입력 완료" });
+    expect((completeButton as HTMLButtonElement).disabled).toBe(true);
+
     fireEvent.change(screen.getByLabelText("위쪽 팀 점수"), { target: { value: "6" } });
+    expect((completeButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("아래쪽 팀 점수"), { target: { value: "3" } });
 
+    expect(updateMatchScoreAction).not.toHaveBeenCalled();
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
-    expect(updateMatchScoreAction).not.toHaveBeenCalled();
+    expect((completeButton as HTMLButtonElement).disabled).toBe(false);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(899);
-    });
-    expect(updateMatchScoreAction).not.toHaveBeenCalled();
+    fireEvent.click(completeButton);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1);
-    });
-
-    expect(updateMatchScoreAction).toHaveBeenCalledWith(
-      { matchId: "match-1", sideAScore: 6, sideBScore: null },
+    await waitFor(() => expect(updateMatchScoreAction).toHaveBeenCalledWith(
+      { matchId: "match-1", sideAScore: 6, sideBScore: 3 },
       "stc"
-    );
+    ));
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "저장 완료" })).toBeTruthy());
   });
 
-  it("flushes pending score auto-save when the input loses focus", async () => {
-    vi.useFakeTimers();
+  it("does not save score edits on blur", () => {
     render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: "대진표" }));
-    const scoreInput = screen.getByLabelText("위쪽 팀 점수");
-    fireEvent.change(scoreInput, { target: { value: "6" } });
-    await act(async () => {
-      fireEvent.blur(scoreInput);
-      await Promise.resolve();
-    });
+    const topScoreInput = screen.getByLabelText("위쪽 팀 점수");
+    fireEvent.change(topScoreInput, { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText("아래쪽 팀 점수"), { target: { value: "3" } });
+    fireEvent.blur(topScoreInput);
 
-    expect(updateMatchScoreAction).toHaveBeenCalledWith(
-      { matchId: "match-1", sideAScore: 6, sideBScore: null },
-      "stc"
-    );
+    expect(updateMatchScoreAction).not.toHaveBeenCalled();
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
+    expect(screen.getByText("점수를 확인한 후 점수 입력 완료를 눌러주세요.")).toBeTruthy();
   });
-
-  it("opens fixed-pair tournament draw and accepts score input", async () => {
+  it("opens fixed-pair tournament draw and saves a completed score explicitly", async () => {
     render(<TournamentManageClient initialState={makeFixedPairTournamentState()} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: "대진표" }));
     fireEvent.change(screen.getByLabelText("위쪽 팀 점수"), { target: { value: "6" } });
     fireEvent.change(screen.getByLabelText("아래쪽 팀 점수"), { target: { value: "3" } });
 
-    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    expect(updateTournamentMatchStatesAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "점수 입력 완료" }));
+
+    await waitFor(() => expect(updateTournamentMatchStatesAction).toHaveBeenCalledTimes(1));
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("6")).toBeTruthy();
     expect(screen.getByDisplayValue("3")).toBeTruthy();
   });
-
   it("disables tournament score inputs for BYE matches", () => {
     render(<TournamentManageClient initialState={makeTournamentByeState()} clubSlug="stc" />);
 
@@ -467,10 +465,11 @@ describe("TournamentManageClient save timing", () => {
     expect((screen.getByLabelText("아래쪽 팀 점수") as HTMLInputElement).disabled).toBe(true);
   });
 
-  it("shows the initial automatic BYE in the seed preview before generating matches", () => {
-    render(<TournamentManageClient initialState={makeNinePairTournamentState()} clubSlug="stc" />);
+  it("does not repeat tournament seeds below the participant order", () => {
+    const { container } = render(<TournamentManageClient initialState={makeNinePairTournamentState()} clubSlug="stc" />);
 
-    expect(screen.getAllByText(/자동 부전승/).length).toBeGreaterThan(0);
+    expect(container.querySelector(".fixed-pair-preview")).toBeNull();
+    expect(container.querySelectorAll(".group-selected-member-grid .sortable-participant")).toHaveLength(18);
   });
 
   it("saves a selected tournament BYE as an automatic winner in the next round", async () => {
@@ -521,15 +520,64 @@ it("creates and saves a five-pair round robin league", async () => {
     state.groupMemberIds = { g1: [], g2: [] };
 
     const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
-    const formatSelects = Array.from(container.querySelectorAll<HTMLSelectElement>(".format-field select"));
-
-    expect(formatSelects).toHaveLength(2);
-    for (const select of formatSelects) {
-      const values = Array.from(select.options).map((option) => option.value);
+    const expectGeneralFormatsOnly = () => {
+      const select = container.querySelector<HTMLSelectElement>(".format-field select");
+      expect(select).toBeTruthy();
+      const values = Array.from(select!.options).map((option) => option.value);
       expect(values).toContain("fixed-pair-league");
       expect(values).not.toContain("fixed-pair-tournament");
       expect(values).not.toContain("single-tournament");
-    }
+    };
+
+    expectGeneralFormatsOnly();
+    fireEvent.click(screen.getByRole("tab", { name: /B조.*0명/ }));
+    expectGeneralFormatsOnly();
+    expect(container.querySelectorAll(".group-setup-card")).toHaveLength(1);
+  });
+  it("shows dynamic setup tabs and only unassigned players for the active group", () => {
+    const state = makeStateWithParticipants();
+    state.groups = [
+      state.groups[0],
+      { ...state.groups[0], id: "g2", name: "B조", sortOrder: 2 }
+    ];
+    state.groupMemberIds = { g1: ["m1"], g2: ["m2"] };
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    expect(screen.getByRole("tab", { name: /A조.*1명/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: /B조.*1명/ })).toBeTruthy();
+    expect(container.querySelector(".group-selected-member-grid")?.textContent).toContain("김철수");
+    expect(container.querySelector(".unassigned-participant-grid")?.textContent).not.toContain("박영희");
+    expect(container.querySelector(".unassigned-participant-grid")?.textContent).toContain("이민준");
+
+    fireEvent.click(screen.getByRole("tab", { name: /B조.*1명/ }));
+    expect(container.querySelector(".group-selected-member-grid")?.textContent).toContain("박영희");
+    fireEvent.click(screen.getByRole("button", { name: "이민준" }));
+
+    expect(screen.getByRole("tab", { name: /B조.*2명/ })).toBeTruthy();
+    expect(container.querySelector(".group-selected-member-grid")?.textContent).toContain("이민준");
+  });
+  it("renumbers remaining groups after a group is deleted", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const state = makeStateWithParticipants();
+    state.groups = [
+      state.groups[0],
+      { ...state.groups[0], id: "g2", name: "B조", sortOrder: 2 },
+      { ...state.groups[0], id: "g3", name: "C조", sortOrder: 3 },
+      { ...state.groups[0], id: "g4", name: "D조", sortOrder: 4 }
+    ];
+    state.groupMemberIds = { g1: [], g2: [], g3: [], g4: ["m1"] };
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("tab", { name: /C조.*0명/ }));
+    fireEvent.click(screen.getByRole("button", { name: "그룹 삭제" }));
+
+    expect(screen.getByRole("tab", { name: /A조.*0명/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: /B조.*0명/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /C조.*1명/ })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: /D조/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /C조.*1명/ }));
+    expect(container.querySelector(".group-selected-member-grid")?.textContent).toContain("김철수");
   });
   it("shows each group format in the draw title and hides manual matches for fixed pairs", () => {
     const state = makeStateWithMatch();

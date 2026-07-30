@@ -42,3 +42,14 @@ export const matchScoreInputSchema = z.object({
   sideAScore: z.number().int().min(0).max(99).nullable(),
   sideBScore: z.number().int().min(0).max(99).nullable()
 });
+export const tournamentMatchStatesInputSchema = z.object({
+  publicSlug: z.string().trim().min(1),
+  matches: z.array(z.object({
+    matchId: z.string().trim().min(1),
+    sideAPlayerIds: z.array(z.string().trim().min(1)).max(2),
+    sideBPlayerIds: z.array(z.string().trim().min(1)).max(2),
+    sideAScore: z.number().int().min(0).max(99).nullable(),
+    sideBScore: z.number().int().min(0).max(99).nullable(),
+    status: z.enum(["scheduled", "completed"])
+  })).min(1).max(32)
+});
