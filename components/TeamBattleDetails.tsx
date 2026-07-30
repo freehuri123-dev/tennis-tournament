@@ -14,12 +14,21 @@ type ContributionRow = {
 
 function calculateContribution(members: Member[], matches: Match[]): ContributionRow[] {
   const winsByMemberId = new Map(calculateRankings(members, matches).map((row) => [row.memberId, row.wins]));
-  const totalWinCredits = members.reduce((sum, member) => sum + (winsByMemberId.get(member.id) ?? 0), 0);
+  const memberIds = new Set(members.map((member) => member.id));
+  const teamWins = matches.filter((match) => {
+    if (match.status !== "completed" || match.sideAScore === null || match.sideBScore === null) return false;
+    const hasSideAMember = match.sideAPlayerIds.some((memberId) => memberIds.has(memberId));
+    const hasSideBMember = match.sideBPlayerIds.some((memberId) => memberIds.has(memberId));
+    return (hasSideAMember && match.sideAScore > match.sideBScore)
+      || (hasSideBMember && match.sideBScore > match.sideAScore);
+  }).length;
 
-  return members.map((member) => ({
-    member,
-    percent: totalWinCredits > 0 ? Math.round(((winsByMemberId.get(member.id) ?? 0) / totalWinCredits) * 100) : 0
-  }));
+  return members
+    .map((member) => ({
+      member,
+      percent: teamWins > 0 ? Math.round(((winsByMemberId.get(member.id) ?? 0) / teamWins) * 100) : 0
+    }))
+    .sort((left, right) => right.percent - left.percent || left.member.name.localeCompare(right.member.name, "ko"));
 }
 
 export function TeamBattleRoster({ blueMembers, whiteMembers }: Omit<TeamBattleDetailsProps, "matches">) {
@@ -80,7 +89,7 @@ export function TeamBattleContributionDetails({ blueMembers, whiteMembers, match
           </section>
         ))}
       </div>
-      <p className="team-contribution-note">기여도는 팀 전체 선수 승리 횟수 중 각 선수가 참여한 승리 비율입니다.</p>
+      <p className="team-contribution-note">기여도는 팀 전체 승리 경기 중 각 선수가 승리에 참여한 비율입니다.</p>
     </section>
   );
 }

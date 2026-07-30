@@ -112,6 +112,6 @@ it("removes overall ranking and renders team standings when a fixed pair league 
     expect(screen.getByRole("tab", { name: "팀 스코어" }).getAttribute("aria-selected")).toBe("true");
     expect(container.querySelector(".team-battle-scoreboard")?.textContent).toContain("청팀2:백팀1");
     expect(screen.getByText("팀 기여도")).toBeTruthy();
-    expect(screen.getByLabelText("김철수 팀 승리 기여도 50%")).toBeTruthy();
+    expect(screen.getByLabelText("김철수 팀 승리 기여도 100%")).toBeTruthy();
   });
 });
