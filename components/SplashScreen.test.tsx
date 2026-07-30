@@ -19,7 +19,7 @@ describe("SplashScreen", () => {
   });
 
   it("uses the joogo intro image for the joogo meeting", () => {
-    expect(source).toContain('joogo: "/joogo_intro.jpg"');
+    expect(source).toContain('joogo: "/joogo_intro_summer_coast.webp"');
   });
 
   it("uses the army intro image for the army meeting", () => {

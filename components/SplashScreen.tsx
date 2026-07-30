@@ -6,7 +6,7 @@ import type { ClubSlug } from "@/lib/domain/club";
 const introImages: Record<ClubSlug, string> = {
   stc: "/stc_intro_summer_coast.webp",
   otc: "/otc_intro_summer_coast.webp",
-  joogo: "/joogo_intro.jpg",
+  joogo: "/joogo_intro_summer_coast.webp",
   army: "/army_intro.jpg"
 };
 
