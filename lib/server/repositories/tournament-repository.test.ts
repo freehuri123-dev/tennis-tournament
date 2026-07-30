@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { deleteTournament, fromDbScheduleFormat, listMembersByClub, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentMatchStates } from "./tournament-repository";
+import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentMatchStates } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -66,6 +66,17 @@ describe("tournament repository mapping", () => {
 
     await expect(loadTournamentStateFromDb("stc")).resolves.toMatchObject({ matches: [], groups: [] });
     expect(prisma.club.findUnique).toHaveBeenCalledTimes(2);
+  });
+  it("retries the club home query up to a third attempt for the production connection timeout", async () => {
+    const transientError = new Error("timeout exceeded when trying to connect");
+    prisma.club.findUnique
+      .mockRejectedValueOnce(transientError)
+      .mockRejectedValueOnce(transientError)
+      .mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findMany.mockResolvedValue([]);
+
+    await expect(listTournamentsByClub("stc")).resolves.toEqual([]);
+    expect(prisma.club.findUnique).toHaveBeenCalledTimes(3);
   });
   it("retries a public tournament query once after a transient database connection error", async () => {
     const transientError = new Error("Connection terminated due to connection timeout");

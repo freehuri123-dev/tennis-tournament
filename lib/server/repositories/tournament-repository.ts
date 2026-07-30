@@ -243,10 +243,10 @@ function isTransientDatabaseConnectionError(error: unknown) {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
   const message = error instanceof Error ? error.message : String(error);
   return ["P1001", "P1002", "P1017"].includes(code)
-    || /failed to connect to upstream database|can't reach database server|connection (?:terminated|closed)|ECONNRESET|ETIMEDOUT/i.test(message);
+    || /failed to connect to upstream database|can't reach database server|timeout exceeded when trying to connect|connection (?:terminated|closed)|ECONNRESET|ETIMEDOUT/i.test(message);
 }
 
-async function withDatabaseConnectionRetry<T>(operation: () => Promise<T>, maxAttempts = 2): Promise<T> {
+async function withDatabaseConnectionRetry<T>(operation: () => Promise<T>, maxAttempts = 3): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -254,7 +254,7 @@ async function withDatabaseConnectionRetry<T>(operation: () => Promise<T>, maxAt
     } catch (error) {
       lastError = error;
       if (attempt === maxAttempts || !isTransientDatabaseConnectionError(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
     }
   }
   throw lastError;
@@ -296,23 +296,29 @@ function matchPlayerIds(match: Match) {
   return [...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => id !== "");
 }
 
-export async function getClubOrThrow(clubSlug: ClubSlug) {
+async function getClubOrThrowOnce(clubSlug: ClubSlug) {
   const prisma = await getPrisma();
   const club = await prisma.club.findUnique({ where: { slug: clubSlug } });
   if (!club) throw new Error(`Club not found: ${clubSlug}`);
   return club;
 }
 
+export async function getClubOrThrow(clubSlug: ClubSlug) {
+  return withDatabaseConnectionRetry(() => getClubOrThrowOnce(clubSlug));
+}
+
 export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
   if (shouldUseLocalSampleData()) return localSampleState().members;
 
   const prisma = await getPrisma();
-  const club = await getClubOrThrow(clubSlug);
-  const members = await prisma.member.findMany({
-    where: { clubId: club.id, deleted: false },
-    orderBy: [{ name: "asc" }, { id: "asc" }]
+  return withDatabaseConnectionRetry(async () => {
+    const club = await getClubOrThrowOnce(clubSlug);
+    const members = await prisma.member.findMany({
+      where: { clubId: club.id, deleted: false },
+      orderBy: [{ name: "asc" }, { id: "asc" }]
+    });
+    return sortMembersByDisplayName(members.map(toDomainMember));
   });
-  return sortMembersByDisplayName(members.map(toDomainMember));
 }
 
 export async function getMemberById(clubSlug: ClubSlug, memberId: string): Promise<Member | null> {
@@ -321,11 +327,13 @@ export async function getMemberById(clubSlug: ClubSlug, memberId: string): Promi
   }
 
   const prisma = await getPrisma();
-  const club = await getClubOrThrow(clubSlug);
-  const member = await prisma.member.findFirst({
-    where: { id: memberId, clubId: club.id, deleted: false }
+  return withDatabaseConnectionRetry(async () => {
+    const club = await getClubOrThrowOnce(clubSlug);
+    const member = await prisma.member.findFirst({
+      where: { id: memberId, clubId: club.id, deleted: false }
+    });
+    return member ? toDomainMember(member) : null;
   });
-  return member ? toDomainMember(member) : null;
 }
 
 export async function upsertMember(input: MemberInput): Promise<Member> {
@@ -508,12 +516,14 @@ export async function listTournamentsByClub(clubSlug: ClubSlug): Promise<Tournam
   if (shouldUseLocalSampleData()) return localSampleState().tournaments;
 
   const prisma = await getPrisma();
-  const club = await getClubOrThrow(clubSlug);
-  const tournaments = await prisma.tournament.findMany({
-    where: { clubId: club.id },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
+  return withDatabaseConnectionRetry(async () => {
+    const club = await getClubOrThrowOnce(clubSlug);
+    const tournaments = await prisma.tournament.findMany({
+      where: { clubId: club.id },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
+    });
+    return tournaments.map(toDomainTournament);
   });
-  return tournaments.map(toDomainTournament);
 }
 
 export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members: Member[]; tournaments: Tournament[]; matches: Match[] }> {
@@ -527,27 +537,29 @@ export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members:
   }
 
   const prisma = await getPrisma();
-  const club = await getClubOrThrow(clubSlug);
-  const [members, tournaments, matches] = await Promise.all([
-    prisma.member.findMany({
-      where: { clubId: club.id, deleted: false },
-      orderBy: [{ name: "asc" }, { id: "asc" }]
-    }),
-    prisma.tournament.findMany({
-      where: { clubId: club.id },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
-    }),
-    prisma.match.findMany({
-      where: { tournament: { clubId: club.id, type: { not: "team_battle" } } },
-      orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
-    })
-  ]);
+  return withDatabaseConnectionRetry(async () => {
+    const club = await getClubOrThrowOnce(clubSlug);
+    const [members, tournaments, matches] = await Promise.all([
+      prisma.member.findMany({
+        where: { clubId: club.id, deleted: false },
+        orderBy: [{ name: "asc" }, { id: "asc" }]
+      }),
+      prisma.tournament.findMany({
+        where: { clubId: club.id },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
+      }),
+      prisma.match.findMany({
+        where: { tournament: { clubId: club.id, type: { not: "team_battle" } } },
+        orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
+      })
+    ]);
 
-  return {
-    members: sortMembersByDisplayName(members.map(toDomainMember)),
-    tournaments: tournaments.map(toDomainTournament),
-    matches: matches.map(toDomainMatch)
-  };
+    return {
+      members: sortMembersByDisplayName(members.map(toDomainMember)),
+      tournaments: tournaments.map(toDomainTournament),
+      matches: matches.map(toDomainMatch)
+    };
+  });
 }
 
 export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId?: string): Promise<TournamentState> {
@@ -555,7 +567,7 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
 
   const prisma = await getPrisma();
   const { members, tournaments, selectedTournament } = await withDatabaseConnectionRetry(async () => {
-    const club = await getClubOrThrow(clubSlug);
+    const club = await getClubOrThrowOnce(clubSlug);
     const [members, tournaments, selectedTournament] = await Promise.all([
       prisma.member.findMany({
         where: { clubId: club.id, deleted: false },
@@ -748,7 +760,7 @@ async function loadPublicTournamentStateOnce(clubSlug: ClubSlug, publicSlug: str
   }
 
   const prisma = await getPrisma();
-  const club = await getClubOrThrow(clubSlug);
+  const club = await getClubOrThrowOnce(clubSlug);
   const tournamentInclude = {
     participants: { orderBy: [{ sortOrder: "asc" as const }, { memberId: "asc" as const }] },
     groups: {
