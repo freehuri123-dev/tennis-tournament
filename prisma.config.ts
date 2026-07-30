@@ -7,7 +7,7 @@ loadEnv();
 export default defineConfig({
   schema: "prisma/schema.prisma",
   datasource: {
-    url: env("DATABASE_URL")
+    url: env("DIRECT_URL")
   },
   migrations: {
     path: "prisma/migrations",

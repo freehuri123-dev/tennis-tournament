@@ -11,14 +11,17 @@ const introImages: Record<ClubSlug, string> = {
 };
 
 export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: { clubSlug?: ClubSlug; startLabel?: string }) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
   const startedRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const storageKey = `splash-started:${clubSlug}`;
-    if (window.sessionStorage.getItem(storageKey) === "yes") return;
+    if (window.sessionStorage.getItem(storageKey) === "yes") {
+      setVisible(false);
+      return;
+    }
 
     startedRef.current = false;
     setVisible(true);
@@ -47,7 +50,7 @@ export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: 
 
   return (
     <div className={`splash-screen ${leaving ? "leaving" : ""}`}>
-      <img alt="테니스매치업 시작 화면" src={introImages[clubSlug]} />
+      <img alt="테니스매치업 시작 화면" fetchPriority="high" loading="eager" src={introImages[clubSlug]} />
       <button className="splash-start-button" onClick={startApp} type="button">
         {startLabel}
       </button>

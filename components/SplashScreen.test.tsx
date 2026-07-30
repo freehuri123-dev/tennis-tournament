@@ -7,10 +7,17 @@ describe("SplashScreen", () => {
 
   it("lets the user start or automatically continues after ten seconds", () => {
     expect(source).toContain("시작하기");
+    expect(source).toContain("useState(true)");
+    expect(source).toContain("setVisible(false)");
     expect(source).toContain("function startApp()");
     expect(source).toContain("}, 10000)");
     expect(source).toContain("splash-started:${clubSlug}");
     expect(source).not.toContain("setTimeout(() => setLeaving(true), 2600)");
+  });
+
+  it("renders and eagerly loads the intro image in the initial server response", () => {
+    expect(source).toContain('fetchPriority="high"');
+    expect(source).toContain('loading="eager"');
   });
 
   it("uses optimized summer intro images for the STC and OTC clubs", () => {

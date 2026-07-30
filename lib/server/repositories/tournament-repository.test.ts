@@ -67,6 +67,15 @@ describe("tournament repository mapping", () => {
     await expect(loadTournamentStateFromDb("stc")).resolves.toMatchObject({ matches: [], groups: [] });
     expect(prisma.club.findUnique).toHaveBeenCalledTimes(2);
   });
+  it("retries a public tournament query once after a transient database connection error", async () => {
+    const transientError = new Error("Connection terminated due to connection timeout");
+    prisma.club.findUnique.mockRejectedValueOnce(transientError).mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findUnique.mockResolvedValue(null);
+
+    await expect(loadPublicTournamentState("stc", "missing-slug")).resolves.toBeNull();
+    expect(prisma.club.findUnique).toHaveBeenCalledTimes(2);
+  });
+
   it("returns null for an unknown public slug without loading fallback tournament data", async () => {
     prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
     prisma.tournament.findUnique.mockResolvedValue(null);

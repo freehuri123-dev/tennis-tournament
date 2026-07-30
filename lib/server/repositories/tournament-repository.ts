@@ -741,7 +741,7 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
   }, { maxWait: 10_000, timeout: 30_000 });
 }
 
-export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: string): Promise<TournamentState | null> {
+async function loadPublicTournamentStateOnce(clubSlug: ClubSlug, publicSlug: string): Promise<TournamentState | null> {
   if (shouldUseLocalSampleData()) {
     const state = localSampleState();
     return state.tournament.publicSlug === publicSlug ? state : null;
@@ -811,4 +811,8 @@ export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: 
     matches: selectedTournament.matches.map(toDomainMatch),
     deletedPublicSlugs: []
   };
+}
+
+export async function loadPublicTournamentState(clubSlug: ClubSlug, publicSlug: string): Promise<TournamentState | null> {
+  return withDatabaseConnectionRetry(() => loadPublicTournamentStateOnce(clubSlug, publicSlug));
 }

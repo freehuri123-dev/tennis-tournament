@@ -289,6 +289,39 @@ textarea:focus-visible {
   transform: translateX(-50%) scale(0.98);
 }
 
+.error-recovery-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.error-recovery-card {
+  width: min(100%, 420px);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.error-recovery-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.error-retry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.error-recovery-card small {
+  color: var(--muted);
+}
+
 .page {
   animation: page-in 220ms ease both;
 }
