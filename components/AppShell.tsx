@@ -1,7 +1,6 @@
 import { CalendarDays, Home, Trophy, Users } from "lucide-react";
 import { buildClubPath, getClubBySlug, type ClubSlug } from "../lib/domain/club";
 import { PendingLink } from "./PendingLink";
-import { SplashScreen } from "./SplashScreen";
 
 type AppShellProps = {
   title: string;
@@ -41,7 +40,6 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
 
   return (
     <div className="app-shell">
-      <SplashScreen clubSlug={clubSlug} />
       <div className="mobile-frame">
         <header className="app-header">
           <span className="header-brand">{club?.name ?? "테니스 클럽"}</span>
@@ -71,7 +69,6 @@ export function PublicShell({ title, subtitle, children, clubSlug = "stc", brand
 
   return (
     <div className="app-shell public-app-shell">
-      <SplashScreen clubSlug={clubSlug} startLabel="대진표 확인하기" />
       <div className="mobile-frame public-mobile-frame">
         <header className="app-header">
           <PublicBrand clubName={club?.name ?? "테니스 클럽"} />

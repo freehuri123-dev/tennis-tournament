@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR, Noto_Serif_KR } from "next/font/google";
 import Script from "next/script";
+import { RouteSplashScreen } from "@/components/RouteSplashScreen";
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html className={`${notoSansKr.variable} ${notoSerifKr.variable}`} lang="ko">
       <body>
+        <RouteSplashScreen />
         {children}
         <Script
           crossOrigin="anonymous"
