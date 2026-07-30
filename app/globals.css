@@ -3151,18 +3151,21 @@ textarea:focus-visible {
 }
 
 .court-badge {
-  min-height: 26px;
-  padding: 0 9px;
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  background: #183b2a;
+  background: linear-gradient(135deg, #17695d 0%, #2f8f80 100%);
   color: #fff;
-  font-size: 12px;
+  box-shadow: 0 5px 12px rgba(23, 105, 93, 0.22);
+  font-size: 13px;
   font-style: normal;
   font-weight: 900;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
@@ -3181,8 +3184,9 @@ textarea:focus-visible {
 .public-court-badge,
 .fixed-public-court,
 .tournament-round-court {
-  background: #dff2d6;
-  color: #1d4d30;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: linear-gradient(135deg, #17695d 0%, #2f8f80 100%);
+  color: #fff;
 }
 
 .tv-match-badges {
@@ -3190,14 +3194,15 @@ textarea:focus-visible {
 }
 
 .tv-court-badge {
-  min-height: 28px;
-  padding: 0 9px;
+  min-height: 32px;
+  padding: 0 11px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   background: #ffe7a3;
   color: #221700;
-  font-size: 13px;
+  box-shadow: 0 5px 12px rgba(122, 88, 0, 0.18);
+  font-size: 14px;
   font-style: normal;
   font-weight: 950;
   white-space: nowrap;
@@ -3528,14 +3533,15 @@ body {
 }
 
 .court-badge {
-  background: #245f57;
+  background: linear-gradient(135deg, #17695d 0%, #2f8f80 100%);
 }
 
 .public-court-badge,
 .fixed-public-court,
 .tournament-round-court {
-  background: #e2f1ed;
-  color: #245f57;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: linear-gradient(135deg, #17695d 0%, #2f8f80 100%);
+  color: #fff;
 }
 
 .court-number-option.active {
