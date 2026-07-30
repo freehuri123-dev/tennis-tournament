@@ -20,7 +20,7 @@ function createDatabasePool() {
     connectionString: databaseUrl,
     connectionTimeoutMillis: 15_000,
     idleTimeoutMillis: 300_000,
-    max: 1
+    max: 3
   });
 }
 
