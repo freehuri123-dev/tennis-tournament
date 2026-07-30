@@ -1,20 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { openKakaoTournamentShare } from "./kakao-share";
+import { isMobileBrowser, openKakaoTournamentShare } from "./kakao-share";
 
 const input = {
   javascriptKey: "javascript-key",
-  title: "STC 테니스 클럽 - 7월 정기대회",
-  description: "테니스매치업 대진표를 확인하세요.",
+  title: "STC \uD14C\uB2C8\uC2A4 \uD074\uB7FD - 7\uC6D4 \uC815\uAE30\uB300\uD68C",
+  description: "\uD14C\uB2C8\uC2A4\uB9E4\uCE58\uC5C5 \uB300\uC9C4\uD45C\uB97C \uD655\uC778\uD558\uC138\uC694.",
   url: "https://example.com/public/stc/1234",
-  imageUrl: "https://example.com/tennis-matchup-share-card.png"
+  imageUrl: "https://example.com/tennis-matchup-share-card.png",
+  userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"
 };
 
 describe("openKakaoTournamentShare", () => {
-  it("initializes the SDK and opens a feed share", () => {
+  it("initializes the SDK and opens a feed share on mobile", async () => {
     const sendDefault = vi.fn();
     const init = vi.fn();
 
-    const result = openKakaoTournamentShare({
+    const result = await openKakaoTournamentShare({
       ...input,
       sdk: {
         init,
@@ -36,7 +37,7 @@ describe("openKakaoTournamentShare", () => {
       }),
       buttons: [
         {
-          title: "대진표 확인하기",
+          title: "\uB300\uC9C4\uD45C \uD655\uC778\uD558\uAE30",
           link: {
             mobileWebUrl: input.url,
             webUrl: input.url
@@ -46,32 +47,70 @@ describe("openKakaoTournamentShare", () => {
     }));
   });
 
-  it("returns false when the key or SDK is unavailable", () => {
-    expect(openKakaoTournamentShare({ ...input, javascriptKey: "", sdk: undefined })).toBe(false);
-    expect(openKakaoTournamentShare({ ...input, sdk: undefined })).toBe(false);
+  it("returns false when the key or SDK is unavailable", async () => {
+    await expect(openKakaoTournamentShare({ ...input, javascriptKey: "", sdk: undefined })).resolves.toBe(false);
+    await expect(openKakaoTournamentShare({ ...input, sdk: undefined })).resolves.toBe(false);
   });
 
-  it("returns false when initialization does not expose the Share module", () => {
-    expect(openKakaoTournamentShare({
+  it("returns false when initialization does not expose the Share module", async () => {
+    await expect(openKakaoTournamentShare({
       ...input,
       sdk: {
         init: vi.fn(),
         isInitialized: () => false
       }
-    })).toBe(false);
+    })).resolves.toBe(false);
   });
 
-  it("does not initialize an SDK that is already initialized", () => {
+  it("does not initialize an SDK that is already initialized", async () => {
     const init = vi.fn();
 
-    expect(openKakaoTournamentShare({
+    await expect(openKakaoTournamentShare({
       ...input,
       sdk: {
         init,
         isInitialized: () => true,
         Share: { sendDefault: vi.fn() }
       }
-    })).toBe(true);
+    })).resolves.toBe(true);
     expect(init).not.toHaveBeenCalled();
+  });
+
+  it("returns false on desktop without opening Kakao share", async () => {
+    const sendDefault = vi.fn();
+
+    await expect(openKakaoTournamentShare({
+      ...input,
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      sdk: {
+        init: vi.fn(),
+        isInitialized: () => true,
+        Share: { sendDefault }
+      }
+    })).resolves.toBe(false);
+    expect(sendDefault).not.toHaveBeenCalled();
+  });
+
+  it("returns false when the Kakao share promise rejects", async () => {
+    await expect(openKakaoTournamentShare({
+      ...input,
+      sdk: {
+        init: vi.fn(),
+        isInitialized: () => true,
+        Share: { sendDefault: vi.fn().mockRejectedValue(new Error("share failed")) }
+      }
+    })).resolves.toBe(false);
+  });
+});
+
+describe("isMobileBrowser", () => {
+  it("recognizes Android, iPhone, and touch-enabled iPad user agents", () => {
+    expect(isMobileBrowser("Mozilla/5.0 (Linux; Android 15)")).toBe(true);
+    expect(isMobileBrowser("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)")).toBe(true);
+    expect(isMobileBrowser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", 5)).toBe(true);
+  });
+
+  it("does not treat a desktop browser as mobile", () => {
+    expect(isMobileBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")).toBe(false);
   });
 });

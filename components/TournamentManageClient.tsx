@@ -608,7 +608,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       url
     };
 
-    const sharedToKakao = openKakaoTournamentShare({
+    const sharedToKakao = await openKakaoTournamentShare({
       javascriptKey: process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY ?? "",
       title: shareData.title,
       description: shareData.text,

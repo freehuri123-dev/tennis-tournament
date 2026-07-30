@@ -32,6 +32,8 @@ type OpenKakaoTournamentShareInput = {
   url: string;
   imageUrl: string;
   sdk?: KakaoJavaScriptSdk;
+  userAgent?: string;
+  maxTouchPoints?: number;
 };
 
 function browserKakaoSdk() {
@@ -39,15 +41,30 @@ function browserKakaoSdk() {
   return (window as typeof window & { Kakao?: KakaoJavaScriptSdk }).Kakao;
 }
 
-export function openKakaoTournamentShare({
+function browserUserAgent() {
+  return typeof navigator === "undefined" ? "" : navigator.userAgent;
+}
+
+function browserMaxTouchPoints() {
+  return typeof navigator === "undefined" ? 0 : navigator.maxTouchPoints;
+}
+
+export function isMobileBrowser(userAgent: string, maxTouchPoints = 0) {
+  return /Android|webOS|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(userAgent)
+    || (/Macintosh/i.test(userAgent) && maxTouchPoints > 1);
+}
+
+export async function openKakaoTournamentShare({
   javascriptKey,
   title,
   description,
   url,
   imageUrl,
-  sdk = browserKakaoSdk()
+  sdk = browserKakaoSdk(),
+  userAgent = browserUserAgent(),
+  maxTouchPoints = browserMaxTouchPoints()
 }: OpenKakaoTournamentShareInput) {
-  if (!javascriptKey || !sdk) return false;
+  if (!isMobileBrowser(userAgent, maxTouchPoints) || !javascriptKey || !sdk) return false;
 
   try {
     if (!sdk.isInitialized()) sdk.init(javascriptKey);
@@ -58,7 +75,7 @@ export function openKakaoTournamentShare({
       webUrl: url
     };
 
-    sdk.Share.sendDefault({
+    await sdk.Share.sendDefault({
       objectType: "feed",
       content: {
         title,
