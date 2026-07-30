@@ -1887,6 +1887,22 @@ textarea:focus-visible {
   min-height: 48px;
 }
 
+.score-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.score-action-row.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.score-reset-button {
+  min-width: 112px;
+  min-height: 48px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
 .score-save-status.dirty {
   border-color: rgba(59, 143, 128, 0.18);
   background: #edf8f5;

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TournamentManageClient } from "./TournamentManageClient";
 import type { TournamentState } from "@/lib/store/tournament-store";
@@ -455,6 +455,63 @@ describe("TournamentManageClient save timing", () => {
     expect(persistTournamentStateAction).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("6")).toBeTruthy();
     expect(screen.getByDisplayValue("3")).toBeTruthy();
+  });
+  it("resets only the selected completed match in a regular tournament", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const state = makeStateWithMatch();
+    state.matches[0] = { ...state.matches[0], sideAScore: 6, sideBScore: 3, status: "completed" };
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.click(screen.getByRole("button", { name: "점수 초기화" }));
+
+    await waitFor(() => expect(updateMatchScoreAction).toHaveBeenCalledWith(
+      { matchId: "match-1", sideAScore: null, sideBScore: null },
+      "stc"
+    ));
+    await waitFor(() => expect(screen.getByText("점수가 초기화되었습니다.")).toBeTruthy());
+    expect((screen.getByLabelText("위쪽 팀 점수") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("아래쪽 팀 점수") as HTMLInputElement).value).toBe("");
+  });
+
+  it("resets downstream tournament assignments and scores with the selected result", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const state = makeNinePairTournamentState();
+    const sourceMatch = state.matches.find((match) => match.sortOrder === 1)!;
+    const winnerIds = sourceMatch.sideAPlayerIds;
+    const downstreamMatch = state.matches.find((match) => match.sortOrder > 4 && (
+      winnerIds.every((memberId) => match.sideAPlayerIds.includes(memberId))
+      || winnerIds.every((memberId) => match.sideBPlayerIds.includes(memberId))
+    ));
+    if (!downstreamMatch) throw new Error("Downstream tournament match was not generated");
+    state.matches = applyTournamentAdvancement(state.matches.map((match) => (
+      match.id === downstreamMatch.id
+        ? { ...match, sideAScore: 6, sideBScore: 4, status: "completed" as const }
+        : match
+    )), "g1");
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const sourceCard = container.querySelector<HTMLElement>(`#match-${sourceMatch.id}`);
+    if (!sourceCard) throw new Error("Source tournament match card was not rendered");
+    fireEvent.click(within(sourceCard).getByRole("button", { name: "점수 초기화" }));
+
+    await waitFor(() => expect(updateTournamentMatchStatesAction).toHaveBeenCalledTimes(1));
+    const input = vi.mocked(updateTournamentMatchStatesAction).mock.calls[0][0] as {
+      matches: Array<{ matchId: string; sideAScore: number | null; sideBScore: number | null; status: string }>;
+    };
+    expect(input.matches).toContainEqual(expect.objectContaining({
+      matchId: sourceMatch.id,
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled"
+    }));
+    expect(input.matches).toContainEqual(expect.objectContaining({
+      matchId: downstreamMatch.id,
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled"
+    }));
   });
   it("disables tournament score inputs for BYE matches", () => {
     render(<TournamentManageClient initialState={makeTournamentByeState()} clubSlug="stc" />);

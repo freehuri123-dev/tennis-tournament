@@ -25,10 +25,28 @@ import type { TournamentState } from "@/lib/store/tournament-store";
 
 type TabId = "setup" | "draw" | "ranking";
 type HelpImage = "kdk-v2010" | "hanul-aa" | null;
-type ScoreSaveStatus = "dirty" | "saving" | "saved" | "error";
+type ScoreSaveStatus = "dirty" | "saving" | "saved" | "error" | "resetting" | "reset" | "reset-error";
 
 const COURT_NUMBER_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 const COURT_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
+function changedMatchStatePayload(previousMatches: Match[], nextMatches: Match[]) {
+  return nextMatches.filter((nextMatch) => {
+    const previousMatch = previousMatches.find((item) => item.id === nextMatch.id);
+    return !previousMatch
+      || previousMatch.sideAScore !== nextMatch.sideAScore
+      || previousMatch.sideBScore !== nextMatch.sideBScore
+      || previousMatch.status !== nextMatch.status
+      || previousMatch.sideAPlayerIds.join("\u0000") !== nextMatch.sideAPlayerIds.join("\u0000")
+      || previousMatch.sideBPlayerIds.join("\u0000") !== nextMatch.sideBPlayerIds.join("\u0000");
+  }).map((item) => ({
+    matchId: item.id,
+    sideAPlayerIds: item.sideAPlayerIds,
+    sideBPlayerIds: item.sideBPlayerIds,
+    sideAScore: item.sideAScore,
+    sideBScore: item.sideBScore,
+    status: item.status
+  }));
+}
 const TEAM_BATTLE_ROUND_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1);
 
 function teamBattleSelectionRule(memberCount: number, baseGames: number, extraGamePlayerCount: number) {
@@ -295,18 +313,32 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     setScoreSaveStatusByMatchId((current) => ({ ...current, [matchId]: status }));
   }
 
-  function queueMatchSave(matchId: string, save: () => Promise<void>) {
-    setScoreSaveStatus(matchId, "saving");
+  function queueMatchSave(
+    matchId: string,
+    save: () => Promise<void>,
+    options: {
+      pendingStatus?: ScoreSaveStatus;
+      successStatus?: ScoreSaveStatus;
+      errorStatus?: ScoreSaveStatus;
+      onSuccess?: () => void;
+    } = {}
+  ) {
+    const pendingStatus = options.pendingStatus ?? "saving";
+    const successStatus = options.successStatus ?? "saved";
+    const errorStatus = options.errorStatus ?? "error";
+    setScoreSaveStatus(matchId, pendingStatus);
     const previous = scoreSaveQueuesRef.current.get(matchId) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(save);
 
     scoreSaveQueuesRef.current.set(matchId, current);
     current
       .then(() => {
-        if (scoreSaveQueuesRef.current.get(matchId) === current) setScoreSaveStatus(matchId, "saved");
+        if (scoreSaveQueuesRef.current.get(matchId) !== current) return;
+        options.onSuccess?.();
+        setScoreSaveStatus(matchId, successStatus);
       })
       .catch(() => {
-        if (scoreSaveQueuesRef.current.get(matchId) === current) setScoreSaveStatus(matchId, "error");
+        if (scoreSaveQueuesRef.current.get(matchId) === current) setScoreSaveStatus(matchId, errorStatus);
       });
   }
 
@@ -329,25 +361,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     updateLocal(completedState);
     queueMatchSave(matchId, async () => {
       if (shouldAdvanceTournament) {
-        const changedMatches = completedState.matches.filter((nextMatch) => {
-          const previousMatch = state.matches.find((item) => item.id === nextMatch.id);
-          return !previousMatch
-            || previousMatch.sideAScore !== nextMatch.sideAScore
-            || previousMatch.sideBScore !== nextMatch.sideBScore
-            || previousMatch.status !== nextMatch.status
-            || previousMatch.sideAPlayerIds.join("\u0000") !== nextMatch.sideAPlayerIds.join("\u0000")
-            || previousMatch.sideBPlayerIds.join("\u0000") !== nextMatch.sideBPlayerIds.join("\u0000");
-        });
         await updateTournamentMatchStatesAction({
           publicSlug: state.tournament.publicSlug,
-          matches: changedMatches.map((item) => ({
-            matchId: item.id,
-            sideAPlayerIds: item.sideAPlayerIds,
-            sideBPlayerIds: item.sideBPlayerIds,
-            sideAScore: item.sideAScore,
-            sideBScore: item.sideBScore,
-            status: item.status
-          }))
+          matches: changedMatchStatePayload(state.matches, completedState.matches)
         }, clubSlug);
         return;
       }
@@ -357,6 +373,53 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       );
     });
   }
+
+  function resetMatchScore(matchId: string) {
+    if (isCompleted) return;
+    const match = state.matches.find((item) => item.id === matchId);
+    if (!match || match.status !== "completed" || match.sideAScore === null || match.sideBScore === null) return;
+
+    const matchGroup = state.groups.find((group) => group.id === match.groupId);
+    const shouldAdvanceTournament = Boolean(matchGroup && isTournamentFormat(matchGroup));
+    const confirmation = shouldAdvanceTournament
+      ? "이 경기와 연결된 이후 라운드의 진출자 및 점수도 함께 초기화됩니다. 계속할까요?"
+      : "이 경기의 입력 점수를 초기화할까요?";
+    if (!window.confirm(confirmation)) return;
+
+    const clearedMatch = { ...match, sideAScore: null, sideBScore: null, status: "scheduled" as const };
+    const nextState = {
+      ...state,
+      matches: state.matches.map((item) => item.id === matchId ? clearedMatch : item)
+    };
+    const resetState = shouldAdvanceTournament
+      ? { ...nextState, matches: applyTournamentAdvancement(nextState.matches, match.groupId) }
+      : nextState;
+    const changedMatches = changedMatchStatePayload(state.matches, resetState.matches);
+    const changedMatchIds = new Set(changedMatches.map((item) => item.matchId));
+    const resetMatchesById = new Map(resetState.matches.filter((item) => changedMatchIds.has(item.id)).map((item) => [item.id, item]));
+
+    queueMatchSave(matchId, async () => {
+      if (shouldAdvanceTournament) {
+        await updateTournamentMatchStatesAction({
+          publicSlug: state.tournament.publicSlug,
+          matches: changedMatches
+        }, clubSlug);
+        return;
+      }
+      await updateMatchScoreAction({ matchId, sideAScore: null, sideBScore: null }, clubSlug);
+    }, {
+      pendingStatus: "resetting",
+      successStatus: "reset",
+      errorStatus: "reset-error",
+      onSuccess: () => {
+        setState((current) => ({
+          ...current,
+          matches: current.matches.map((item) => resetMatchesById.get(item.id) ?? item)
+        }));
+      }
+    });
+  }
+
   function displayGroupName(group: TournamentGroup) {
     return tournamentType === "team-battle" ? "청백전" : state.groups.length === 1 ? "전체" : group.name;
   }
@@ -1534,7 +1597,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     {round.matches.map((match) => {
                     const byeSelection = isTournamentFormat(group) ? tournamentByeSelections(group).find((selection) => selection.byeMatchId === match.id) : undefined;
                     const scoreSaveStatus = scoreSaveStatusByMatchId[match.id];
-                    const scoreInputDisabled = isCompleted || scoreSaveStatus === "saving" || (isTournamentFormat(group) && !canEnterMatchScore(match));
+                    const scoreOperationPending = scoreSaveStatus === "saving" || scoreSaveStatus === "resetting";
+                    const scoreInputDisabled = isCompleted || scoreOperationPending || (isTournamentFormat(group) && !canEnterMatchScore(match));
+                    const scoreCanReset = match.status === "completed" && match.sideAScore !== null && match.sideBScore !== null;
                     const scoreReady = match.sideAScore !== null && match.sideBScore !== null;
                     return (
                     <div className="stack" key={match.id}>
@@ -1583,14 +1648,26 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           </div>
                         </label>
                       </div>
-                      <button
-                        className="primary-button score-complete-button"
-                        disabled={scoreInputDisabled || !scoreReady || scoreSaveStatus === "saved"}
-                        onClick={() => completeMatchScore(match.id)}
-                        type="button"
-                      >
-                        {scoreSaveStatus === "saving" ? "저장 중..." : scoreSaveStatus === "saved" ? "저장 완료" : scoreSaveStatus === "error" ? "다시 저장" : "점수 입력 완료"}
-                      </button>
+                      <div className={`score-action-row ${scoreCanReset ? "" : "single"}`}>
+                        <button
+                          className="primary-button score-complete-button"
+                          disabled={scoreInputDisabled || !scoreReady || scoreSaveStatus === "saved"}
+                          onClick={() => completeMatchScore(match.id)}
+                          type="button"
+                        >
+                          {scoreSaveStatus === "saving" ? "저장 중..." : scoreSaveStatus === "saved" ? "저장 완료" : scoreSaveStatus === "error" ? "다시 저장" : "점수 입력 완료"}
+                        </button>
+                        {scoreCanReset && (
+                          <button
+                            className="danger-button score-reset-button"
+                            disabled={isCompleted || scoreOperationPending}
+                            onClick={() => resetMatchScore(match.id)}
+                            type="button"
+                          >
+                            {scoreSaveStatus === "resetting" ? "초기화 중..." : scoreSaveStatus === "reset-error" ? "다시 초기화" : "점수 초기화"}
+                          </button>
+                        )}
+                      </div>
                       {group.scheduleFormat === "team-battle" && match.status !== "completed" && (
                         <details className="player-edit-box team-battle-player-edit" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                           <summary>선수 변경</summary>
@@ -1626,6 +1703,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           {scoreSaveStatus === "saving" && "점수를 저장하고 있습니다."}
                           {scoreSaveStatus === "saved" && "점수 저장이 완료되었습니다."}
                           {scoreSaveStatus === "error" && "점수 저장에 실패했습니다. 점수 입력 완료를 다시 눌러주세요."}
+                          {scoreSaveStatus === "resetting" && "점수를 초기화하고 있습니다."}
+                          {scoreSaveStatus === "reset" && "점수가 초기화되었습니다."}
+                          {scoreSaveStatus === "reset-error" && "점수 초기화에 실패했습니다. 다시 초기화해 주세요."}
                         </p>
                       )}
                       {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
