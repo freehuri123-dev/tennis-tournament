@@ -2935,8 +2935,16 @@ textarea:focus-visible {
   }
 
   .public-mobile-frame .app-footer,
-  .public-phone-view,
   .public-mobile-frame .refresh-button {
+    display: none;
+  }
+
+  .public-phone-view {
+    width: min(100%, 960px);
+    margin: 0 auto;
+  }
+
+  .public-tablet-board + .public-phone-view {
     display: none;
   }
 

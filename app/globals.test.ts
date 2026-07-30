@@ -35,6 +35,12 @@ describe("mobile app frame styles", () => {
     expect(css).toMatch(/\.public-team-grid\s+\.match-player\s*\{[^}]*white-space:\s*nowrap;[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/s);
   });
 
+  it("keeps the public phone view visible on wide screens unless a tablet board exists", () => {
+    expect(css).toMatch(/@media\s*\(min-width:\s*769px\)\s*\{[\s\S]*?\.public-phone-view\s*\{[^}]*width:\s*min\(100%,\s*960px\);[^}]*margin:\s*0 auto;/s);
+    expect(css).toMatch(/\.public-tablet-board\s*\+\s*\.public-phone-view\s*\{[^}]*display:\s*none;/s);
+    expect(css).not.toMatch(/\.public-mobile-frame\s+\.app-footer,\s*\.public-phone-view,\s*\.public-mobile-frame\s+\.refresh-button/);
+  });
+
   it("uses the selected cool mint palette", () => {
     expect(css).toMatch(/--bg:\s*#eef5f3;/);
     expect(css).toMatch(/--green:\s*#3b8f80;/);
