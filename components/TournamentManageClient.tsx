@@ -9,6 +9,7 @@ import { TeamRankingTable } from "@/components/TeamRankingTable";
 import { TeamBattleContributionDetails, TeamBattleRoster } from "@/components/TeamBattleDetails";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getClubBySlug, type ClubSlug } from "@/lib/domain/club";
+import { getClubShareContent } from "@/lib/domain/club-share";
 import { openKakaoTournamentShare } from "@/lib/domain/kakao-share";
 import { calculateFixedPairRankings, calculateRankings } from "@/lib/domain/ranking";
 import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
@@ -600,9 +601,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   async function shareTournament() {
     const url = `${window.location.origin}/public/${clubSlug}/${tournament.publicSlug}`;
     const clubName = getClubBySlug(clubSlug)?.name ?? "테니스 클럽";
+    const clubShare = getClubShareContent(clubSlug);
     const shareData = {
       title: `${clubName} - ${tournament.name}`,
-      text: "테니스매치업에서 대진표와 순위를 확인하세요.",
+      text: clubShare.description,
       url
     };
 
@@ -611,7 +613,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       title: shareData.title,
       description: shareData.text,
       url,
-      imageUrl: `${window.location.origin}/tennis-matchup-share-card.png`
+      imageUrl: `${window.location.origin}${clubShare.imagePath}`
     });
     if (sharedToKakao) return;
 
