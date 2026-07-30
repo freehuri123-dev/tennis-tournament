@@ -8,7 +8,8 @@ import { RankingTable } from "@/components/RankingTable";
 import { TeamRankingTable } from "@/components/TeamRankingTable";
 import { TeamBattleContributionDetails, TeamBattleRoster } from "@/components/TeamBattleDetails";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { ClubSlug } from "@/lib/domain/club";
+import { getClubBySlug, type ClubSlug } from "@/lib/domain/club";
+import { openKakaoTournamentShare } from "@/lib/domain/kakao-share";
 import { calculateFixedPairRankings, calculateRankings } from "@/lib/domain/ranking";
 import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
@@ -598,11 +599,21 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
   async function shareTournament() {
     const url = `${window.location.origin}/public/${clubSlug}/${tournament.publicSlug}`;
+    const clubName = getClubBySlug(clubSlug)?.name ?? "테니스 클럽";
     const shareData = {
-      title: tournament.name,
-      text: `${tournament.name} 대진표와 순위표를 확인하세요.`,
+      title: `${clubName} - ${tournament.name}`,
+      text: "테니스매치업에서 대진표와 순위를 확인하세요.",
       url
     };
+
+    const sharedToKakao = openKakaoTournamentShare({
+      javascriptKey: process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY ?? "",
+      title: shareData.title,
+      description: shareData.text,
+      url,
+      imageUrl: `${window.location.origin}/tennis-matchup-share-card.png`
+    });
+    if (sharedToKakao) return;
 
     await shareTournamentLink({
       ...shareData,
@@ -1039,7 +1050,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
             <StatusBadge status={tournament.status} />
             <button className="ghost-button" onClick={shareTournament} type="button">
               <Share2 size={18} />
-              공유하기
+              카카오톡 공유
             </button>
           </div>
           {isCompleted && <p className="notice-text" style={{ marginTop: 12 }}>완료된 대회는 날짜만 수정할 수 있습니다. 날짜를 오늘 또는 이후로 바꾸면 다시 수정할 수 있습니다.</p>}
