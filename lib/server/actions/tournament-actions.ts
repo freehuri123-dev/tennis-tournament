@@ -14,6 +14,7 @@ function formString(formData: FormData, key: string) {
 }
 
 function revalidateTournamentAdminPaths(clubSlug: string) {
+  revalidatePath(`/${clubSlug}`);
   revalidatePath(`/${clubSlug}/tournaments/manage`);
   revalidatePath(`/${clubSlug}/tournaments`);
   revalidatePath("/admin/tournaments/manage");

@@ -1,8 +1,14 @@
 import { AppShell } from "@/components/AppShell";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { InvalidClubPage } from "@/components/InvalidClubPage";
-import { isKnownClubSlug } from "@/lib/domain/club";
+import { clubs, isKnownClubSlug } from "@/lib/domain/club";
 import { listTournamentsByClub } from "@/lib/server/repositories/tournament-repository";
+
+export const revalidate = 3600;
+
+export function generateStaticParams() {
+  return clubs.map((club) => ({ clubSlug: club.slug }));
+}
 
 export default async function ClubHomePage({ params }: { params: Promise<{ clubSlug: string }> }) {
   const { clubSlug } = await params;
