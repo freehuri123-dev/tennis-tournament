@@ -41,6 +41,7 @@ vi.mock('@vercel/functions/db-connections', () => ({
 describe('database pool', () => {
   beforeAll(async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://user:password@pooled.db.prisma.io:5432/postgres');
+    vi.stubEnv('DIRECT_URL', 'postgres://user:password@db.prisma.io:5432/postgres');
     vi.stubEnv('VERCEL', '1');
     await import('./db');
   });
@@ -49,12 +50,12 @@ describe('database pool', () => {
     vi.unstubAllEnvs();
   });
 
-  it('fails fast and releases idle connections promptly on Vercel', () => {
+  it('uses one direct runtime connection and releases it promptly on Vercel', () => {
     expect(mocks.poolConstructor).toHaveBeenCalledWith({
-      connectionString: 'postgres://user:password@pooled.db.prisma.io:5432/postgres',
+      connectionString: 'postgres://user:password@db.prisma.io:5432/postgres',
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 5_000,
-      max: 3
+      max: 1
     });
     expect(mocks.attachDatabasePool).toHaveBeenCalledOnce();
   });

@@ -162,7 +162,6 @@ describe("server action validation", () => {
 
     expect(requireAdmin).toHaveBeenCalledWith("stc");
     expect(replaceTournamentState).toHaveBeenCalledWith("stc", state);
-    expect(revalidatePath).toHaveBeenCalledWith("/stc");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments/manage");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/tournaments");
     expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");

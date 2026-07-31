@@ -11,16 +11,16 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createDatabasePool() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required to initialize PrismaClient.");
+    throw new Error("DIRECT_URL or DATABASE_URL is required to initialize PrismaClient.");
   }
 
   return new Pool({
     connectionString: databaseUrl,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 5_000,
-    max: 3
+    max: 1
   });
 }
 
