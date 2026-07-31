@@ -1048,7 +1048,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   function teamBattleReplacementCandidates(roundMatches: Match[], match: Match, side: "A" | "B", index: number, selected?: string) {
     const playingIds = new Set(roundMatches.flatMap((roundMatch) => [...roundMatch.sideAPlayerIds, ...roundMatch.sideBPlayerIds]));
     const teamMembers = side === "A" ? blueTeamMembers : whiteTeamMembers;
-    const temporaryMembers = tournamentParticipants.filter((member) => !teamAssignment[member.id]);
+    const tournamentParticipantIdSet = new Set(tournamentParticipantIds);
+    const temporaryMembers = [
+      ...tournamentParticipants.filter((member) => !teamAssignment[member.id]),
+      ...state.members.filter((member) => !member.deleted && member.active !== false && !tournamentParticipantIdSet.has(member.id))
+    ];
     const candidateMap = new Map<string, typeof state.members[number]>();
     if (selected) {
       const selectedMember = membersById.get(selected);
@@ -1071,8 +1075,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
     const expectedTeam: TeamSide = side === "A" ? "blue" : "white";
     const roundPlayingIds = new Set(roundMatches.flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]));
-    const isTemporaryParticipant = tournamentParticipantIds.includes(memberId) && !teamAssignment[memberId];
-    if ((teamAssignment[memberId] !== expectedTeam && !isTemporaryParticipant) || roundPlayingIds.has(memberId)) return;
+    const replacementMember = membersById.get(memberId);
+    const canUseTemporaryMember = Boolean(replacementMember && !replacementMember.deleted && replacementMember.active !== false && !teamAssignment[memberId]);
+    if ((teamAssignment[memberId] !== expectedTeam && !canUseTemporaryMember) || roundPlayingIds.has(memberId)) return;
 
     sourceIds[index] = memberId;
     persist({
