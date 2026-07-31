@@ -75,6 +75,12 @@ describe("team battle", () => {
     const counts = new Map<string, number>();
     matches.forEach((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds].forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1)));
     expect(matches).toHaveLength(15);
+    const pairKeyForTest = (ids: string[]) => [...ids].sort().join("|");
+    const featuredTopGradeMatches = matches.filter((match) =>
+      pairKeyForTest(match.sideAPlayerIds) === "b1|b2"
+      && pairKeyForTest(match.sideBPlayerIds) === "w1|w2"
+    );
+    expect(featuredTopGradeMatches).toHaveLength(1);
     [...blue, ...white].forEach((item) => expect(counts.get(item.id)).toBe(targetGamesByMemberId[item.id]));
     expect(groupTeamBattleMatchesByRound(matches).map((round) => round.matches.length)).toEqual([3, 3, 3, 3, 3]);
     const membersById = new Map([...blue, ...white].map((item) => [item.id, item]));

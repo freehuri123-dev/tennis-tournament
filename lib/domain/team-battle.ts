@@ -16,6 +16,7 @@ export type TeamBattleResult = {
 };
 
 export type TeamGrade = "A" | "B" | "C" | "D";
+const TEAM_GRADE_ORDER: TeamGrade[] = ["A", "B", "C", "D"];
 
 export function normalizeTeamGrade(level?: string): TeamGrade {
   const normalized = level?.trim().toUpperCase() ?? "";
@@ -166,6 +167,29 @@ function repeatedCombinationPenalty(counts: Map<string, number>) {
   return [...counts.values()].reduce((sum, count) => sum + Math.max(0, count - 1) ** 2, 0);
 }
 
+type FeaturedSameGradeMatch = {
+  grade: TeamGrade;
+  blueIds: [string, string];
+  whiteIds: [string, string];
+};
+
+function findFeaturedSameGradeMatch(blueMembers: Member[], whiteMembers: Member[]): FeaturedSameGradeMatch | null {
+  for (const grade of TEAM_GRADE_ORDER) {
+    const blueIds = blueMembers.filter((member) => normalizeTeamGrade(member.level) === grade).map((member) => member.id);
+    const whiteIds = whiteMembers.filter((member) => normalizeTeamGrade(member.level) === grade).map((member) => member.id);
+    if (blueIds.length >= 2 && whiteIds.length >= 2) {
+      return { grade, blueIds: [blueIds[0], blueIds[1]], whiteIds: [whiteIds[0], whiteIds[1]] };
+    }
+  }
+  return null;
+}
+
+function isFeaturedSameGradeMatch(match: Pick<Match, "sideAPlayerIds" | "sideBPlayerIds">, featuredMatch: FeaturedSameGradeMatch | null) {
+  if (!featuredMatch) return false;
+  return pairKey(match.sideAPlayerIds) === pairKey(featuredMatch.blueIds)
+    && pairKey(match.sideBPlayerIds) === pairKey(featuredMatch.whiteIds);
+}
+
 function teamBattleBalanceScore(matches: Match[], membersById: Map<string, Member>): TeamBattleBalanceScore {
   const partnerCounts = new Map<string, number>();
   const opponentCounts = new Map<string, number>();
@@ -211,7 +235,7 @@ function playerAppearsElsewhereInRound(matches: Match[], roundSize: number, matc
   return false;
 }
 
-function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], roundSize: number): Match[] {
+function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], roundSize: number, protectedMatchIds = new Set<string>()): Match[] {
   if (matches.length < 2) return matches;
   const membersById = new Map(members.map((member) => [member.id, member]));
   let optimized = matches.map((match) => ({
@@ -225,7 +249,9 @@ function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], rou
   for (let iteration = 0; iteration < maximumIterations; iteration += 1) {
     let best: { matches: Match[]; score: TeamBattleBalanceScore; key: string } | null = null;
     for (let leftIndex = 0; leftIndex < optimized.length - 1; leftIndex += 1) {
+      if (protectedMatchIds.has(optimized[leftIndex].id)) continue;
       for (let rightIndex = leftIndex + 1; rightIndex < optimized.length; rightIndex += 1) {
+        if (protectedMatchIds.has(optimized[rightIndex].id)) continue;
         const sameRound = Math.floor(leftIndex / roundSize) === Math.floor(rightIndex / roundSize);
         for (const sideKey of ["sideAPlayerIds", "sideBPlayerIds"] as const) {
           for (let leftSlot = 0; leftSlot < 2; leftSlot += 1) {
@@ -351,6 +377,9 @@ export function generateTeamBattleMatches({
     ...defaultTargets(whiteMembers),
     ...targetGamesByMemberId
   };
+  const featuredMatch = findFeaturedSameGradeMatch(blueMembers, whiteMembers);
+  const featuredAlreadyExists = preserved.some((match) => isFeaturedSameGradeMatch(match, featuredMatch));
+  const protectedGeneratedMatchIds = new Set<string>();
 
   while (preserved.length + generated.length < targetMatchCount) {
     const remainingMatches = targetMatchCount - preserved.length - generated.length;
@@ -365,12 +394,24 @@ export function generateTeamBattleMatches({
 
     for (let courtIndex = 0; courtIndex < roundSize; courtIndex += 1) {
       let best: { blue: [Member, Member]; white: [Member, Member]; score: number; key: string } | null = null;
+      const shouldUseFeaturedMatch = featuredMatch
+        && !featuredAlreadyExists
+        && !generated.some((match) => isFeaturedSameGradeMatch(match, featuredMatch))
+        && generated.length === 0
+        && courtIndex === 0;
       for (const blue of bluePairs) {
         if (blue.some((member) => usedBlueIds.has(member.id))) continue;
         for (const white of whitePairs) {
           if (white.some((member) => usedWhiteIds.has(member.id))) continue;
           const selected = [...blue, ...white];
           if (selected.some((member) => (appearances.get(member.id) ?? 0) >= (targets[member.id] ?? 0))) continue;
+          const candidateMatch = {
+            sideAPlayerIds: blue.map((member) => member.id),
+            sideBPlayerIds: white.map((member) => member.id)
+          };
+          const isFeaturedCandidate = isFeaturedSameGradeMatch(candidateMatch, featuredMatch);
+          if (shouldUseFeaturedMatch && !isFeaturedCandidate) continue;
+          if (!shouldUseFeaturedMatch && isFeaturedCandidate && (featuredAlreadyExists || generated.some((match) => isFeaturedSameGradeMatch(match, featuredMatch)))) continue;
           const unmet = selected.reduce((sum, member) => sum + Math.max(0, (targets[member.id] ?? 0) - (appearances.get(member.id) ?? 0)), 0);
           const currentAppearances = selected.reduce((sum, member) => sum + (appearances.get(member.id) ?? 0), 0);
           const blueStrength = teamGradeWeight(blue[0]) + teamGradeWeight(blue[1]);
@@ -407,12 +448,13 @@ export function generateTeamBattleMatches({
         courtNumber: courtNumbers[courtIndex] ?? null
       };
       generated.push(match);
+      if (isFeaturedSameGradeMatch(match, featuredMatch)) protectedGeneratedMatchIds.add(match.id);
       best.blue.forEach((member) => usedBlueIds.add(member.id));
       best.white.forEach((member) => usedWhiteIds.add(member.id));
       register(match);
     }
   }
-  const balancedGenerated = optimizeTeamBattleMatchBalance(generated, [...blueMembers, ...whiteMembers], requestedRoundSize);
+  const balancedGenerated = optimizeTeamBattleMatchBalance(generated, [...blueMembers, ...whiteMembers], requestedRoundSize, protectedGeneratedMatchIds);
   return [...preserved, ...balancedGenerated].map((match, index) => ({ ...match, matchNumber: index + 1, sortOrder: index + 1 }));
 }
 

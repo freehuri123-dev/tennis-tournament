@@ -758,6 +758,35 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(new Set(firstRoundPlayerIds).size).toBe(firstRoundPlayerIds.length);
     expect(state.teamAssignments?.t1[restingPlayerId!]).toBe("blue");
   });
+  it("moves a team battle round and saves the new match order", async () => {
+    const state = makeState();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
+    state.members = Array.from({ length: 8 }, (_, index) => ({ id: `m${index + 1}`, name: `선수${index + 1}`, level: "B", notes: "" }));
+    state.groups = [{ id: "g1", tournamentId: "t1", name: "청백전", scheduleFormat: "team-battle", sortOrder: 1 }];
+    state.groupMemberIds = { g1: state.members.map((member) => member.id) };
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    state.teamAssignments = { t1: { m1: "blue", m2: "blue", m3: "blue", m4: "blue", m5: "white", m6: "white", m7: "white", m8: "white" } };
+    state.matches = [
+      { id: "round-1-court-1", tournamentId: "t1", groupId: "g1", matchNumber: 1, sideAPlayerIds: ["m1", "m2"], sideBPlayerIds: ["m5", "m6"], sideAScore: null, sideBScore: null, status: "scheduled", sortOrder: 1, courtNumber: "1" },
+      { id: "round-1-court-2", tournamentId: "t1", groupId: "g1", matchNumber: 2, sideAPlayerIds: ["m3", "m4"], sideBPlayerIds: ["m7", "m8"], sideAScore: null, sideBScore: null, status: "scheduled", sortOrder: 2, courtNumber: "2" },
+      { id: "round-2-court-1", tournamentId: "t1", groupId: "g1", matchNumber: 3, sideAPlayerIds: ["m1", "m3"], sideBPlayerIds: ["m5", "m7"], sideAScore: null, sideBScore: null, status: "scheduled", sortOrder: 3, courtNumber: "1" },
+      { id: "round-2-court-2", tournamentId: "t1", groupId: "g1", matchNumber: 4, sideAPlayerIds: ["m2", "m4"], sideBPlayerIds: ["m6", "m8"], sideAScore: null, sideBScore: null, status: "scheduled", sortOrder: 4, courtNumber: "2" }
+    ];
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const moveButtons = container.querySelectorAll<HTMLButtonElement>(".round-order-button");
+    expect(moveButtons).toHaveLength(4);
+
+    fireEvent.click(moveButtons[1]);
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
+    expect(saved?.matches.map((match) => match.id)).toEqual(["round-2-court-1", "round-2-court-2", "round-1-court-1", "round-1-court-2"]);
+    expect(saved?.matches.map((match) => match.sortOrder)).toEqual([1, 2, 3, 4]);
+    expect(saved?.matches.map((match) => match.matchNumber)).toEqual([1, 2, 3, 4]);
+  });
   it("shows duplicate team details for a team battle only in the admin draw", () => {
     const state = makeStateWithMatch();
     state.tournament = { ...state.tournament, type: "team-battle" };

@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, HelpCircle, Plus, Share2, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ClipboardList, HelpCircle, Plus, Share2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
@@ -420,6 +420,31 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     });
   }
 
+
+  function moveTeamBattleRound(groupId: string, roundNumber: number, direction: "up" | "down") {
+    if (isCompleted) return;
+    const groupMatches = [...(matchesByGroupId.get(groupId) ?? [])].sort((left, right) => left.sortOrder - right.sortOrder);
+    const rounds = groupTeamBattleMatchesByRound(groupMatches);
+    const currentIndex = rounds.findIndex((round) => round.roundNumber === roundNumber);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= rounds.length) return;
+
+    const reorderedRounds = [...rounds];
+    [reorderedRounds[currentIndex], reorderedRounds[targetIndex]] = [reorderedRounds[targetIndex], reorderedRounds[currentIndex]];
+    const reorderedGroupMatches = reorderedRounds.flatMap((round) => round.matches).map((match, index) => ({
+      ...match,
+      matchNumber: index + 1,
+      sortOrder: index + 1
+    }));
+    let groupInserted = false;
+    const nextMatches = state.matches.flatMap((match) => {
+      if (match.groupId !== groupId) return [match];
+      if (groupInserted) return [];
+      groupInserted = true;
+      return reorderedGroupMatches;
+    });
+    persist({ ...state, matches: nextMatches });
+  }
   function displayGroupName(group: TournamentGroup) {
     return tournamentType === "team-battle" ? "청백전" : state.groups.length === 1 ? "전체" : group.name;
   }
@@ -1584,13 +1609,21 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 {(group.scheduleFormat === "team-battle"
                   ? groupTeamBattleMatchesByRound(matchesByGroupId.get(group.id) ?? [])
                   : [{ roundNumber: 0, matches: [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) }]
-                ).map((round) => (
+                ).map((round, roundIndex, rounds) => (
                   <section className={group.scheduleFormat === "team-battle" ? "team-battle-round-card admin-team-battle-round-card" : "stack"} key={`round-${round.roundNumber}`}>
                     {group.scheduleFormat === "team-battle" && (
                       <div className="team-battle-round-card-head">
-                        <span>ROUND {String(round.roundNumber).padStart(2, "0")}</span>
-                        <strong>{round.roundNumber}라운드</strong>
+                        <span>ROUND {String(roundIndex + 1).padStart(2, "0")}</span>
+                        <strong>{roundIndex + 1}라운드</strong>
                         <small>{round.matches.length}경기</small>
+                        <div className="round-order-controls" aria-label={`${roundIndex + 1}라운드 순서 변경`}>
+                          <button aria-label={`${roundIndex + 1}라운드 위로 이동`} className="round-order-button" disabled={isCompleted || roundIndex === 0} onClick={() => moveTeamBattleRound(group.id, round.roundNumber, "up")} type="button">
+                            <ChevronUp size={16} />
+                          </button>
+                          <button aria-label={`${roundIndex + 1}라운드 아래로 이동`} className="round-order-button" disabled={isCompleted || roundIndex === rounds.length - 1} onClick={() => moveTeamBattleRound(group.id, round.roundNumber, "down")} type="button">
+                            <ChevronDown size={16} />
+                          </button>
+                        </div>
                       </div>
                     )}
                     <div className={group.scheduleFormat === "team-battle" ? "team-battle-round-match-list" : "stack"}>
