@@ -18,8 +18,8 @@ function createDatabasePool() {
 
   return new Pool({
     connectionString: databaseUrl,
-    connectionTimeoutMillis: 15_000,
-    idleTimeoutMillis: 300_000,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 5_000,
     max: 3
   });
 }
