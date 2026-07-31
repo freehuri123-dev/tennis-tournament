@@ -675,8 +675,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
       const groupMemberIds = new Set(state.groupMemberIds[match.groupId] ?? []);
       const playerIds = matchPlayerIds(match);
       assertAllowedIds(playerIds, clubMemberIds, "Match player is not an active club member");
-      const isHistoricalTeamBattleMatch = tournament.type === "team-battle" && match.status === "completed";
-      if (!isHistoricalTeamBattleMatch) assertAllowedIds(playerIds, groupMemberIds, "Match player is not assigned to group");
+      const allowsTemporaryTeamBattlePlayers = tournament.type === "team-battle";
+      if (!allowsTemporaryTeamBattlePlayers) assertAllowedIds(playerIds, groupMemberIds, "Match player is not assigned to group");
     }
 
     await tx.tournament.update({

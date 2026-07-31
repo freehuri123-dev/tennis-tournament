@@ -277,6 +277,70 @@ describe("tournament repository mapping", () => {
     expect(prisma.tournamentParticipant.deleteMany).not.toHaveBeenCalled();
   });
 
+
+  it("allows temporary active club members in team battle matches without adding them as participants", async () => {
+    const state: TournamentState = {
+      version: 9,
+      adminUnlocked: false,
+      members: [],
+      tournaments: [],
+      currentTournamentId: "tournament-1",
+      tournament: {
+        id: "tournament-1",
+        name: "Team Battle",
+        date: "2026-05-24",
+        publicSlug: "team-battle",
+        status: "active",
+        type: "team-battle"
+      },
+      groups: [
+        {
+          id: "group-1",
+          tournamentId: "tournament-1",
+          name: "청백전",
+          scheduleFormat: "team-battle",
+          sortOrder: 1
+        }
+      ],
+      tournamentParticipantIds: { "tournament-1": ["member-1", "member-2", "member-3", "member-4"] },
+      groupMemberIds: { "group-1": ["member-1", "member-2", "member-3", "member-4"] },
+      teamAssignments: { "tournament-1": { "member-1": "blue", "member-2": "blue", "member-3": "white", "member-4": "white" } },
+      matches: [
+        {
+          id: "match-1",
+          tournamentId: "tournament-1",
+          groupId: "group-1",
+          matchNumber: 1,
+          sideAPlayerIds: ["member-5", "member-2"],
+          sideBPlayerIds: ["member-3", "member-4"],
+          sideAScore: null,
+          sideBScore: null,
+          status: "scheduled",
+          sortOrder: 1
+        }
+      ],
+      deletedPublicSlugs: []
+    };
+
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "tournament-1" });
+    prisma.member.findMany.mockResolvedValue([
+      { id: "member-1" },
+      { id: "member-2" },
+      { id: "member-3" },
+      { id: "member-4" },
+      { id: "member-5" }
+    ]);
+
+    await expect(replaceTournamentState("stc", state)).resolves.toBeUndefined();
+
+    expect(prisma.tournamentParticipant.createMany).toHaveBeenCalledWith({
+      data: expect.not.arrayContaining([expect.objectContaining({ memberId: "member-5" })])
+    });
+    expect(prisma.match.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ sideAPlayerIds: ["member-5", "member-2"] })]
+    });
+  });
   it("updates match scores only inside the requested club with one query", async () => {
     prisma.match.updateManyAndReturn.mockResolvedValue([{
       id: "match-1",
