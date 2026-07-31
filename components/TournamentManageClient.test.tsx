@@ -734,6 +734,7 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(appearances.get("w1")).toBe(5);
     expect(appearances.get("w2")).toBe(5);
     expect(saved?.matches.every((match, index) => match.courtNumber === String(index % 3 + 1))).toBe(true);
+    expect(saved?.groups[0].seedPlayerIds).toEqual(expect.arrayContaining(["b5", "w1", "w2"]));
     expect(document.querySelectorAll(".admin-team-battle-round-card")).toHaveLength(5);
     expect(saved).toBeTruthy();
     firstView.unmount();
@@ -754,6 +755,7 @@ it("creates and saves a five-pair round robin league", async () => {
     const changed = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
     expect(changed?.matches[0].sideAPlayerIds).toContain(restingPlayerId);
     expect(changed?.matches[0].sideAPlayerIds).not.toContain(outgoingPlayerId);
+    expect(changed?.groups[0].seedPlayerIds).toEqual(saved?.groups[0].seedPlayerIds);
     const firstRoundPlayerIds = changed?.matches.slice(0, 3).flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]) ?? [];
     expect(new Set(firstRoundPlayerIds).size).toBe(firstRoundPlayerIds.length);
     expect(state.teamAssignments?.t1[restingPlayerId!]).toBe("blue");

@@ -143,6 +143,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const blueTeamMembers = tournamentParticipants.filter((member) => teamAssignment[member.id] === "blue");
   const whiteTeamMembers = tournamentParticipants.filter((member) => teamAssignment[member.id] === "white");
   const unassignedTeamMembers = tournamentParticipants.filter((member) => !teamAssignment[member.id]);
+  const teamBattleGroup = state.groups.find((group) => group.scheduleFormat === "team-battle");
+  const persistedTeamBattleExtraGamePlayerIds = teamBattleGroup?.seedPlayerIds ?? [];
   const teamBattleTotalAppearances = getTeamBattleTargetAppearances(teamBattleRoundCount, courtCount);
   const teamBattleSidePlans = {
     blue: calculateTeamBattleSideGamePlan(blueTeamMembers.length, teamBattleTotalAppearances),
@@ -177,7 +179,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         const selectionRule = teamBattleSelectionRule(members.length, plan.baseGames, plan.extraGamePlayerCount);
         const required = selectionRule.selectionCount;
         const memberIds = new Set(members.map((member) => member.id));
-        const retained = current[side].filter((memberId) => memberIds.has(memberId)).slice(0, required);
+        const persisted = persistedTeamBattleExtraGamePlayerIds.filter((memberId) => memberIds.has(memberId)).slice(0, required);
+        const preferred = current[side].length > 0 ? current[side] : persisted;
+        const retained = preferred.filter((memberId) => memberIds.has(memberId)).slice(0, required);
         const candidates = members
           .filter((member) => !retained.includes(member.id))
           .sort((left, right) => {
@@ -194,7 +198,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     setTeamBattleScheduleError("");
   // The roster keys intentionally reset selections only when participants move between teams.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blueTeamRosterKey, whiteTeamRosterKey, teamBattleSidePlans.blue.baseGames, teamBattleSidePlans.blue.extraGamePlayerCount, teamBattleSidePlans.white.baseGames, teamBattleSidePlans.white.extraGamePlayerCount]);
+  }, [blueTeamRosterKey, whiteTeamRosterKey, persistedTeamBattleExtraGamePlayerIds.join("|"), teamBattleSidePlans.blue.baseGames, teamBattleSidePlans.blue.extraGamePlayerCount, teamBattleSidePlans.white.baseGames, teamBattleSidePlans.white.extraGamePlayerCount]);
 
   useEffect(() => {
     if (tournamentType !== "team-battle" || maximumTeamBattleCourtCount <= 0 || courtCount <= maximumTeamBattleCourtCount) return;
@@ -878,6 +882,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         sortOrder: 1,
         seedPlayerIds: []
       };
+      const teamBattleSeedPlayerIds = [
+        ...teamBattleExtraGamePlayerIds.blue,
+        ...teamBattleExtraGamePlayerIds.white
+      ];
       const message = state.matches.length > 0 ? "기존 청백전 대진과 경기 결과를 모두 초기화하고 새 대진을 만들까요?" : "청백전 대진표를 생성할까요?";
       if (courtAssignmentEnabled && selectedCourtNumbers.length < courtCount) {
         window.alert(`${courtCount}개 코트를 사용하려면 코트 번호 ${courtCount}개를 선택해주세요.`);
@@ -899,7 +907,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         persist({
           ...state,
           tournament: { ...tournament, type: "team-battle" },
-          groups: [group],
+          groups: [{ ...group, seedPlayerIds: teamBattleSeedPlayerIds }],
           groupMemberIds: { [group.id]: tournamentParticipantIds },
           matches
         });
