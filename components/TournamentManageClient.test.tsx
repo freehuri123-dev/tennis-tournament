@@ -809,6 +809,35 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(screen.getByText(`${memberName("m3")} · ${memberName("m4")} — 경기 1, 경기 2`)).toBeTruthy();
   });
 
+  it("allows an unassigned participant to substitute into a team battle match without joining team contribution", async () => {
+    const state = makeStateWithMatch();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
+    state.members = [...state.members, { id: "m5", name: "늦은선수", level: "B", notes: "" }];
+    state.groups = [{ ...state.groups[0], scheduleFormat: "team-battle" }];
+    state.groupMemberIds = { g1: state.members.map((member) => member.id) };
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    state.teamAssignments = { t1: { m1: "blue", m2: "blue", m3: "white", m4: "white" } };
+    state.matches = [
+      { ...state.matches[0], sideAPlayerIds: ["m1", "m2"], sideBPlayerIds: ["m3", "m4"], courtNumber: "1" }
+    ];
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const editBox = container.querySelector<HTMLDetailsElement>(".team-battle-player-edit");
+    expect(editBox).toBeTruthy();
+    fireEvent.click(editBox!.querySelector("summary")!);
+    const blueSelect = container.querySelector<HTMLSelectElement>(".team-battle-player-edit select");
+    expect(blueSelect).toBeTruthy();
+    expect(Array.from(blueSelect!.options).map((option) => option.value)).toContain("m5");
+
+    fireEvent.change(blueSelect!, { target: { value: "m5" } });
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
+    expect(saved?.matches[0].sideAPlayerIds).toEqual(["m5", "m2"]);
+    expect(saved?.teamAssignments?.t1?.m5).toBeUndefined();
+  });
   it("resets every existing team battle match and score before regenerating", async () => {
     const state = makeStateWithMatch();
     state.tournament = { ...state.tournament, type: "team-battle" };

@@ -53,4 +53,19 @@ describe("TeamBattleContributionDetails", () => {
     expect(screen.getByLabelText("\uBC15\uC9C0\uC218 \uD300 \uC2B9\uB9AC \uAE30\uC5EC\uB3C4 40%")).toBeTruthy();
     expect(screen.getByLabelText("\uCD5C\uC11C\uC724 \uD300 \uC2B9\uB9AC \uAE30\uC5EC\uB3C4 40%")).toBeTruthy();
   });
+
+  it("excludes temporary substitutes from contribution rows while counting their team wins", () => {
+    const matches: Match[] = [
+      completedBlueWin("1", ["blue-park", "guest-late"]),
+      completedBlueWin("2", ["guest-late", "guest-other"])
+    ];
+
+    const { container } = render(
+      <TeamBattleContributionDetails blueMembers={[blueMembers[0]]} whiteMembers={whiteMembers} matches={matches} />
+    );
+
+    expect(screen.queryByText("guest-late")).toBeNull();
+    expect(container.querySelector(".team-contribution-card.blue .team-personal-ranking-head strong")?.textContent).toBe("1명");
+    expect(screen.getByLabelText("박지수 팀 승리 기여도 50%")).toBeTruthy();
+  });
 });

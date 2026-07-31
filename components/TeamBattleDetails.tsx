@@ -12,15 +12,11 @@ type ContributionRow = {
   percent: number;
 };
 
-function calculateContribution(members: Member[], matches: Match[]): ContributionRow[] {
+function calculateContribution(members: Member[], matches: Match[], side: "blue" | "white"): ContributionRow[] {
   const winsByMemberId = new Map(calculateRankings(members, matches).map((row) => [row.memberId, row.wins]));
-  const memberIds = new Set(members.map((member) => member.id));
   const teamWins = matches.filter((match) => {
     if (match.status !== "completed" || match.sideAScore === null || match.sideBScore === null) return false;
-    const hasSideAMember = match.sideAPlayerIds.some((memberId) => memberIds.has(memberId));
-    const hasSideBMember = match.sideBPlayerIds.some((memberId) => memberIds.has(memberId));
-    return (hasSideAMember && match.sideAScore > match.sideBScore)
-      || (hasSideBMember && match.sideBScore > match.sideAScore);
+    return side === "blue" ? match.sideAScore > match.sideBScore : match.sideBScore > match.sideAScore;
   }).length;
 
   return members
@@ -55,8 +51,8 @@ export function TeamBattleRoster({ blueMembers, whiteMembers }: Omit<TeamBattleD
 
 export function TeamBattleContributionDetails({ blueMembers, whiteMembers, matches }: TeamBattleDetailsProps) {
   const teams = [
-    { side: "blue" as const, label: "청팀", rows: calculateContribution(blueMembers, matches) },
-    { side: "white" as const, label: "백팀", rows: calculateContribution(whiteMembers, matches) }
+    { side: "blue" as const, label: "청팀", rows: calculateContribution(blueMembers, matches, "blue") },
+    { side: "white" as const, label: "백팀", rows: calculateContribution(whiteMembers, matches, "white") }
   ];
 
   return (

@@ -1046,12 +1046,18 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function teamBattleReplacementCandidates(roundMatches: Match[], match: Match, side: "A" | "B", index: number, selected?: string) {
-    const playingIds = new Set(roundMatches.flatMap((roundMatch) => side === "A" ? roundMatch.sideAPlayerIds : roundMatch.sideBPlayerIds));
+    const playingIds = new Set(roundMatches.flatMap((roundMatch) => [...roundMatch.sideAPlayerIds, ...roundMatch.sideBPlayerIds]));
     const teamMembers = side === "A" ? blueTeamMembers : whiteTeamMembers;
-    return [
-      ...(selected ? [membersById.get(selected)] : []),
-      ...teamMembers.filter((member) => !playingIds.has(member.id))
-    ].filter((member): member is typeof state.members[number] => Boolean(member));
+    const temporaryMembers = tournamentParticipants.filter((member) => !teamAssignment[member.id]);
+    const candidateMap = new Map<string, typeof state.members[number]>();
+    if (selected) {
+      const selectedMember = membersById.get(selected);
+      if (selectedMember) candidateMap.set(selectedMember.id, selectedMember);
+    }
+    [...teamMembers, ...temporaryMembers].forEach((member) => {
+      if (!playingIds.has(member.id)) candidateMap.set(member.id, member);
+    });
+    return [...candidateMap.values()];
   }
 
   function replaceTeamBattlePlayer(matchId: string, roundMatches: Match[], side: "A" | "B", index: number, memberId: string) {
@@ -1064,8 +1070,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (!sourceMemberId || sourceMemberId === memberId) return;
 
     const expectedTeam: TeamSide = side === "A" ? "blue" : "white";
-    const roundPlayingIds = new Set(roundMatches.flatMap((match) => side === "A" ? match.sideAPlayerIds : match.sideBPlayerIds));
-    if (teamAssignment[memberId] !== expectedTeam || roundPlayingIds.has(memberId)) return;
+    const roundPlayingIds = new Set(roundMatches.flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]));
+    const isTemporaryParticipant = tournamentParticipantIds.includes(memberId) && !teamAssignment[memberId];
+    if ((teamAssignment[memberId] !== expectedTeam && !isTemporaryParticipant) || roundPlayingIds.has(memberId)) return;
 
     sourceIds[index] = memberId;
     persist({
