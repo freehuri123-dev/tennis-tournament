@@ -28,6 +28,8 @@ export type TournamentGroup = {
   scheduleFormat: "hanul-aa" | "kdk-v2010" | "random" | "fixed-pair-league" | "fixed-pair-tournament" | "single-tournament" | "team-battle";
   sortOrder: number;
   seedPlayerIds?: string[];
+  randomCourtCount?: number;
+  randomGamesPerPlayer?: number;
 };
 
 export type MatchStatus = "scheduled" | "completed";

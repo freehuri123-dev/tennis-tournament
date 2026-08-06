@@ -7,7 +7,8 @@ const introImages: Record<ClubSlug, string> = {
   stc: "/stc_intro_summer_coast.webp",
   otc: "/otc_intro_summer_coast.webp",
   joogo: "/joogo_intro_summer_coast.webp",
-  army: "/army_intro.jpg"
+  army: "/army_intro.jpg",
+  queensday: "/queensday_intro.webp"
 };
 
 export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: { clubSlug?: ClubSlug; startLabel?: string }) {

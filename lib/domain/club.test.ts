@@ -7,6 +7,7 @@ describe("club routing", () => {
     expect(isKnownClubSlug("otc")).toBe(true);
     expect(isKnownClubSlug("joogo")).toBe(true);
     expect(isKnownClubSlug("army")).toBe(true);
+    expect(isKnownClubSlug("queensday")).toBe(true);
     expect(isKnownClubSlug("admin")).toBe(false);
     expect(isKnownClubSlug("")).toBe(false);
   });
@@ -16,6 +17,7 @@ describe("club routing", () => {
     expect(buildClubPath("otc", "tournaments/manage")).toBe("/otc/tournaments/manage");
     expect(buildClubPath("joogo", "tournaments")).toBe("/joogo/tournaments");
     expect(buildClubPath("army", "tournaments")).toBe("/army/tournaments");
+    expect(buildClubPath("queensday", "tournaments")).toBe("/queensday/tournaments");
     expect(buildClubPath("stc")).toBe("/stc");
   });
 
@@ -28,5 +30,7 @@ describe("club routing", () => {
     expect(getClubBySlug("army")?.name).toBe("천하제일1사단");
     expect(getClubBySlug("army")?.organizationLabel).toBe("모임");
     expect(getClubBySlug("army")?.tournamentLabel).toBe("모임대회");
+    expect(getClubBySlug("queensday")?.name).toBe("퀸즈데이");
+    expect(getClubBySlug("queensday")?.organizationLabel).toBe("모임");
   });
 });

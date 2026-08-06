@@ -7,6 +7,7 @@ describe("getTournamentStorageKey", () => {
     expect(getTournamentStorageKey("otc")).toBe("tennis-monthly-tournament-state:otc");
     expect(getTournamentStorageKey("joogo")).toBe("tennis-monthly-tournament-state:joogo");
     expect(getTournamentStorageKey("army")).toBe("tennis-monthly-tournament-state:army");
+    expect(getTournamentStorageKey("queensday")).toBe("tennis-monthly-tournament-state:queensday");
   });
 
   it("uses the legacy storage key when no club slug is provided", () => {

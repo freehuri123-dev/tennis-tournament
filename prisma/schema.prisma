@@ -114,6 +114,8 @@ model TournamentGroup {
   scheduleFormat ScheduleFormat
   sortOrder      Int
   seedPlayerIds  String[]                @default([])
+  randomCourtCount Int?
+  randomGamesPerPlayer Int?
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
   tournament     Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

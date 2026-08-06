@@ -141,6 +141,29 @@ describe("generateInitialMatches", () => {
     expect([...playCounts.values()].every((count) => count >= 4)).toBe(true);
   });
 
+  it("랜덤 방식은 설정한 1인 경기 수와 코트 번호로 균형 대진을 만든다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "random",
+      participants: makeMembers(10),
+      courtNumbers: ["1", "2"],
+      randomGamesPerPlayer: 3
+    });
+
+    const playCounts = new Map(makeMembers(10).map((member) => [member.id, 0]));
+    for (const match of matches) {
+      for (const playerId of [...match.sideAPlayerIds, ...match.sideBPlayerIds]) {
+        playCounts.set(playerId, (playCounts.get(playerId) ?? 0) + 1);
+      }
+    }
+
+    expect(matches).toHaveLength(8);
+    expect(matches.map((match) => match.courtNumber)).toEqual(["1", "2", "1", "2", "1", "2", "1", "2"]);
+    expect(Math.min(...playCounts.values())).toBe(3);
+    expect(Math.max(...playCounts.values())).toBe(4);
+  });
+
   it("복식 토너먼트는 순번대로 붙이고 마지막 홀수 페어만 BYE로 올린다", () => {
     const matches = generateInitialMatches({
       tournamentId: "t1",

@@ -152,6 +152,8 @@ function toDomainGroup(group: {
   scheduleFormat: ScheduleFormat;
   sortOrder: number;
   seedPlayerIds: string[];
+  randomCourtCount?: number | null;
+  randomGamesPerPlayer?: number | null;
 }): TournamentGroup {
   return {
     id: group.id,
@@ -159,7 +161,9 @@ function toDomainGroup(group: {
     name: group.name,
     scheduleFormat: fromDbScheduleFormat(group.scheduleFormat),
     sortOrder: group.sortOrder,
-    seedPlayerIds: group.seedPlayerIds
+    seedPlayerIds: group.seedPlayerIds,
+    randomCourtCount: group.randomCourtCount ?? undefined,
+    randomGamesPerPlayer: group.randomGamesPerPlayer ?? undefined
   };
 }
 
@@ -716,7 +720,9 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
           name: group.name,
           scheduleFormat: toDbScheduleFormat(group.scheduleFormat),
           sortOrder: group.sortOrder || index + 1,
-          seedPlayerIds: group.seedPlayerIds ?? []
+          seedPlayerIds: group.seedPlayerIds ?? [],
+          randomCourtCount: group.randomCourtCount ?? null,
+          randomGamesPerPlayer: group.randomGamesPerPlayer ?? null
         }))
       });
     }

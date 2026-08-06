@@ -8,6 +8,7 @@ type GenerateInitialMatchesInput = {
   seedPlayerIds?: string[];
   courtNumbers?: string[];
   courtStartIndex?: number;
+  randomGamesPerPlayer?: number;
 };
 
 type ScheduleFormat = TournamentGroup["scheduleFormat"];
@@ -161,17 +162,40 @@ function generateFixedPairLeagueMatches(input: GenerateInitialMatchesInput): Mat
 }
 
 function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
+  const gamesPerPlayer = Math.max(1, Math.min(8, Math.floor(input.randomGamesPerPlayer ?? 4)));
+  const shuffledParticipants = shuffle([...input.participants]);
+  const targetAppearances = new Map(shuffledParticipants.map((member) => [member.id, gamesPerPlayer]));
+  const totalTargetAppearances = input.participants.length * gamesPerPlayer;
+  const roundedTargetAppearances = Math.ceil(totalTargetAppearances / 4) * 4;
+  for (const member of shuffledParticipants.slice(0, roundedTargetAppearances - totalTargetAppearances)) {
+    targetAppearances.set(member.id, (targetAppearances.get(member.id) ?? gamesPerPlayer) + 1);
+  }
+
   const playCounts = new Map(input.participants.map((member) => [member.id, 0]));
+  const partnerCounts = new Map<string, number>();
+  const opponentCounts = new Map<string, number>();
   const matches: Match[] = [];
+  const targetMatchCount = roundedTargetAppearances / 4;
 
-  while ([...playCounts.values()].some((count) => count < 4)) {
-    const selected = shuffle([...input.participants])
-      .sort((left, right) => (playCounts.get(left.id) ?? 0) - (playCounts.get(right.id) ?? 0))
-      .slice(0, 4);
-    const players = shuffle(selected).map((member) => member.id);
+  while (matches.length < targetMatchCount) {
+    const preferredCandidates = shuffle([...input.participants])
+      .filter((member) => (playCounts.get(member.id) ?? 0) < (targetAppearances.get(member.id) ?? gamesPerPlayer))
+      .sort((left, right) => (playCounts.get(left.id) ?? 0) - (playCounts.get(right.id) ?? 0));
+    const fillerCandidates = shuffle([...input.participants])
+      .filter((member) => !preferredCandidates.some((candidate) => candidate.id === member.id))
+      .sort((left, right) => (playCounts.get(left.id) ?? 0) - (playCounts.get(right.id) ?? 0));
+    const candidatePool = [...preferredCandidates, ...fillerCandidates]
+      .slice(0, Math.min(12, input.participants.length));
+    const match = chooseBalancedRandomMatch(candidatePool, playCounts, partnerCounts, opponentCounts);
+    if (!match) break;
 
-    for (const playerId of players) {
+    for (const playerId of [...match.sideAPlayerIds, ...match.sideBPlayerIds]) {
       playCounts.set(playerId, (playCounts.get(playerId) ?? 0) + 1);
+    }
+    bumpPairCount(partnerCounts, match.sideAPlayerIds[0], match.sideAPlayerIds[1]);
+    bumpPairCount(partnerCounts, match.sideBPlayerIds[0], match.sideBPlayerIds[1]);
+    for (const left of match.sideAPlayerIds) {
+      for (const right of match.sideBPlayerIds) bumpPairCount(opponentCounts, left, right);
     }
 
     matches.push({
@@ -179,8 +203,8 @@ function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
       tournamentId: input.tournamentId,
       groupId: input.groupId,
       matchNumber: matches.length + 1,
-      sideAPlayerIds: players.slice(0, 2),
-      sideBPlayerIds: players.slice(2, 4),
+      sideAPlayerIds: match.sideAPlayerIds,
+      sideBPlayerIds: match.sideBPlayerIds,
       sideAScore: null,
       sideBScore: null,
       status: "scheduled",
@@ -190,6 +214,77 @@ function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
   }
 
   return matches;
+}
+
+function chooseBalancedRandomMatch(
+  candidates: Member[],
+  playCounts: Map<string, number>,
+  partnerCounts: Map<string, number>,
+  opponentCounts: Map<string, number>
+): { sideAPlayerIds: string[]; sideBPlayerIds: string[] } | null {
+  let best: { sideAPlayerIds: string[]; sideBPlayerIds: string[]; score: number } | null = null;
+  for (const group of combinations(candidates, 4)) {
+    const ids = group.map((member) => member.id);
+    const pairings = [
+      [[ids[0], ids[1]], [ids[2], ids[3]]],
+      [[ids[0], ids[2]], [ids[1], ids[3]]],
+      [[ids[0], ids[3]], [ids[1], ids[2]]]
+    ];
+    for (const [sideAPlayerIds, sideBPlayerIds] of pairings) {
+      const score = randomMatchScore(group, sideAPlayerIds, sideBPlayerIds, playCounts, partnerCounts, opponentCounts);
+      if (!best || score < best.score) best = { sideAPlayerIds, sideBPlayerIds, score };
+    }
+  }
+  return best ? { sideAPlayerIds: best.sideAPlayerIds, sideBPlayerIds: best.sideBPlayerIds } : null;
+}
+
+function randomMatchScore(
+  members: Member[],
+  sideAPlayerIds: string[],
+  sideBPlayerIds: string[],
+  playCounts: Map<string, number>,
+  partnerCounts: Map<string, number>,
+  opponentCounts: Map<string, number>
+) {
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const sideAStrength = sideAPlayerIds.reduce((sum, id) => sum + memberStrength(memberById.get(id)), 0);
+  const sideBStrength = sideBPlayerIds.reduce((sum, id) => sum + memberStrength(memberById.get(id)), 0);
+  const partnerRepeat = pairCount(partnerCounts, sideAPlayerIds[0], sideAPlayerIds[1]) + pairCount(partnerCounts, sideBPlayerIds[0], sideBPlayerIds[1]);
+  const opponentRepeat = sideAPlayerIds.reduce((sum, left) => sum + sideBPlayerIds.reduce((inner, right) => inner + pairCount(opponentCounts, left, right), 0), 0);
+  const countSpread = Math.max(...members.map((member) => playCounts.get(member.id) ?? 0)) - Math.min(...members.map((member) => playCounts.get(member.id) ?? 0));
+  const totalPlayCount = members.reduce((sum, member) => sum + (playCounts.get(member.id) ?? 0), 0);
+  return totalPlayCount * 160 + partnerRepeat * 80 + opponentRepeat * 18 + Math.abs(sideAStrength - sideBStrength) * 12 + countSpread * 5 + Math.random();
+}
+
+function memberStrength(member?: Member) {
+  const level = member?.level?.trim().toUpperCase() ?? "";
+  if (level.startsWith("A")) return 4;
+  if (level.startsWith("C")) return 2;
+  if (level.startsWith("D")) return 1;
+  return 3;
+}
+
+function pairKey(left: string, right: string) {
+  return [left, right].sort().join("|");
+}
+
+function pairCount(counts: Map<string, number>, left: string, right: string) {
+  return counts.get(pairKey(left, right)) ?? 0;
+}
+
+function bumpPairCount(counts: Map<string, number>, left: string, right: string) {
+  const key = pairKey(left, right);
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+function combinations<T>(items: T[], size: number): T[][] {
+  if (size === 0) return [[]];
+  if (items.length < size) return [];
+  const result: T[][] = [];
+  for (let index = 0; index <= items.length - size; index += 1) {
+    for (const rest of combinations(items.slice(index + 1), size - 1)) result.push([items[index], ...rest]);
+  }
+  return result;
 }
 
 function generateTournamentMatches(input: GenerateInitialMatchesInput, teamSize: 1 | 2): Match[] {

@@ -21,6 +21,25 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg(databaseUrl)
 });
 
+
+const queensdayMembers = [
+  "전영선",
+  "김은정",
+  "김정희",
+  "이미영",
+  "김보경",
+  "서지민",
+  "정유리",
+  "윤희순",
+  "조원희",
+  "이지숙",
+  "이지은",
+  "채명숙",
+  "양오숙",
+  "윤우순",
+  "최햇님"
+];
+
 function scopedId(clubSlug: string, id: string) {
   return clubSlug === "stc" ? id : `${clubSlug}-${id}`;
 }
@@ -42,6 +61,23 @@ async function main() {
         shortName: seedClub.shortName
       }
     });
+
+    if (seedClub.slug === "queensday") {
+      for (const [index, name] of queensdayMembers.entries()) {
+        await prisma.member.create({
+          data: {
+            id: scopedId(seedClub.slug, `m${index + 1}`),
+            clubId: club.id,
+            name,
+            gender: "female",
+            notes: "",
+            active: true,
+            deleted: false
+          }
+        });
+      }
+      continue;
+    }
 
     if (seedClub.seedSampleData === false) continue;
 
