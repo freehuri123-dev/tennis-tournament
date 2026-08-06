@@ -19,8 +19,6 @@ enum TournamentStatus {
 
 enum TournamentType {
   general
-  fixed_pair_league
-  monthly
   team_battle
   tournament
 }

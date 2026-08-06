@@ -9,7 +9,7 @@ export type Member = {
   deleted?: boolean;
 };
 
-export type TournamentType = "general" | "fixed-pair-league" | "monthly" | "team-battle" | "tournament";
+export type TournamentType = "general" | "team-battle" | "tournament";
 export type TeamSide = "blue" | "white";
 
 export type Tournament = {

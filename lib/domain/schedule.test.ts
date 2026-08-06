@@ -464,9 +464,7 @@ describe("fixed pair league round robin", () => {
     expect(matches).toHaveLength(10);
     expect([...playCounts.values()]).toEqual([4, 4, 4, 4, 4]);
     expect([...opponents.values()].map((items) => items.size)).toEqual([4, 4, 4, 4, 4]);
-    expect(validateScheduleParticipants("fixed-pair-league", 8)).toBe("");
+    expect(validateScheduleParticipants("fixed-pair-league", 8)).toContain("10명(5페어)");
     expect(validateScheduleParticipants("fixed-pair-league", 10)).toBe("");
-    expect(validateScheduleParticipants("fixed-pair-league", 12)).toBe("");
-    expect(validateScheduleParticipants("fixed-pair-league", 9)).toContain("8명, 10명, 12명");
   });
 });

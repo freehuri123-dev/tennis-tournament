@@ -253,6 +253,7 @@ describe("TournamentManageClient save timing", () => {
 
   it("restores court assignment options from generated matches", () => {
     const state = makeStateWithMatch();
+    state.groups = state.groups.map((group) => ({ ...group, scheduleFormat: "kdk-v2010" }));
     state.matches = [
       { ...state.matches[0], courtNumber: "4" },
       { ...state.matches[0], id: "match-2", matchNumber: 2, sortOrder: 2, courtNumber: "5" }
@@ -284,12 +285,17 @@ describe("TournamentManageClient save timing", () => {
 
   it("assigns and displays default court numbers when court assignment is enabled before generating schedules", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<TournamentManageClient initialState={makeStateWithParticipants()} clubSlug="stc" />);
+    const state = makeStateWithParticipants();
+    state.groups = state.groups.map((group) => ({ ...group, scheduleFormat: "kdk-v2010" }));
+    state.members = [...state.members, { id: "m5", name: "추가회원", gender: "female", notes: "" }];
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: /김철수/ }));
     fireEvent.click(screen.getByRole("button", { name: /박영희/ }));
     fireEvent.click(screen.getByRole("button", { name: /이민준/ }));
     fireEvent.click(screen.getByRole("button", { name: /최지은/ }));
+    fireEvent.click(screen.getByRole("button", { name: /추가회원/ }));
     fireEvent.click(screen.getByRole("button", { name: "사용안함" }));
     fireEvent.click(screen.getByRole("button", { name: "대진표 생성" }));
 
@@ -300,7 +306,9 @@ describe("TournamentManageClient save timing", () => {
   });
 
   it("hides court assignment when a second group is added", () => {
-    render(<TournamentManageClient initialState={makeStateWithParticipants()} clubSlug="stc" />);
+    const state = makeStateWithParticipants();
+    state.groups = state.groups.map((group) => ({ ...group, scheduleFormat: "kdk-v2010" }));
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: "사용안함" }));
     expect(screen.getByRole("button", { name: "사용함" })).toBeTruthy();

@@ -4107,81 +4107,6 @@ body,
   font-weight: 800;
 }
 
-.tournament-type-card-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.tournament-type-card {
-  position: relative;
-  display: grid;
-  gap: 7px;
-  padding: 12px;
-  border: 1px solid rgba(21, 92, 83, 0.16);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 6px 16px rgba(12, 55, 50, 0.06);
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.tournament-type-card:hover {
-  transform: translateY(-1px);
-  border-color: rgba(20, 117, 104, 0.32);
-  box-shadow: 0 10px 20px rgba(12, 55, 50, 0.1);
-}
-
-.tournament-type-card input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.tournament-type-card:has(input:checked) {
-  border-color: #137d6f;
-  background: #eefbf7;
-  box-shadow: 0 10px 22px rgba(19, 125, 111, 0.16);
-}
-
-.tournament-type-card:has(input:checked)::after {
-  content: "";
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #137d6f;
-  box-shadow: 0 0 0 4px rgba(19, 125, 111, 0.12);
-}
-
-.tournament-type-card-main {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding-right: 22px;
-}
-
-.tournament-type-card-main strong {
-  color: #153f39;
-  font-size: 15px;
-}
-
-.tournament-type-card-main small {
-  color: #147568;
-  font-size: 11px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.tournament-type-card em {
-  color: #5e746f;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 700;
-  line-height: 1.45;
-}
 
 .team-battle-grid {
   display: grid;
@@ -4403,7 +4328,7 @@ body,
 }
 
 .team-battle-ranking-details > summary::after {
-  content: "蹂닿린";
+  content: "보기";
   flex: 0 0 auto;
   padding: 5px 9px;
   border-radius: 999px;
@@ -4413,7 +4338,7 @@ body,
 }
 
 .team-battle-ranking-details[open] > summary::after {
-  content: "?リ린";
+  content: "닫기";
 }
 
 .team-battle-ranking-details > summary small {

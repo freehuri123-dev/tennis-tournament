@@ -64,21 +64,11 @@ function toDbTournamentType(value: TournamentType | undefined): DbTournamentType
 }
 
 function fromDbTournamentType(value: DbTournamentType): TournamentType {
-  if (value === "team_battle") return "team-battle";
-  if (value === "fixed_pair_league") return "fixed-pair-league";
-  return value;
+  return value === "team_battle" ? "team-battle" : value;
 }
 
 function fromDbTeamSide(value: DbTeamSide | null): TeamSide | undefined {
   return value ?? undefined;
-}
-
-function defaultScheduleFormatForTournamentType(type: TournamentType | undefined): TournamentGroup["scheduleFormat"] {
-  if (type === "team-battle") return "team-battle";
-  if (type === "tournament") return "fixed-pair-tournament";
-  if (type === "fixed-pair-league") return "fixed-pair-league";
-  if (type === "monthly") return "kdk-v2010";
-  return "random";
 }
 
 export function toDomainDate(value: Date): string {
@@ -392,23 +382,15 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
   };
 
   if (!input.id) {
-    const tournament = await prisma.tournament.create({
-      data: {
-        clubId: club.id,
-        ...data,
-        status: "draft",
-        groups: {
-          create: {
-            name: "전체",
-            scheduleFormat: toDbScheduleFormat(defaultScheduleFormatForTournamentType(input.type)),
-            sortOrder: 1,
-            seedPlayerIds: [],
-            randomGamesPerPlayer: input.type === "general" ? 2 : null
-          }
+    return toDomainTournament(
+      await prisma.tournament.create({
+        data: {
+          clubId: club.id,
+          ...data,
+          status: "draft"
         }
-      }
-    });
-    return toDomainTournament(tournament);
+      })
+    );
   }
 
   const existing = await prisma.tournament.findFirst({

@@ -20,14 +20,6 @@ function tournamentManagePath(clubSlug: ClubSlug, tournamentId: string) {
   return `${buildClubPath(clubSlug, "tournaments/manage")}?tournamentId=${encodeURIComponent(tournamentId)}`;
 }
 
-function tournamentTypeLabel(type: string | undefined) {
-  if (type === "team-battle") return "\uCCAD\uBC31\uC804 \u00B7 \uB2E8\uCCB4\uC804";
-  if (type === "tournament") return "\uD1A0\uB108\uBA3C\uD2B8";
-  if (type === "fixed-pair-league") return "\uACE0\uC815\uD398\uC5B4\uB9AC\uADF8";
-  if (type === "monthly") return "\uC6D4\uB840\uB300\uD68C \u00B7 KDK";
-  return "\uC77C\uBC18\uB300\uD68C \u00B7 \uC790\uB3D9\uB79C\uB364\uBCF5\uC2DD";
-}
-
 async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: TournamentTab }) {
   const tournaments = (await listTournamentsByClub(clubSlug)).map((tournament) => withDateStatus(tournament));
   const visibleTournaments = tournaments.filter((tournament) =>
@@ -64,7 +56,7 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
                   </div>
                   <div className="list-card-meta">
                     <span>{tournament.date}</span>
-                    <span>{tournamentTypeLabel(tournament.type)}</span>
+                    <span>{tournament.type === "team-battle" ? "청백전 · 단체전" : tournament.type === "tournament" ? "토너먼트" : "일반 대회"}</span>
                   </div>
                 </PendingLink>
                 <ConfirmActionForm action={deleteTournamentAction} confirmMessage="대회를 삭제하시겠습니까?" pendingLabel="대회 삭제 중...">

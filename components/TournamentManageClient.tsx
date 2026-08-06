@@ -131,24 +131,11 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     ? "team-battle"
     : state.groups.some((group) => group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament")
       ? "tournament"
-      : state.groups.some((group) => group.scheduleFormat === "fixed-pair-league")
-        ? "fixed-pair-league"
-        : state.groups.some((group) => group.scheduleFormat === "kdk-v2010" || group.scheduleFormat === "hanul-aa")
-          ? "monthly"
-          : "general");
-  const tournamentTypeBadgeLabel = tournamentType === "team-battle"
-    ? "청백전 · 단체전"
-    : tournamentType === "tournament"
-      ? "토너먼트"
-      : tournamentType === "fixed-pair-league"
-        ? "고정페어리그"
-        : tournamentType === "monthly"
-          ? "월례대회 · KDK"
-          : "일반대회 · 자동랜덤복식";
+      : "general");
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
-  const isAutomaticRandomTournament = tournamentType === "general" && state.groups.every((group) => group.scheduleFormat === "random");
-  const canUseCourtAssignment = tournamentType === "team-battle" || (state.groups.length === 1 && !isAutomaticRandomTournament);
+  const isRandomKdkTournament = tournamentType === "general" && state.groups.some((group) => group.scheduleFormat === "random");
+  const canUseCourtAssignment = tournamentType === "team-battle" || (state.groups.length === 1 && !isRandomKdkTournament);
 
   const tournamentParticipants = useMemo(
     () => tournamentParticipantIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member)),
@@ -775,7 +762,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function addGroup() {
     if (isCompleted || tournamentType === "team-battle") return;
-    if ((tournamentType === "tournament" || tournamentType === "fixed-pair-league" || tournamentType === "general") && state.groups.length > 0) return;
+    if ((tournamentType === "tournament" || state.groups.some((group) => group.scheduleFormat === "random" || group.scheduleFormat === "fixed-pair-league")) && state.groups.length > 0) return;
     if (state.groups.some(isTournamentFormat)) {
       window.alert("토너먼트 방식은 한 그룹으로만 진행할 수 있습니다.");
       return;
@@ -796,8 +783,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         {
           id: groupId,
           tournamentId: tournament.id,
-          name: tournamentType === "tournament" || tournamentType === "fixed-pair-league" || tournamentType === "general" ? "전체" : `${String.fromCharCode(64 + nextGroupNumber)}조`,
-          scheduleFormat: tournamentType === "tournament" ? "fixed-pair-tournament" : tournamentType === "fixed-pair-league" ? "fixed-pair-league" : tournamentType === "general" ? "random" : "kdk-v2010",
+          name: tournamentType === "tournament" ? "전체" : `${String.fromCharCode(64 + nextGroupNumber)}조`,
+          scheduleFormat: tournamentType === "tournament" ? "fixed-pair-tournament" : "kdk-v2010",
           sortOrder: nextGroupNumber,
           seedPlayerIds: []
         }
@@ -1244,7 +1231,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         {activeTab === "setup" && (
           <div className="tab-panel stack" key="setup">
             <section className="section-card stack">
-              <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentTypeBadgeLabel}</span></div>
+              <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentType === "general" ? "일반 대회" : tournamentType === "team-battle" ? "청백전 · 단체전" : "토너먼트"}</span></div>
               <label className="field boxed-field">
                 <span>대회명</span>
                 <input disabled={isCompleted} onBlur={(event) => persistName(tournament.id, event.target.value)} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
@@ -1448,7 +1435,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
             {tournamentType !== "team-battle" && (<section className="section-card stack">
               <div className="today-card-top">
                 <strong className="section-head" style={{ marginBottom: 0 }}>{tournamentType === "tournament" ? "토너먼트 구성" : "그룹 편성"}</strong>
-                <button className="ghost-button" disabled={isCompleted || ((tournamentType === "tournament" || tournamentType === "fixed-pair-league" || tournamentType === "general") && state.groups.length > 0)} onClick={addGroup} type="button">
+                <button className="ghost-button" disabled={isCompleted || ((tournamentType === "tournament" || state.groups.some((group) => group.scheduleFormat === "random" || group.scheduleFormat === "fixed-pair-league")) && state.groups.length > 0)} onClick={addGroup} type="button">
                   <Plus size={18} />
                   {tournamentType === "tournament" ? "토너먼트 구성" : "그룹 추가"}
                 </button>
@@ -1504,16 +1491,15 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                             <option value="fixed-pair-tournament">복식 토너먼트</option>
                             <option value="single-tournament">단식 토너먼트</option>
                           </>
-                        ) : tournamentType === "fixed-pair-league" ? (
-                          <option value="fixed-pair-league">고정페어리그</option>
-                        ) : tournamentType === "general" ? (
-                          <option value="random">자동 밸런스 복식</option>
                         ) : (
                           <>
                             <option value="kdk-v2010">KDK-V2010 방식</option>
                             <option value="hanul-aa">한울AA KDK 방식</option>
+                            <option value="random">랜덤 KDK 방식</option>
+                            <option value="fixed-pair-league">고정 페어 리그</option>
                           </>
-                        )}                      </select>
+                        )}
+                      </select>
                       {group.scheduleFormat !== "random" && !isFixedPairLeagueFormat(group) && !isTournamentFormat(group) && (
                         <button className="icon-help-button" aria-label="대진방식 보기" onClick={() => openHelpImage(group.scheduleFormat)} type="button">
                           <HelpCircle size={20} />
@@ -1574,7 +1560,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     )}
                     {(isTournamentFormat(group) || isFixedPairLeagueFormat(group)) && (
                       <div className="fixed-pair-tools">
-                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? ![8, 10, 12].includes(selectedMembers.length) : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
+                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? selectedMembers.length !== 10 : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
                           {group.scheduleFormat === "single-tournament" ? "랜덤 시드 생성" : "랜덤 페어 구성"}
                         </button>
                         <p className="notice-text">
