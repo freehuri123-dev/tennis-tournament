@@ -34,6 +34,6 @@ describe("SplashScreen", () => {
   });
 
   it("uses the queensday intro image for the queensday meeting", () => {
-    expect(source).toContain('queensday: "/queensday_intro.webp"');
+    expect(source).toContain('queensday: "/queensday_intro_ai_design_1.webp"');
   });
 });

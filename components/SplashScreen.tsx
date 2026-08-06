@@ -8,7 +8,7 @@ const introImages: Record<ClubSlug, string> = {
   otc: "/otc_intro_summer_coast.webp",
   joogo: "/joogo_intro_summer_coast.webp",
   army: "/army_intro.jpg",
-  queensday: "/queensday_intro.webp"
+  queensday: "/queensday_intro_ai_design_1.webp"
 };
 
 export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: { clubSlug?: ClubSlug; startLabel?: string }) {
@@ -50,7 +50,7 @@ export function SplashScreen({ clubSlug = "stc", startLabel = "시작하기" }: 
   }
 
   return (
-    <div className={`splash-screen ${leaving ? "leaving" : ""}`}>
+    <div className={`splash-screen club-${clubSlug} ${leaving ? "leaving" : ""}`}>
       <img alt="테니스매치업 시작 화면" fetchPriority="high" loading="eager" src={introImages[clubSlug]} />
       <button className="splash-start-button" onClick={startApp} type="button">
         {startLabel}

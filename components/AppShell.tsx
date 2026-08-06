@@ -39,7 +39,7 @@ export function AppShell({ title, subtitle = "월례대회 운영 관리", child
   ] as const;
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell club-${clubSlug}`}>
       <div className="mobile-frame">
         <header className="app-header">
           <span className="header-brand">{club?.name ?? "테니스 클럽"}</span>
@@ -68,7 +68,7 @@ export function PublicShell({ title, subtitle, children, clubSlug = "stc", brand
   const club = getClubBySlug(clubSlug);
 
   return (
-    <div className="app-shell public-app-shell">
+    <div className={`app-shell public-app-shell club-${clubSlug}`}>
       <div className="mobile-frame public-mobile-frame">
         <header className="app-header">
           <PublicBrand clubName={club?.name ?? "테니스 클럽"} />

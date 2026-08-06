@@ -131,7 +131,20 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     ? "team-battle"
     : state.groups.some((group) => group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament")
       ? "tournament"
-      : "general");
+      : state.groups.some((group) => group.scheduleFormat === "fixed-pair-league")
+        ? "fixed-pair-league"
+        : state.groups.some((group) => group.scheduleFormat === "kdk-v2010" || group.scheduleFormat === "hanul-aa")
+          ? "monthly"
+          : "general");
+  const tournamentTypeBadgeLabel = tournamentType === "team-battle"
+    ? "\uCCAD\uBC31\uC804 \u00B7 \uB2E8\uCCB4\uC804"
+    : tournamentType === "tournament"
+      ? "\uD1A0\uB108\uBA3C\uD2B8"
+      : tournamentType === "fixed-pair-league"
+        ? "\uACE0\uC815\uD398\uC5B4\uB9AC\uADF8"
+        : tournamentType === "monthly"
+          ? "\uC6D4\uB840\uB300\uD68C \u00B7 KDK"
+          : "\uC77C\uBC18\uB300\uD68C \u00B7 \uC790\uB3D9\uB79C\uB364\uBCF5\uC2DD";
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
   const canUseCourtAssignment = tournamentType === "team-battle" || state.groups.length === 1;
@@ -761,7 +774,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function addGroup() {
     if (isCompleted || tournamentType === "team-battle") return;
-    if (tournamentType === "tournament" && state.groups.length > 0) return;
+    if ((tournamentType === "tournament" || tournamentType === "fixed-pair-league" || tournamentType === "general") && state.groups.length > 0) return;
     if (state.groups.some(isTournamentFormat)) {
       window.alert("토너먼트 방식은 한 그룹으로만 진행할 수 있습니다.");
       return;
@@ -782,8 +795,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         {
           id: groupId,
           tournamentId: tournament.id,
-          name: tournamentType === "tournament" ? "전체" : `${String.fromCharCode(64 + nextGroupNumber)}조`,
-          scheduleFormat: tournamentType === "tournament" ? "fixed-pair-tournament" : "kdk-v2010",
+          name: tournamentType === "tournament" || tournamentType === "fixed-pair-league" || tournamentType === "general" ? "전체" : `${String.fromCharCode(64 + nextGroupNumber)}조`,
+          scheduleFormat: tournamentType === "tournament" ? "fixed-pair-tournament" : tournamentType === "fixed-pair-league" ? "fixed-pair-league" : tournamentType === "general" ? "random" : "kdk-v2010",
           sortOrder: nextGroupNumber,
           seedPlayerIds: []
         }
@@ -815,8 +828,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (isCompleted) return;
     const targetGroup = state.groups.find((group) => group.id === groupId);
     const tournamentMode = scheduleFormat === "fixed-pair-tournament" || scheduleFormat === "single-tournament";
-    if (tournamentMode && state.groups.length > 1) return;
-    const nextGroups = tournamentMode && targetGroup
+    const singleGroupMode = tournamentMode || scheduleFormat === "random" || scheduleFormat === "fixed-pair-league";
+    if (singleGroupMode && state.groups.length > 1) return;
+    const nextGroups = singleGroupMode && targetGroup
       ? [{ ...targetGroup, scheduleFormat, seedPlayerIds: [], name: "전체", sortOrder: 1 }]
       : state.groups.map((group) => (group.id === groupId ? { ...group, scheduleFormat, seedPlayerIds: [] } : group));
     const nextGroupIds = new Set(nextGroups.map((group) => group.id));
@@ -1195,7 +1209,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         {activeTab === "setup" && (
           <div className="tab-panel stack" key="setup">
             <section className="section-card stack">
-              <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentType === "general" ? "일반 대회" : tournamentType === "team-battle" ? "청백전 · 단체전" : "토너먼트"}</span></div>
+              <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentTypeBadgeLabel}</span></div>
               <label className="field boxed-field">
                 <span>대회명</span>
                 <input disabled={isCompleted} onBlur={(event) => persistName(tournament.id, event.target.value)} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
@@ -1399,7 +1413,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
             {tournamentType !== "team-battle" && (<section className="section-card stack">
               <div className="today-card-top">
                 <strong className="section-head" style={{ marginBottom: 0 }}>{tournamentType === "tournament" ? "토너먼트 구성" : "그룹 편성"}</strong>
-                <button className="ghost-button" disabled={isCompleted || (tournamentType === "tournament" && state.groups.length > 0)} onClick={addGroup} type="button">
+                <button className="ghost-button" disabled={isCompleted || ((tournamentType === "tournament" || tournamentType === "fixed-pair-league" || tournamentType === "general") && state.groups.length > 0)} onClick={addGroup} type="button">
                   <Plus size={18} />
                   {tournamentType === "tournament" ? "토너먼트 구성" : "그룹 추가"}
                 </button>
@@ -1452,15 +1466,17 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       <select className="select-input" disabled={isCompleted} onChange={(event) => updateGroupFormat(group.id, event.target.value as TournamentGroup["scheduleFormat"])} value={group.scheduleFormat}>
                         {tournamentType === "tournament" ? (
                           <>
-                            <option value="fixed-pair-tournament">복식 토너먼트</option>
-                            <option value="single-tournament">단식 토너먼트</option>
+                            <option value="fixed-pair-tournament">{"\uBCF5\uC2DD \uD1A0\uB108\uBA3C\uD2B8"}</option>
+                            <option value="single-tournament">{"\uB2E8\uC2DD \uD1A0\uB108\uBA3C\uD2B8"}</option>
                           </>
+                        ) : tournamentType === "fixed-pair-league" ? (
+                          <option value="fixed-pair-league">{"\uACE0\uC815\uD398\uC5B4\uB9AC\uADF8"}</option>
+                        ) : tournamentType === "general" ? (
+                          <option value="random">{"\uC790\uB3D9 \uBC38\uB7F0\uC2A4 \uBCF5\uC2DD"}</option>
                         ) : (
                           <>
-                            <option value="kdk-v2010">KDK-V2010 방식</option>
-                            <option value="hanul-aa">한울AA KDK 방식</option>
-                            <option value="random">랜덤 KDK 방식</option>
-                            <option value="fixed-pair-league">고정 페어 리그</option>
+                            <option value="kdk-v2010">KDK-V2010 {"\uBC29\uC2DD"}</option>
+                            <option value="hanul-aa">{"\uD55C\uC6B8AA KDK \uBC29\uC2DD"}</option>
                           </>
                         )}
                       </select>
@@ -1502,7 +1518,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     )}
                     {(isTournamentFormat(group) || isFixedPairLeagueFormat(group)) && (
                       <div className="fixed-pair-tools">
-                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? selectedMembers.length !== 10 : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
+                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? ![8, 10, 12].includes(selectedMembers.length) : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
                           {group.scheduleFormat === "single-tournament" ? "랜덤 시드 생성" : "랜덤 페어 구성"}
                         </button>
                         <p className="notice-text">
