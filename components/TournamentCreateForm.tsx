@@ -42,10 +42,12 @@ const tournamentTypeOptions = [
   }
 ] as const;
 
+const creatingTournamentLabel = "\uB300\uD68C \uB9CC\uB4DC\uB294 \uC911...";
+
 export function TournamentCreateForm({ action, clubSlug }: TournamentCreateFormProps) {
   return (
     <form action={action} className="sticky-footer tournament-create-footer action-form">
-      <FormPendingOverlay label="\uB300\uD68C \uB9CC\uB4DC\uB294 \uC911..." />
+      <FormPendingOverlay label={creatingTournamentLabel} />
       <input name="clubSlug" type="hidden" value={clubSlug} />
       <div className="tournament-type-create-field">
         <span>{"\uB300\uD68C \uC720\uD615 \uC120\uD0DD"}</span>
@@ -62,7 +64,7 @@ export function TournamentCreateForm({ action, clubSlug }: TournamentCreateFormP
           ))}
         </div>
       </div>
-      <PendingButton className="primary-button" pendingLabel="\uB300\uD68C \uB9CC\uB4DC\uB294 \uC911...">
+      <PendingButton className="primary-button" pendingLabel={creatingTournamentLabel}>
         <CalendarPlus size={20} />{"\uC0C8 \uB300\uD68C \uB9CC\uB4E4\uAE30"}
       </PendingButton>
     </form>
