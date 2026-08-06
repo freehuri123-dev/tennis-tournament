@@ -164,10 +164,17 @@ function generateFixedPairLeagueMatches(input: GenerateInitialMatchesInput): Mat
 function generateRandomMatches(input: GenerateInitialMatchesInput): Match[] {
   const gamesPerPlayer = Math.max(1, Math.min(8, Math.floor(input.randomGamesPerPlayer ?? 4)));
   const shuffledParticipants = shuffle([...input.participants]);
+  const participantIds = new Set(input.participants.map((member) => member.id));
   const targetAppearances = new Map(shuffledParticipants.map((member) => [member.id, gamesPerPlayer]));
   const totalTargetAppearances = input.participants.length * gamesPerPlayer;
   const roundedTargetAppearances = Math.ceil(totalTargetAppearances / 4) * 4;
-  for (const member of shuffledParticipants.slice(0, roundedTargetAppearances - totalTargetAppearances)) {
+  const extraAppearanceCount = roundedTargetAppearances - totalTargetAppearances;
+  const selectedExtraMembers = (input.seedPlayerIds ?? [])
+    .filter((memberId) => participantIds.has(memberId))
+    .map((memberId) => input.participants.find((member) => member.id === memberId))
+    .filter((member): member is Member => Boolean(member));
+  const fallbackExtraMembers = shuffledParticipants.filter((member) => !selectedExtraMembers.some((selected) => selected.id === member.id));
+  for (const member of [...selectedExtraMembers, ...fallbackExtraMembers].slice(0, extraAppearanceCount)) {
     targetAppearances.set(member.id, (targetAppearances.get(member.id) ?? gamesPerPlayer) + 1);
   }
 

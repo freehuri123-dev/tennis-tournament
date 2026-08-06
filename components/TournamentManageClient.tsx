@@ -137,17 +137,18 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
           ? "monthly"
           : "general");
   const tournamentTypeBadgeLabel = tournamentType === "team-battle"
-    ? "\uCCAD\uBC31\uC804 \u00B7 \uB2E8\uCCB4\uC804"
+    ? "청백전 · 단체전"
     : tournamentType === "tournament"
-      ? "\uD1A0\uB108\uBA3C\uD2B8"
+      ? "토너먼트"
       : tournamentType === "fixed-pair-league"
-        ? "\uACE0\uC815\uD398\uC5B4\uB9AC\uADF8"
+        ? "고정페어리그"
         : tournamentType === "monthly"
-          ? "\uC6D4\uB840\uB300\uD68C \u00B7 KDK"
-          : "\uC77C\uBC18\uB300\uD68C \u00B7 \uC790\uB3D9\uB79C\uB364\uBCF5\uC2DD";
+          ? "월례대회 · KDK"
+          : "일반대회 · 자동랜덤복식";
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
-  const canUseCourtAssignment = tournamentType === "team-battle" || state.groups.length === 1;
+  const isAutomaticRandomTournament = tournamentType === "general" && state.groups.every((group) => group.scheduleFormat === "random");
+  const canUseCourtAssignment = tournamentType === "team-battle" || (state.groups.length === 1 && !isAutomaticRandomTournament);
 
   const tournamentParticipants = useMemo(
     () => tournamentParticipantIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member)),
@@ -489,8 +490,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     return numbers.slice(0, nextCount);
   }
 
-  function randomGroupCourtNumbers(group: TournamentGroup) {
-    return selectedCourtNumbersForSchedule(group.randomCourtCount ?? 2, true);
+  function randomGroupCourtNumbers(_group: TournamentGroup) {
+    return [];
   }
 
   function toggleCourtAssignment() {
@@ -852,11 +853,44 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       : Math.max(1, Math.min(8, value));
     updateLocal({
       ...state,
-      groups: state.groups.map((group) => (group.id === groupId ? { ...group, [field]: normalized } : group)),
+      groups: state.groups.map((group) => (group.id === groupId ? { ...group, [field]: normalized, seedPlayerIds: field === "randomGamesPerPlayer" ? [] : group.seedPlayerIds } : group)),
       matches: state.matches.filter((match) => match.groupId !== groupId)
     });
   }
 
+
+  function randomExtraGameCount(memberCount: number, minimumGames: number) {
+    const total = memberCount * minimumGames;
+    return Math.ceil(total / 4) * 4 - total;
+  }
+
+  function randomExtraGamePlayerIds(group: TournamentGroup, members: typeof state.members) {
+    const extraCount = randomExtraGameCount(members.length, group.randomGamesPerPlayer ?? 2);
+    if (extraCount <= 0) return [];
+    const memberIds = new Set(members.map((member) => member.id));
+    const selected = (group.seedPlayerIds ?? []).filter((memberId) => memberIds.has(memberId)).slice(0, extraCount);
+    return selected.length > 0 ? selected : members.slice(0, extraCount).map((member) => member.id);
+  }
+
+  function toggleRandomExtraGamePlayer(groupId: string, memberId: string) {
+    if (isCompleted) return;
+    const group = state.groups.find((item) => item.id === groupId);
+    if (!group) return;
+    const members = groupParticipants(groupId);
+    const extraCount = randomExtraGameCount(members.length, group.randomGamesPerPlayer ?? 2);
+    if (extraCount <= 0) return;
+    const current = randomExtraGamePlayerIds(group, members);
+    const next = current.includes(memberId)
+      ? current
+      : current.length < extraCount
+        ? [...current, memberId]
+        : [...current.slice(1), memberId];
+    updateLocal({
+      ...state,
+      groups: state.groups.map((item) => (item.id === groupId ? { ...item, seedPlayerIds: next } : item)),
+      matches: state.matches.filter((match) => match.groupId !== groupId)
+    });
+  }
   function randomizeTournamentSeeds(groupId: string) {
     if (isCompleted) return;
     const shuffledIds = shuffle(state.groupMemberIds[groupId] ?? []);
@@ -965,16 +999,17 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const courtNumbers = selectedCourtNumbersForSchedule();
     let courtStartIndex = 0;
     const generated = state.groups.flatMap((group) => {
+      const participants = groupParticipants(group.id);
       const groupCourtNumbers = group.scheduleFormat === "random" ? randomGroupCourtNumbers(group) : courtNumbers;
       const matches = generateInitialMatches({
         tournamentId: tournament.id,
         groupId: group.id,
         format: group.scheduleFormat,
-        seedPlayerIds: group.seedPlayerIds,
-        participants: groupParticipants(group.id),
+        seedPlayerIds: group.scheduleFormat === "random" ? randomExtraGamePlayerIds(group, participants) : group.seedPlayerIds,
+        participants,
         courtNumbers: groupCourtNumbers,
         courtStartIndex,
-        randomGamesPerPlayer: group.randomGamesPerPlayer ?? 4
+        randomGamesPerPlayer: group.randomGamesPerPlayer ?? 2
       });
       courtStartIndex += matches.length;
       return matches;
@@ -1466,20 +1501,19 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       <select className="select-input" disabled={isCompleted} onChange={(event) => updateGroupFormat(group.id, event.target.value as TournamentGroup["scheduleFormat"])} value={group.scheduleFormat}>
                         {tournamentType === "tournament" ? (
                           <>
-                            <option value="fixed-pair-tournament">{"\uBCF5\uC2DD \uD1A0\uB108\uBA3C\uD2B8"}</option>
-                            <option value="single-tournament">{"\uB2E8\uC2DD \uD1A0\uB108\uBA3C\uD2B8"}</option>
+                            <option value="fixed-pair-tournament">복식 토너먼트</option>
+                            <option value="single-tournament">단식 토너먼트</option>
                           </>
                         ) : tournamentType === "fixed-pair-league" ? (
-                          <option value="fixed-pair-league">{"\uACE0\uC815\uD398\uC5B4\uB9AC\uADF8"}</option>
+                          <option value="fixed-pair-league">고정페어리그</option>
                         ) : tournamentType === "general" ? (
-                          <option value="random">{"\uC790\uB3D9 \uBC38\uB7F0\uC2A4 \uBCF5\uC2DD"}</option>
+                          <option value="random">자동 밸런스 복식</option>
                         ) : (
                           <>
-                            <option value="kdk-v2010">KDK-V2010 {"\uBC29\uC2DD"}</option>
-                            <option value="hanul-aa">{"\uD55C\uC6B8AA KDK \uBC29\uC2DD"}</option>
+                            <option value="kdk-v2010">KDK-V2010 방식</option>
+                            <option value="hanul-aa">한울AA KDK 방식</option>
                           </>
-                        )}
-                      </select>
+                        )}                      </select>
                       {group.scheduleFormat !== "random" && !isFixedPairLeagueFormat(group) && !isTournamentFormat(group) && (
                         <button className="icon-help-button" aria-label="대진방식 보기" onClick={() => openHelpImage(group.scheduleFormat)} type="button">
                           <HelpCircle size={20} />
@@ -1488,28 +1522,50 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       </div>
                     </div>
                     {validation && <p className="notice-text">{validation}</p>}
-                    {group.scheduleFormat === "random" && (
-                      <div className="random-kdk-settings">
-                        <label className="mini-select-field">
-                          <span>코트 수</span>
-                          <select className="select-input" disabled={isCompleted} onChange={(event) => updateRandomGroupOption(group.id, "randomCourtCount", Number(event.target.value))} value={group.randomCourtCount ?? 2}>
-                            {COURT_COUNT_OPTIONS.map((count) => (
-                              <option key={count} value={count}>{count}개</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="mini-select-field">
-                          <span>1인 경기 수</span>
-                          <select className="select-input" disabled={isCompleted} onChange={(event) => updateRandomGroupOption(group.id, "randomGamesPerPlayer", Number(event.target.value))} value={group.randomGamesPerPlayer ?? 4}>
-                            {RANDOM_GAMES_PER_PLAYER_OPTIONS.map((count) => (
-                              <option key={count} value={count}>{count}경기</option>
-                            ))}
-                          </select>
-                        </label>
-                        <p className="notice-text">참여 횟수, 파트너 중복, 상대 중복을 줄이면서 자동으로 균형을 맞춰 생성합니다.</p>
-                      </div>
-                    )}
-                    <div className="field-label-row">
+                    {group.scheduleFormat === "random" && (() => {
+                      const minimumGames = group.randomGamesPerPlayer ?? 2;
+                      const extraCount = randomExtraGameCount(selectedMembers.length, minimumGames);
+                      const selectedExtraIds = randomExtraGamePlayerIds(group, selectedMembers);
+                      return (
+                        <div className="random-kdk-settings">
+                          <label className="mini-select-field">
+                            <span>1인 최소 경기 수</span>
+                            <select className="select-input" disabled={isCompleted} onChange={(event) => updateRandomGroupOption(group.id, "randomGamesPerPlayer", Number(event.target.value))} value={minimumGames}>
+                              {RANDOM_GAMES_PER_PLAYER_OPTIONS.map((count) => (
+                                <option key={count} value={count}>{count}경기</option>
+                              ))}
+                            </select>
+                          </label>
+                          <p className="notice-text">참가자별 최소 경기 수를 맞추고, 추가 경기 대상은 아래에서 선택합니다.</p>
+                          {extraCount > 0 && (
+                            <div className="team-battle-game-plan">
+                              <div className="team-battle-game-plan-head">
+                                <div>
+                                  <strong>추가 경기 선수</strong>
+                                  <small>{extraCount}명을 선택하면 선택 선수는 {minimumGames + 1}경기, 나머지는 {minimumGames}경기를 출전합니다.</small>
+                                </div>
+                                <span>{selectedExtraIds.length}/{extraCount}명 선택</span>
+                              </div>
+                              <div className="team-battle-game-plan-grid single">
+                                <div className="team-game-selector">
+                                  <div className="team-game-member-grid">
+                                    {selectedMembers.map((member) => {
+                                      const selected = selectedExtraIds.includes(member.id);
+                                      return (
+                                        <button aria-pressed={selected} className={selected ? "active" : ""} disabled={isCompleted} key={member.id} onClick={() => toggleRandomExtraGamePlayer(group.id, member.id)} type="button">
+                                          <strong>{member.name}</strong>
+                                          <small>{selected ? `${minimumGames + 1}경기` : `${minimumGames}경기`}</small>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}                    <div className="field-label-row">
                       <strong>참여자 순번</strong>
                       <span>드래그해서 순서를 변경</span>
                     </div>

@@ -60,11 +60,7 @@ export function fromDbScheduleFormat(value: ScheduleFormat): TournamentGroup["sc
 }
 
 function toDbTournamentType(value: TournamentType | undefined): DbTournamentType {
-  if (value === "team-battle") return "team_battle";
-  if (value === "fixed-pair-league") return "fixed_pair_league";
-  if (value === "monthly") return "monthly";
-  if (value === "tournament") return "tournament";
-  return "general";
+  return value === "team-battle" ? "team_battle" : value === "tournament" ? "tournament" : "general";
 }
 
 function fromDbTournamentType(value: DbTournamentType): TournamentType {
@@ -75,6 +71,14 @@ function fromDbTournamentType(value: DbTournamentType): TournamentType {
 
 function fromDbTeamSide(value: DbTeamSide | null): TeamSide | undefined {
   return value ?? undefined;
+}
+
+function defaultScheduleFormatForTournamentType(type: TournamentType | undefined): TournamentGroup["scheduleFormat"] {
+  if (type === "team-battle") return "team-battle";
+  if (type === "tournament") return "fixed-pair-tournament";
+  if (type === "fixed-pair-league") return "fixed-pair-league";
+  if (type === "monthly") return "kdk-v2010";
+  return "random";
 }
 
 export function toDomainDate(value: Date): string {
@@ -170,27 +174,6 @@ function toDomainGroup(group: {
     seedPlayerIds: group.seedPlayerIds,
     randomCourtCount: group.randomCourtCount ?? undefined,
     randomGamesPerPlayer: group.randomGamesPerPlayer ?? undefined
-  };
-}
-
-function defaultTournamentGroup(tournament: Tournament): TournamentGroup {
-  const scheduleFormat = tournament.type === "team-battle"
-    ? "team-battle"
-    : tournament.type === "tournament"
-      ? "fixed-pair-tournament"
-      : tournament.type === "fixed-pair-league"
-        ? "fixed-pair-league"
-        : tournament.type === "monthly"
-          ? "kdk-v2010"
-          : "random";
-  return {
-    id: "default-" + tournament.id,
-    tournamentId: tournament.id,
-    name: "전체",
-    scheduleFormat,
-    sortOrder: 1,
-    seedPlayerIds: [],
-    randomGamesPerPlayer: scheduleFormat === "random" ? 2 : undefined
   };
 }
 
@@ -409,15 +392,23 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
   };
 
   if (!input.id) {
-    return toDomainTournament(
-      await prisma.tournament.create({
-        data: {
-          clubId: club.id,
-          ...data,
-          status: "draft"
+    const tournament = await prisma.tournament.create({
+      data: {
+        clubId: club.id,
+        ...data,
+        status: "draft",
+        groups: {
+          create: {
+            name: "전체",
+            scheduleFormat: toDbScheduleFormat(defaultScheduleFormatForTournamentType(input.type)),
+            sortOrder: 1,
+            seedPlayerIds: [],
+            randomGamesPerPlayer: input.type === "general" ? 2 : null
+          }
         }
-      })
-    );
+      }
+    });
+    return toDomainTournament(tournament);
   }
 
   const existing = await prisma.tournament.findFirst({
@@ -629,9 +620,8 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
   const domainMembers = sortMembersByDisplayName(members.map(toDomainMember));
   if (!selectedTournament) return emptyTournamentState(domainMembers);
 
+  const groups = selectedTournament.groups.map(toDomainGroup);
   const tournament = toDomainTournament(selectedTournament);
-  const loadedGroups = selectedTournament.groups.map(toDomainGroup);
-  const groups = loadedGroups.length > 0 ? loadedGroups : [defaultTournamentGroup(tournament)];
   const tournamentParticipantIds = {
     [selectedTournament.id]: selectedTournament.participants.map((participant) => participant.memberId)
   };
@@ -654,7 +644,7 @@ export async function loadTournamentStateFromDb(clubSlug: ClubSlug, tournamentId
     tournament,
     groups,
     tournamentParticipantIds,
-    groupMemberIds: { ...Object.fromEntries(groups.map((group) => [group.id, groupMemberIds[group.id] ?? []])), ...groupMemberIds },
+    groupMemberIds,
     teamAssignments,
     matches: selectedTournament.matches.map(toDomainMatch),
     deletedPublicSlugs: []
@@ -829,8 +819,7 @@ async function loadPublicTournamentStateOnce(clubSlug: ClubSlug, publicSlug: str
         })
       : [];
   const tournament = { ...toDomainTournament(selectedTournament), publicSlug };
-  const loadedGroups = selectedTournament.groups.map(toDomainGroup);
-  const groups = loadedGroups.length > 0 ? loadedGroups : [defaultTournamentGroup(tournament)];
+  const groups = selectedTournament.groups.map(toDomainGroup);
   const tournamentParticipantIds = {
     [selectedTournament.id]: selectedTournament.participants.map((participant) => participant.memberId)
   };
@@ -853,7 +842,7 @@ async function loadPublicTournamentStateOnce(clubSlug: ClubSlug, publicSlug: str
     tournament,
     groups,
     tournamentParticipantIds,
-    groupMemberIds: { ...Object.fromEntries(groups.map((group) => [group.id, groupMemberIds[group.id] ?? []])), ...groupMemberIds },
+    groupMemberIds,
     teamAssignments,
     matches: selectedTournament.matches.map(toDomainMatch),
     deletedPublicSlugs: []
