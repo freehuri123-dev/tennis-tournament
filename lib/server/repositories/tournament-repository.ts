@@ -553,7 +553,7 @@ export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members:
         orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }]
       }),
       prisma.match.findMany({
-        where: { tournament: { clubId: club.id, type: { not: "team_battle" } } },
+        where: { tournament: { clubId: club.id } },
         orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
       })
     ]);

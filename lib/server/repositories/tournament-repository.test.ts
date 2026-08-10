@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentMatchStates } from "./tournament-repository";
+import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadClubRecordData, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentMatchStates } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -57,6 +57,19 @@ describe("tournament repository mapping", () => {
     ]);
   });
 
+  it("loads team battle matches for club records", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.member.findMany.mockResolvedValue([]);
+    prisma.tournament.findMany.mockResolvedValue([]);
+    prisma.match.findMany.mockResolvedValue([]);
+
+    await expect(loadClubRecordData("stc")).resolves.toEqual({ members: [], tournaments: [], matches: [] });
+
+    expect(prisma.match.findMany).toHaveBeenCalledWith({
+      where: { tournament: { clubId: "club-1" } },
+      orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
+    });
+  });
   it("retries the tournament management query once after a transient database connection error", async () => {
     const transientError = Object.assign(new Error("Failed to connect to upstream database."), { code: "P1001" });
     prisma.club.findUnique.mockRejectedValueOnce(transientError).mockResolvedValue({ id: "club-1", slug: "stc" });
