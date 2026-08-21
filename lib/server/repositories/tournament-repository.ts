@@ -134,14 +134,20 @@ function toDomainTournament(tournament: {
   publicSlug: string;
   status: "draft" | "active" | "completed";
   type: DbTournamentType;
+  scheduleLocked?: boolean;
+  rankingExcludedMemberIds?: string[];
+  includeInClubRecords?: boolean;
 }): Tournament {
   return withDateStatus({
     id: tournament.id,
     name: tournament.name,
     date: toDomainDate(tournament.date),
-    publicSlug: createTournamentSlug(tournament.id),
+    publicSlug: tournament.publicSlug,
     status: tournament.status,
     type: fromDbTournamentType(tournament.type),
+    scheduleLocked: tournament.scheduleLocked ?? false,
+    rankingExcludedMemberIds: tournament.rankingExcludedMemberIds ?? [],
+    includeInClubRecords: tournament.includeInClubRecords ?? true,
   });
 }
 
@@ -199,6 +205,7 @@ function toDomainMatch(match: {
   status: "scheduled" | "completed";
   sortOrder: number;
   courtNumber?: string | null;
+  roundNumber?: number | null;
 }): Match {
   return {
     id: match.id,
@@ -211,7 +218,8 @@ function toDomainMatch(match: {
     sideBScore: match.sideBScore,
     status: match.status,
     sortOrder: match.sortOrder,
-    courtNumber: match.courtNumber ?? null
+    courtNumber: match.courtNumber ?? null,
+    roundNumber: match.roundNumber ?? undefined
   };
 }
 
@@ -691,6 +699,9 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
         publicSlug: tournament.publicSlug,
         status: tournament.status,
         type: toDbTournamentType(tournament.type),
+        scheduleLocked: tournament.scheduleLocked ?? false,
+        rankingExcludedMemberIds: tournament.rankingExcludedMemberIds ?? [],
+        includeInClubRecords: tournament.includeInClubRecords ?? true,
       }
     });
 
@@ -752,7 +763,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
           sideBScore: match.sideBScore,
           status: match.status,
           sortOrder: match.sortOrder || index + 1,
-          courtNumber: match.courtNumber ?? null
+          courtNumber: match.courtNumber ?? null,
+          roundNumber: match.roundNumber ?? null
         }))
       });
     }
@@ -800,7 +812,7 @@ async function loadPublicTournamentStateOnce(clubSlug: ClubSlug, publicSlug: str
           orderBy: [{ name: "asc" }, { id: "asc" }]
         })
       : [];
-  const tournament = { ...toDomainTournament(selectedTournament), publicSlug };
+  const tournament = { ...toDomainTournament(selectedTournament), publicSlug: selectedTournament.publicSlug === publicSlug ? selectedTournament.publicSlug : publicSlug };
   const groups = selectedTournament.groups.map(toDomainGroup);
   const tournamentParticipantIds = {
     [selectedTournament.id]: selectedTournament.participants.map((participant) => participant.memberId)

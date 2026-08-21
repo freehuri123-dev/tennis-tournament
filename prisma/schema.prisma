@@ -82,6 +82,9 @@ model Tournament {
   status     TournamentStatus        @default(draft)
   type       TournamentType          @default(general)
   femaleTeamAllowed Boolean          @default(true)
+  scheduleLocked           Boolean  @default(false)
+  rankingExcludedMemberIds String[] @default([])
+  includeInClubRecords     Boolean  @default(true)
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
   club       Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
@@ -150,6 +153,7 @@ model Match {
   status         MatchStatus     @default(scheduled)
   sortOrder      Int
   courtNumber    String?
+  roundNumber    Int?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   tournament     Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

@@ -41,7 +41,159 @@ describe("tournament repository mapping", () => {
   it("serializes DB dates as yyyy-mm-dd domain dates", () => {
     expect(toDomainDate(new Date("2026-05-24T00:00:00.000Z"))).toBe("2026-05-24");
   });
+  it("maps persisted tournament policies, match rounds, and public slugs from the database", async () => {
+    const tournament = {
+      id: "tournament-1",
+      name: "Summer Open",
+      date: new Date("2026-05-24T00:00:00.000Z"),
+      publicSlug: "summer-open-2026",
+      status: "active" as const,
+      type: "tournament" as const,
+      scheduleLocked: true,
+      rankingExcludedMemberIds: ["member-2"],
+      includeInClubRecords: false
+    };
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.member.findMany.mockResolvedValue([]);
+    prisma.tournament.findMany.mockResolvedValue([tournament]);
+    prisma.tournament.findFirst.mockResolvedValue({
+      ...tournament,
+      participants: [],
+      groups: [],
+      matches: [{
+        id: "match-1",
+        tournamentId: "tournament-1",
+        groupId: "group-1",
+        matchNumber: 1,
+        sideAPlayerIds: ["member-1"],
+        sideBPlayerIds: ["member-2"],
+        sideAScore: null,
+        sideBScore: null,
+        status: "scheduled",
+        sortOrder: 1,
+        roundNumber: 3
+      }]
+    });
 
+    const state = await loadTournamentStateFromDb("stc");
+
+    expect(state.tournament).toMatchObject({
+      publicSlug: "summer-open-2026",
+      scheduleLocked: true,
+      rankingExcludedMemberIds: ["member-2"],
+      includeInClubRecords: false
+    });
+    expect(state.tournaments).toEqual([expect.objectContaining({
+      publicSlug: "summer-open-2026",
+      scheduleLocked: true,
+      rankingExcludedMemberIds: ["member-2"],
+      includeInClubRecords: false
+    })]);
+    expect(state.matches).toEqual([expect.objectContaining({ roundNumber: 3 })]);
+  });
+
+  it("defaults omitted legacy database policy fields", async () => {
+    const legacyTournament = {
+      id: "tournament-1",
+      name: "Legacy Open",
+      date: new Date("2026-05-24T00:00:00.000Z"),
+      publicSlug: "legacy-open",
+      status: "active" as const,
+      type: "general" as const
+    };
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.member.findMany.mockResolvedValue([]);
+    prisma.tournament.findMany.mockResolvedValue([legacyTournament]);
+    prisma.tournament.findFirst.mockResolvedValue({
+      ...legacyTournament,
+      participants: [],
+      groups: [],
+      matches: [{
+        id: "match-1",
+        tournamentId: "tournament-1",
+        groupId: "group-1",
+        matchNumber: 1,
+        sideAPlayerIds: ["member-1"],
+        sideBPlayerIds: ["member-2"],
+        sideAScore: null,
+        sideBScore: null,
+        status: "scheduled",
+        sortOrder: 1,
+        roundNumber: null
+      }]
+    });
+
+    const state = await loadTournamentStateFromDb("stc");
+
+    expect(state.tournament).toMatchObject({
+      scheduleLocked: false,
+      rankingExcludedMemberIds: [],
+      includeInClubRecords: true
+    });
+    expect(state.matches).toEqual([expect.objectContaining({ roundNumber: undefined })]);
+  });
+
+  it("persists tournament policies and match round numbers when replacing state", async () => {
+    const state: TournamentState = {
+      version: 9,
+      adminUnlocked: false,
+      members: [],
+      tournaments: [],
+      currentTournamentId: "tournament-1",
+      tournament: {
+        id: "tournament-1",
+        name: "Summer Open",
+        date: "2026-05-24",
+        publicSlug: "summer-open-2026",
+        status: "active",
+        type: "tournament",
+        scheduleLocked: true,
+        rankingExcludedMemberIds: ["member-1"],
+        includeInClubRecords: false
+      },
+      groups: [{
+        id: "group-1",
+        tournamentId: "tournament-1",
+        name: "A",
+        scheduleFormat: "random",
+        sortOrder: 1
+      }],
+      tournamentParticipantIds: { "tournament-1": ["member-1"] },
+      groupMemberIds: { "group-1": ["member-1"] },
+      teamAssignments: {},
+      matches: [{
+        id: "match-1",
+        tournamentId: "tournament-1",
+        groupId: "group-1",
+        matchNumber: 1,
+        sideAPlayerIds: ["member-1"],
+        sideBPlayerIds: [],
+        sideAScore: null,
+        sideBScore: null,
+        status: "scheduled",
+        sortOrder: 1,
+        roundNumber: 4
+      }],
+      deletedPublicSlugs: []
+    };
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "stc" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "tournament-1" });
+    prisma.member.findMany.mockResolvedValue([{ id: "member-1" }]);
+
+    await replaceTournamentState("stc", state);
+
+    expect(prisma.tournament.update).toHaveBeenCalledWith({
+      where: { id: "tournament-1" },
+      data: expect.objectContaining({
+        scheduleLocked: true,
+        rankingExcludedMemberIds: ["member-1"],
+        includeInClubRecords: false
+      })
+    });
+    expect(prisma.match.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ roundNumber: 4 })]
+    });
+  });
   it("sorts numeric member names in natural display order", async () => {
     prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "army" });
     prisma.member.findMany.mockResolvedValue([
