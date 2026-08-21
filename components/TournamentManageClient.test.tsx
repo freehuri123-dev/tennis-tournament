@@ -186,6 +186,42 @@ function makeNinePairTournamentState(): TournamentState {
 }
 
 describe("TournamentManageClient save timing", () => {
+  it("omits only ranking-excluded members while retaining their match result for other players", () => {
+    const state = makeState();
+    state.members = [
+      { id: "m1", name: "Excluded", gender: "male", notes: "" },
+      { id: "m3", name: "Partner", gender: "male", notes: "" },
+      { id: "m4", name: "Opponent One", gender: "male", notes: "" },
+      { id: "m5", name: "Opponent Two", gender: "male", notes: "" }
+    ];
+    state.tournament = { ...state.tournament, rankingExcludedMemberIds: ["m1"] };
+    state.tournaments = [{ ...state.tournament }];
+    state.tournamentParticipantIds = { t1: ["m1", "m3", "m4", "m5"] };
+    state.groupMemberIds = { g1: ["m1", "m3", "m4", "m5"] };
+    state.matches = [{
+      id: "match-1",
+      tournamentId: "t1",
+      groupId: "g1",
+      matchNumber: 1,
+      sideAPlayerIds: ["m1", "m3"],
+      sideBPlayerIds: ["m4", "m5"],
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed",
+      sortOrder: 1
+    }];
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(container.querySelector(".tab-row")!.querySelectorAll<HTMLButtonElement>("button")[2]);
+
+    const rankingText = container.querySelector(".ranking-card-list")?.textContent ?? "";
+    expect(rankingText).not.toContain("Excluded");
+    expect(rankingText).toContain("Partner");
+    expect(rankingText).toContain("Opponent One");
+    expect(rankingText).toContain("Opponent Two");
+    expect(container.querySelectorAll(".ranking-card")).toHaveLength(3);
+    expect(Array.from(container.querySelectorAll(".ranking-card")).find((card) => card.textContent?.includes("Partner"))?.textContent).toContain("+2");
+  });
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();

@@ -4,6 +4,7 @@ import type { ClubSlug } from "../../domain/club";
 import { createTournamentSlug } from "../../domain/public-access";
 import { createSampleMatches, sampleGroupMemberIds, sampleGroups, sampleMembers, sampleTournament, sampleTournaments } from "../../domain/sample-data";
 import { withDateStatus } from "../../domain/tournament-status";
+import { isIncludedInClubRecords } from "../../domain/tournament-policy";
 import type { Match, Member, TeamSide, Tournament, TournamentGroup, TournamentType } from "../../domain/types";
 import type { TournamentState } from "../../store/tournament-store";
 import type { matchScoreInputSchema, memberInputSchema, tournamentInputSchema, tournamentMatchStatesInputSchema } from "../validation";
@@ -552,10 +553,12 @@ export async function listTournamentsByClub(clubSlug: ClubSlug): Promise<Tournam
 export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members: Member[]; tournaments: Tournament[]; matches: Match[] }> {
   if (shouldUseLocalSampleData()) {
     const state = localSampleState();
+    const tournaments = state.tournaments.filter(isIncludedInClubRecords);
+    const tournamentIds = new Set(tournaments.map((tournament) => tournament.id));
     return {
       members: state.members,
-      tournaments: state.tournaments,
-      matches: state.matches
+      tournaments,
+      matches: state.matches.filter((match) => tournamentIds.has(match.tournamentId))
     };
   }
 
@@ -577,10 +580,13 @@ export async function loadClubRecordData(clubSlug: ClubSlug): Promise<{ members:
       })
     ]);
 
+    const includedTournaments = tournaments.map(toDomainTournament).filter(isIncludedInClubRecords);
+    const includedTournamentIds = new Set(includedTournaments.map((tournament) => tournament.id));
+
     return {
       members: sortMembersByDisplayName(members.map(toDomainMember)),
-      tournaments: tournaments.map(toDomainTournament),
-      matches: matches.map(toDomainMatch)
+      tournaments: includedTournaments,
+      matches: matches.map(toDomainMatch).filter((match) => includedTournamentIds.has(match.tournamentId))
     };
   });
 }

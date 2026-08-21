@@ -17,6 +17,7 @@ import { normalizeMatchScore } from "@/lib/domain/score";
 import { balanceTeamAssignments, calculateTeamBattleResult, calculateTeamBattleSideGamePlan, generateTeamBattleMatches, getTeamBattleTargetAppearances, groupTeamBattleMatchesByRound, normalizeTeamGrade } from "@/lib/domain/team-battle";
 import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
+import { rankingMembersForTournament } from "@/lib/domain/tournament-policy";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, TeamSide, TournamentGroup } from "@/lib/domain/types";
 import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "@/lib/server/actions/match-actions";
@@ -233,7 +234,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   const rankings = useMemo(() => {
     return state.groups.map((group) => {
-      const members = groupMembersByGroupId.get(group.id) ?? [];
+      const groupMembers = groupMembersByGroupId.get(group.id) ?? [];
+      const members = rankingMembersForTournament(tournament, groupMembers);
       const matches = matchesByGroupId.get(group.id) ?? [];
       return {
         group,
@@ -241,7 +243,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         teamRows: group.scheduleFormat === "fixed-pair-league" ? calculateFixedPairRankings(members, matches) : []
       };
     });
-  }, [groupMembersByGroupId, matchesByGroupId, state.groups]);
+  }, [groupMembersByGroupId, matchesByGroupId, state.groups, tournament]);
 
   function normalizeState(next: TournamentState) {
     const nextTournament = withDateStatus(next.tournament);

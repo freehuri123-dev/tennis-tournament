@@ -9,6 +9,7 @@ import { TeamRankingTable } from "./TeamRankingTable";
 import { TeamBattleContributionDetails, TeamBattleRoster } from "./TeamBattleDetails";
 import { getClubBySlug, type ClubSlug } from "../lib/domain/club";
 import { calculateFixedPairRankings, calculateRankings } from "../lib/domain/ranking";
+import { rankingMembersForTournament } from "../lib/domain/tournament-policy";
 import { getFixedPairTournamentRoundCounts, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel } from "../lib/domain/schedule";
 import { getPublicTournamentAccess } from "../lib/domain/public-access";
 import { calculateTeamBattleResult, getTeamBattleRoundNumber, groupTeamBattleMatchesByRound } from "../lib/domain/team-battle";
@@ -64,7 +65,8 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
 
   const groupRankings = useMemo(() => {
     return state.groups.map((group) => {
-      const members = groupMembersByGroupId.get(group.id) ?? [];
+      const groupMembers = groupMembersByGroupId.get(group.id) ?? [];
+      const members = rankingMembersForTournament(displayTournament, groupMembers);
       const matches = matchesByGroupId.get(group.id) ?? [];
       return {
         group,
@@ -72,7 +74,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
         teamRows: group.scheduleFormat === "fixed-pair-league" ? calculateFixedPairRankings(members, matches) : []
       };
     });
-  }, [groupMembersByGroupId, matchesByGroupId, state.groups]);
+  }, [displayTournament, groupMembersByGroupId, matchesByGroupId, state.groups]);
 
   const overallRanking = useMemo(() => {
     const rows = groupRankings.flatMap(({ group, rows }) => rows.map((row) => ({ ...row, groupName: state.groups.length === 1 ? undefined : group.name })));
@@ -231,10 +233,12 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
           <RefreshCw size={20} />
           새로고침
         </button>
-        <a className="public-records-link" href={publicRecordsHref}>
-          <Trophy size={18} />
-          {recordYear} 기록/랭킹 보기
-        </a>
+        {displayTournament.includeInClubRecords !== false && (
+          <a className="public-records-link" href={publicRecordsHref}>
+            <Trophy size={18} />
+            {recordYear} 기록/랭킹 보기
+          </a>
+        )}
 
         {!hasTournamentFormat && !hasTeamBattle && state.groups.length > 1 && (
           <section className="public-tablet-board" aria-label="태블릿 전체 대진표">

@@ -44,6 +44,52 @@ describe("PublicTournamentView auto refresh", () => {
 
     expect(container.querySelector(".public-records-link")?.getAttribute("href")).toBe("/public/stc/records?year=2026");
   });
+  it("omits only ranking-excluded members while preserving the completed match for everyone else", () => {
+    const state = createInitialState();
+    state.members = [
+      { id: "m1", name: "Excluded", gender: "male", notes: "" },
+      { id: "m3", name: "Partner", gender: "male", notes: "" },
+      { id: "m4", name: "Opponent One", gender: "male", notes: "" },
+      { id: "m5", name: "Opponent Two", gender: "male", notes: "" }
+    ];
+    state.tournament = { ...state.tournament, rankingExcludedMemberIds: ["m1"] };
+    state.tournaments = [{ ...state.tournament }];
+    state.groups = [{ id: "g1", tournamentId: state.tournament.id, name: "A", scheduleFormat: "random", sortOrder: 1 }];
+    state.groupMemberIds = { g1: ["m1", "m3", "m4", "m5"] };
+    state.matches = [{
+      id: "match-1",
+      tournamentId: state.tournament.id,
+      groupId: "g1",
+      matchNumber: 1,
+      sideAPlayerIds: ["m1", "m3"],
+      sideBPlayerIds: ["m4", "m5"],
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed",
+      sortOrder: 1
+    }];
+
+    const { container } = render(<PublicTournamentView state={state} slug={state.tournament.publicSlug} clubSlug="stc" />);
+    fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".public-phone-view .tab-button")[1]);
+
+    const rankingText = container.querySelector(".ranking-card-list")?.textContent ?? "";
+    expect(rankingText).not.toContain("Excluded");
+    expect(rankingText).toContain("Partner");
+    expect(rankingText).toContain("Opponent One");
+    expect(rankingText).toContain("Opponent Two");
+    expect(container.querySelectorAll(".ranking-card")).toHaveLength(3);
+    expect(Array.from(container.querySelectorAll(".ranking-card")).find((card) => card.textContent?.includes("Partner"))?.textContent).toContain("+2");
+  });
+
+  it("hides the annual records link for tournaments excluded from club records", () => {
+    const state = createInitialState();
+    state.tournament = { ...state.tournament, includeInClubRecords: false };
+    state.tournaments = [{ ...state.tournament }];
+
+    const { container } = render(<PublicTournamentView state={state} slug={state.tournament.publicSlug} clubSlug="stc" />);
+
+    expect(container.querySelector(".public-records-link")).toBeNull();
+  });
 
 it("removes overall ranking and renders team standings when a fixed pair league exists", () => {
     const state = createInitialState();

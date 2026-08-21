@@ -293,6 +293,65 @@ describe("tournament repository mapping", () => {
       orderBy: [{ tournament: { date: "desc" } }, { sortOrder: "asc" }, { matchNumber: "asc" }, { id: "asc" }]
     });
   });
+  it("excludes only opted-out tournaments and their matches from club record data", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "club-1", slug: "pt" });
+    prisma.member.findMany.mockResolvedValue([]);
+    prisma.tournament.findMany.mockResolvedValue([
+      {
+        id: "included",
+        name: "Included",
+        date: new Date("2026-09-01T00:00:00.000Z"),
+        publicSlug: "3001",
+        status: "completed",
+        type: "general",
+        includeInClubRecords: true
+      },
+      {
+        id: "excluded",
+        name: "Excluded",
+        date: new Date("2026-08-22T00:00:00.000Z"),
+        publicSlug: "2822",
+        status: "completed",
+        type: "general",
+        includeInClubRecords: false
+      }
+    ]);
+    prisma.match.findMany.mockResolvedValue([
+      {
+        id: "included-match",
+        tournamentId: "included",
+        groupId: "g1",
+        matchNumber: 1,
+        sideAPlayerIds: ["m1", "m2"],
+        sideBPlayerIds: ["m3", "m4"],
+        sideAScore: 6,
+        sideBScore: 4,
+        status: "completed",
+        sortOrder: 1
+      },
+      {
+        id: "excluded-match",
+        tournamentId: "excluded",
+        groupId: "g2",
+        matchNumber: 1,
+        sideAPlayerIds: ["m1", "m3"],
+        sideBPlayerIds: ["m2", "m4"],
+        sideAScore: 6,
+        sideBScore: 2,
+        status: "completed",
+        sortOrder: 1
+      }
+    ]);
+
+    const data = await loadClubRecordData("pt");
+
+    expect(data).toMatchObject({
+      tournaments: [{ id: "included", includeInClubRecords: true }],
+      matches: [{ id: "included-match", tournamentId: "included" }]
+    });
+    expect(data.tournaments).toHaveLength(1);
+    expect(data.matches.filter((match) => match.status === "completed")).toHaveLength(1);
+  });
   it("retries the tournament management query once after a transient database connection error", async () => {
     const transientError = Object.assign(new Error("Failed to connect to upstream database."), { code: "P1001" });
     prisma.club.findUnique.mockRejectedValueOnce(transientError).mockResolvedValue({ id: "club-1", slug: "stc" });
