@@ -319,6 +319,20 @@ export async function getClubOrThrow(clubSlug: ClubSlug) {
   return withDatabaseConnectionRetry(() => getClubOrThrowOnce(clubSlug));
 }
 
+async function assertTournamentStructureEditableForClubId(clubId: string, tournamentId: string) {
+  const prisma = await getPrisma();
+  const tournament = await prisma.tournament.findFirst({
+    where: { id: tournamentId, clubId },
+    select: { id: true, scheduleLocked: true }
+  });
+  if (!tournament) throw new Error("Tournament not found: " + tournamentId);
+  if (tournament.scheduleLocked) throw new Error("This tournament schedule is locked");
+}
+
+export async function assertTournamentStructureEditable(clubSlug: ClubSlug, tournamentId: string): Promise<void> {
+  const club = await getClubOrThrow(clubSlug);
+  await assertTournamentStructureEditableForClubId(club.id, tournamentId);
+}
 export async function listMembersByClub(clubSlug: ClubSlug): Promise<Member[]> {
   if (shouldUseLocalSampleData()) return localSampleState().members;
 
@@ -401,10 +415,7 @@ export async function upsertTournament(input: TournamentInput): Promise<Tourname
     );
   }
 
-  const existing = await prisma.tournament.findFirst({
-    where: { id: input.id, clubId: club.id }
-  });
-  if (!existing) throw new Error(`Tournament not found: ${input.id}`);
+  await assertTournamentStructureEditableForClubId(club.id, input.id);
 
   return toDomainTournament(
     await prisma.tournament.update({
@@ -420,11 +431,7 @@ export async function updateTournamentName(clubSlug: ClubSlug, tournamentId: str
   const normalizedName = name.trim();
   if (!normalizedName) throw new Error("Tournament name is required");
 
-  const existing = await prisma.tournament.findFirst({
-    where: { id: tournamentId, clubId: club.id },
-    select: { id: true }
-  });
-  if (!existing) throw new Error(`Tournament not found: ${tournamentId}`);
+  await assertTournamentStructureEditableForClubId(club.id, tournamentId);
 
   return toDomainTournament(
     await prisma.tournament.update({
@@ -437,6 +444,7 @@ export async function updateTournamentName(clubSlug: ClubSlug, tournamentId: str
 export async function updateTournamentDate(clubSlug: ClubSlug, tournamentId: string, date: string): Promise<Tournament> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
+  await assertTournamentStructureEditableForClubId(club.id, tournamentId);
   const existing = await prisma.tournament.findFirst({
     where: { id: tournamentId, clubId: club.id },
     select: { id: true, name: true, publicSlug: true, status: true, type: true }
@@ -466,11 +474,7 @@ export async function updateTournamentDate(clubSlug: ClubSlug, tournamentId: str
 export async function deleteTournament(clubSlug: ClubSlug, tournamentId: string): Promise<void> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
-  const existing = await prisma.tournament.findFirst({
-    where: { id: tournamentId, clubId: club.id },
-    select: { id: true }
-  });
-  if (!existing) throw new Error(`Tournament not found: ${tournamentId}`);
+  await assertTournamentStructureEditableForClubId(club.id, tournamentId);
 
   await prisma.tournament.delete({ where: { id: tournamentId } });
 }
@@ -509,9 +513,16 @@ export async function updateTournamentMatchStates(clubSlug: ClubSlug, inputs: To
   const prisma = await getPrisma();
   const existingMatches = await prisma.match.findMany({
     where: { id: { in: ids }, tournament: { club: { slug: clubSlug } } },
-    select: { id: true }
+    select: {
+      id: true,
+      tournamentId: true,
+      tournament: { select: { scheduleLocked: true } }
+    }
   });
   if (existingMatches.length !== ids.length) throw new Error("One or more tournament matches were not found");
+  if (existingMatches.some((match) => match.tournament?.scheduleLocked)) {
+    throw new Error("This tournament schedule is locked");
+  }
 
   await prisma.$transaction(inputs.map((input) => prisma.match.update({
     where: { id: input.matchId },
@@ -651,9 +662,10 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
   await prisma.$transaction(async (tx) => {
     const existing = await tx.tournament.findFirst({
       where: { id: tournament.id, clubId: club.id },
-      select: { id: true }
+      select: { id: true, scheduleLocked: true }
     });
-    if (!existing) throw new Error(`Tournament not found: ${tournament.id}`);
+    if (!existing) throw new Error("Tournament not found: " + tournament.id);
+    if (existing.scheduleLocked) throw new Error("This tournament schedule is locked");
 
     const clubMembers = await tx.member.findMany({
       where: { clubId: club.id, deleted: false },

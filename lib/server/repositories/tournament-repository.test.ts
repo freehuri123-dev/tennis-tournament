@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadClubRecordData, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentMatchStates } from "./tournament-repository";
+import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadClubRecordData, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentDate, updateTournamentMatchStates, updateTournamentName, upsertTournament } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -23,6 +23,77 @@ describe("tournament repository mapping", () => {
     prisma.$transaction.mockImplementation((input) => Array.isArray(input) ? Promise.all(input) : input(prisma));
   });
 
+  it.each([
+    ["name", () => updateTournamentName("pt", "pt-event", "Changed name")],
+    ["date", () => updateTournamentDate("pt", "pt-event", "2026-08-23")],
+    ["delete", () => deleteTournament("pt", "pt-event")],
+    ["upsert", () => upsertTournament({
+      id: "pt-event",
+      clubSlug: "pt",
+      name: "Changed name",
+      date: "2026-08-23",
+      publicSlug: "2822",
+      type: "general"
+    })]
+  ])("rejects locked tournament %s mutations using database state", async (_operation, mutate) => {
+    prisma.club.findUnique.mockResolvedValue({ id: "pt", slug: "pt" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "pt-event", scheduleLocked: true });
+
+    await expect(mutate()).rejects.toThrow("This tournament schedule is locked");
+
+    expect(prisma.tournament.update).not.toHaveBeenCalled();
+    expect(prisma.tournament.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects replacing a locked tournament even when client state says it is editable", async () => {
+    const state = {
+      version: 9,
+      adminUnlocked: false,
+      members: [],
+      tournaments: [],
+      currentTournamentId: "pt-event",
+      tournament: {
+        id: "pt-event",
+        name: "Changed event",
+        date: "2026-08-23",
+        publicSlug: "2822",
+        status: "active" as const,
+        type: "general" as const,
+        scheduleLocked: false
+      },
+      groups: [],
+      tournamentParticipantIds: { "pt-event": [] },
+      groupMemberIds: {},
+      matches: [],
+      deletedPublicSlugs: []
+    } satisfies TournamentState;
+    prisma.club.findUnique.mockResolvedValue({ id: "pt", slug: "pt" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "pt-event", scheduleLocked: true });
+
+    await expect(replaceTournamentState("pt", state)).rejects.toThrow("This tournament schedule is locked");
+
+    expect(prisma.tournament.update).not.toHaveBeenCalled();
+    expect(prisma.match.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects bulk match state updates for locked tournaments", async () => {
+    prisma.match.findMany.mockResolvedValue([{
+      id: "match-1",
+      tournamentId: "pt-event",
+      tournament: { clubId: "pt", scheduleLocked: true }
+    }]);
+
+    await expect(updateTournamentMatchStates("pt", [{
+      matchId: "match-1",
+      sideAPlayerIds: ["member-1", "member-2"],
+      sideBPlayerIds: ["member-3", "member-4"],
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed"
+    }])).rejects.toThrow("This tournament schedule is locked");
+
+    expect(prisma.match.update).not.toHaveBeenCalled();
+  });
   it("maps schedule formats between domain and Prisma enum values", () => {
     expect(toDbScheduleFormat("hanul-aa")).toBe("hanul_aa");
     expect(toDbScheduleFormat("kdk-v2010")).toBe("kdk_v2010");
@@ -534,6 +605,36 @@ describe("tournament repository mapping", () => {
     expect(prisma.club.findUnique).not.toHaveBeenCalled();
     expect(prisma.match.findFirst).not.toHaveBeenCalled();
   });
+  it("allows score resets for locked tournaments without checking the structure lock", async () => {
+    prisma.match.updateManyAndReturn.mockResolvedValue([{
+      id: "match-1",
+      tournamentId: "pt-event",
+      groupId: "pt-group",
+      matchNumber: 1,
+      sideAPlayerIds: ["member-1", "member-2"],
+      sideBPlayerIds: ["member-3", "member-4"],
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled",
+      sortOrder: 1
+    }]);
+
+    await expect(updateMatchScore("pt", {
+      matchId: "match-1",
+      sideAScore: null,
+      sideBScore: null
+    })).resolves.toMatchObject({
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled"
+    });
+
+    expect(prisma.match.updateManyAndReturn).toHaveBeenCalledWith({
+      where: { id: "match-1", tournament: { club: { slug: "pt" } } },
+      data: { sideAScore: null, sideBScore: null, status: "scheduled" }
+    });
+    expect(prisma.tournament.findFirst).not.toHaveBeenCalled();
+  });
   it("rejects match score updates outside the requested club", async () => {
     prisma.match.updateManyAndReturn.mockResolvedValue([]);
 
@@ -560,7 +661,11 @@ describe("tournament repository mapping", () => {
 
     expect(prisma.match.findMany).toHaveBeenCalledWith({
       where: { id: { in: ["match-1"] }, tournament: { club: { slug: "stc" } } },
-      select: { id: true }
+      select: {
+        id: true,
+        tournamentId: true,
+        tournament: { select: { scheduleLocked: true } }
+      }
     });
     expect(prisma.match.update).toHaveBeenCalledWith({
       where: { id: "match-1" },
@@ -582,7 +687,7 @@ describe("tournament repository mapping", () => {
 
     expect(prisma.tournament.findFirst).toHaveBeenCalledWith({
       where: { id: "tournament-1", clubId: "club-1" },
-      select: { id: true }
+      select: { id: true, scheduleLocked: true }
     });
     expect(prisma.tournament.delete).toHaveBeenCalledWith({
       where: { id: "tournament-1" }

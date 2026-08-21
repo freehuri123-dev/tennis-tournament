@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { deleteMemberAction } from "./actions/member-actions";
 import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "./actions/match-actions";
-import { createTournamentAction, deleteTournamentAction, persistTournamentStateAction } from "./actions/tournament-actions";
+import { createTournamentAction, deleteTournamentAction, persistTournamentStateAction, updateTournamentDateAction, updateTournamentNameAction } from "./actions/tournament-actions";
 import type { TournamentState } from "../store/tournament-store";
 import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
 
-const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, updateTournamentMatchStates, upsertTournament } = vi.hoisted(() => ({
+const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, updateTournamentDate, updateTournamentMatchStates, updateTournamentName, upsertTournament } = vi.hoisted(() => ({
   deleteTournament: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
@@ -15,7 +15,9 @@ const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournam
   replaceTournamentState: vi.fn(),
   softDeleteMember: vi.fn(),
   updateMatchScore: vi.fn(),
+  updateTournamentDate: vi.fn(),
   updateTournamentMatchStates: vi.fn(),
+  updateTournamentName: vi.fn(),
   upsertTournament: vi.fn()
 }));
 
@@ -27,7 +29,9 @@ vi.mock("./repositories/tournament-repository", () => ({
   replaceTournamentState,
   softDeleteMember,
   updateMatchScore,
+  updateTournamentDate,
   updateTournamentMatchStates,
+  updateTournamentName,
   upsertMember: vi.fn(),
   upsertTournament
 }));
@@ -169,6 +173,25 @@ describe("server action validation", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/public/stc/spring-tournament");
   });
 
+  it("propagates the database lock when renaming a locked tournament", async () => {
+    updateTournamentName.mockRejectedValueOnce(new Error("This tournament schedule is locked"));
+
+    await expect(updateTournamentNameAction("pt", "pt-event", "Changed name"))
+      .rejects.toThrow("This tournament schedule is locked");
+
+    expect(requireAdmin).toHaveBeenCalledWith("pt");
+    expect(updateTournamentName).toHaveBeenCalledWith("pt", "pt-event", "Changed name");
+  });
+
+  it("propagates the database lock when changing a locked tournament date", async () => {
+    updateTournamentDate.mockRejectedValueOnce(new Error("This tournament schedule is locked"));
+
+    await expect(updateTournamentDateAction("pt", "pt-event", "2026-08-23"))
+      .rejects.toThrow("This tournament schedule is locked");
+
+    expect(requireAdmin).toHaveBeenCalledWith("pt");
+    expect(updateTournamentDate).toHaveBeenCalledWith("pt", "pt-event", "2026-08-23");
+  });
   it("passes club scope when updating match scores", async () => {
     await expect(
       updateMatchScoreAction(
@@ -191,6 +214,20 @@ describe("server action validation", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/admin/tournaments/manage");
   });
 
+  it("allows resetting a locked event score through the score-only action", async () => {
+    await expect(updateMatchScoreAction({
+      matchId: "pt-match-1",
+      sideAScore: null,
+      sideBScore: null
+    }, "pt")).resolves.toBeUndefined();
+
+    expect(requireAdmin).toHaveBeenCalledWith("pt");
+    expect(updateMatchScore).toHaveBeenCalledWith("pt", {
+      matchId: "pt-match-1",
+      sideAScore: null,
+      sideBScore: null
+    });
+  });
   it("saves only changed tournament matches and revalidates the public page", async () => {
     const matches = [{
       matchId: "match-1",
