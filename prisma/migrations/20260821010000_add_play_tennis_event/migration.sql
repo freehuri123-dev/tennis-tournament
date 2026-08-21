@@ -1,0 +1,198 @@
+INSERT INTO "Club" ("id", "slug", "name", "shortName", "createdAt", "updatedAt")
+VALUES ('pt', 'pt', 'Play Tennis', 'Play Tennis', NOW(), NOW())
+ON CONFLICT ("id") DO UPDATE
+SET "slug" = EXCLUDED."slug",
+    "name" = EXCLUDED."name",
+    "shortName" = EXCLUDED."shortName",
+    "updatedAt" = NOW();
+
+INSERT INTO "Member" ("id", "clubId", "name", "gender", "level", "notes", "phone", "active", "deleted", "createdAt", "updatedAt")
+VALUES
+('pt-m01', 'pt', '감독진', 'male', '7', '', NULL, true, false, NOW(), NOW()),
+('pt-m02', 'pt', '유태주', 'male', '6', '', NULL, true, false, NOW(), NOW()),
+('pt-m03', 'pt', '김성훈', 'male', '5', '', NULL, true, false, NOW(), NOW()),
+('pt-m04', 'pt', '김지동', 'male', '5', '', NULL, true, false, NOW(), NOW()),
+('pt-m05', 'pt', '박준희', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m06', 'pt', '박찬조', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m07', 'pt', '장하현', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m08', 'pt', '조형찬', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m09', 'pt', '이종민', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m10', 'pt', '백용준', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m11', 'pt', '황왕성', 'male', '2', '', NULL, true, false, NOW(), NOW()),
+('pt-m12', 'pt', '김대업', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m13', 'pt', '오성주', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m14', 'pt', '김승빈', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m15', 'pt', '김건우', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m16', 'pt', '정우람', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m17', 'pt', '나우진', 'male', '4', '', NULL, true, false, NOW(), NOW()),
+('pt-m18', 'pt', '이지숙', 'female', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m19', 'pt', '최재필', 'male', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m20', 'pt', '엄태천', 'male', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m21', 'pt', '문현범', 'male', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m22', 'pt', '라정민', 'male', '2', '', NULL, true, false, NOW(), NOW()),
+('pt-m23', 'pt', '신경식', 'male', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m24', 'pt', '양재명', 'male', '2', '', NULL, true, false, NOW(), NOW()),
+('pt-m25', 'pt', '정유리', 'female', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m26', 'pt', '이정근', 'male', '2', '', NULL, true, false, NOW(), NOW()),
+('pt-m27', 'pt', '이대한', 'male', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m28', 'pt', '최동렬', 'male', '2', '', NULL, true, false, NOW(), NOW()),
+('pt-m29', 'pt', '윤진', 'female', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m30', 'pt', '김경아', 'female', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m31', 'pt', '이나현', 'female', '3', '', NULL, true, false, NOW(), NOW()),
+('pt-m32', 'pt', '이화주', 'female', '1', '', NULL, true, false, NOW(), NOW())
+ON CONFLICT ("id") DO UPDATE
+SET "clubId" = EXCLUDED."clubId",
+    "name" = EXCLUDED."name",
+    "gender" = EXCLUDED."gender",
+    "level" = EXCLUDED."level",
+    "notes" = EXCLUDED."notes",
+    "phone" = EXCLUDED."phone",
+    "active" = EXCLUDED."active",
+    "deleted" = EXCLUDED."deleted",
+    "updatedAt" = NOW();
+
+INSERT INTO "Tournament" ("id", "clubId", "name", "date", "publicSlug", "status", "type", "femaleTeamAllowed", "scheduleLocked", "rankingExcludedMemberIds", "includeInClubRecords", "createdAt", "updatedAt")
+VALUES ('pt-tournament-20260822', 'pt', '제2회 임진강 나룻배', DATE '2026-08-22', '2822', 'active', 'general', true, true, ARRAY['pt-m01','pt-m02']::TEXT[], false, NOW(), NOW())
+ON CONFLICT ("id") DO UPDATE
+SET "clubId" = EXCLUDED."clubId",
+    "name" = EXCLUDED."name",
+    "date" = EXCLUDED."date",
+    "publicSlug" = EXCLUDED."publicSlug",
+    "status" = EXCLUDED."status",
+    "type" = EXCLUDED."type",
+    "femaleTeamAllowed" = EXCLUDED."femaleTeamAllowed",
+    "scheduleLocked" = EXCLUDED."scheduleLocked",
+    "rankingExcludedMemberIds" = EXCLUDED."rankingExcludedMemberIds",
+    "includeInClubRecords" = EXCLUDED."includeInClubRecords",
+    "updatedAt" = NOW();
+
+INSERT INTO "TournamentGroup" ("id", "tournamentId", "name", "scheduleFormat", "sortOrder", "seedPlayerIds", "randomCourtCount", "randomGamesPerPlayer", "createdAt", "updatedAt")
+VALUES ('pt-event-group', 'pt-tournament-20260822', '전체', 'random', 1, ARRAY[]::TEXT[], 4, 4, NOW(), NOW())
+ON CONFLICT ("id") DO UPDATE
+SET "tournamentId" = EXCLUDED."tournamentId",
+    "name" = EXCLUDED."name",
+    "scheduleFormat" = EXCLUDED."scheduleFormat",
+    "sortOrder" = EXCLUDED."sortOrder",
+    "seedPlayerIds" = EXCLUDED."seedPlayerIds",
+    "randomCourtCount" = EXCLUDED."randomCourtCount",
+    "randomGamesPerPlayer" = EXCLUDED."randomGamesPerPlayer",
+    "updatedAt" = NOW();
+
+INSERT INTO "TournamentParticipant" ("id", "tournamentId", "memberId", "sortOrder", "createdAt")
+VALUES
+('pt-event-participant-m01', 'pt-tournament-20260822', 'pt-m01', 1, NOW()),
+('pt-event-participant-m02', 'pt-tournament-20260822', 'pt-m02', 2, NOW()),
+('pt-event-participant-m03', 'pt-tournament-20260822', 'pt-m03', 3, NOW()),
+('pt-event-participant-m04', 'pt-tournament-20260822', 'pt-m04', 4, NOW()),
+('pt-event-participant-m05', 'pt-tournament-20260822', 'pt-m05', 5, NOW()),
+('pt-event-participant-m06', 'pt-tournament-20260822', 'pt-m06', 6, NOW()),
+('pt-event-participant-m07', 'pt-tournament-20260822', 'pt-m07', 7, NOW()),
+('pt-event-participant-m08', 'pt-tournament-20260822', 'pt-m08', 8, NOW()),
+('pt-event-participant-m09', 'pt-tournament-20260822', 'pt-m09', 9, NOW()),
+('pt-event-participant-m10', 'pt-tournament-20260822', 'pt-m10', 10, NOW()),
+('pt-event-participant-m11', 'pt-tournament-20260822', 'pt-m11', 11, NOW()),
+('pt-event-participant-m12', 'pt-tournament-20260822', 'pt-m12', 12, NOW()),
+('pt-event-participant-m13', 'pt-tournament-20260822', 'pt-m13', 13, NOW()),
+('pt-event-participant-m14', 'pt-tournament-20260822', 'pt-m14', 14, NOW()),
+('pt-event-participant-m15', 'pt-tournament-20260822', 'pt-m15', 15, NOW()),
+('pt-event-participant-m16', 'pt-tournament-20260822', 'pt-m16', 16, NOW()),
+('pt-event-participant-m17', 'pt-tournament-20260822', 'pt-m17', 17, NOW()),
+('pt-event-participant-m18', 'pt-tournament-20260822', 'pt-m18', 18, NOW()),
+('pt-event-participant-m19', 'pt-tournament-20260822', 'pt-m19', 19, NOW()),
+('pt-event-participant-m20', 'pt-tournament-20260822', 'pt-m20', 20, NOW()),
+('pt-event-participant-m21', 'pt-tournament-20260822', 'pt-m21', 21, NOW()),
+('pt-event-participant-m22', 'pt-tournament-20260822', 'pt-m22', 22, NOW()),
+('pt-event-participant-m23', 'pt-tournament-20260822', 'pt-m23', 23, NOW()),
+('pt-event-participant-m24', 'pt-tournament-20260822', 'pt-m24', 24, NOW()),
+('pt-event-participant-m25', 'pt-tournament-20260822', 'pt-m25', 25, NOW()),
+('pt-event-participant-m26', 'pt-tournament-20260822', 'pt-m26', 26, NOW()),
+('pt-event-participant-m27', 'pt-tournament-20260822', 'pt-m27', 27, NOW()),
+('pt-event-participant-m28', 'pt-tournament-20260822', 'pt-m28', 28, NOW()),
+('pt-event-participant-m29', 'pt-tournament-20260822', 'pt-m29', 29, NOW()),
+('pt-event-participant-m30', 'pt-tournament-20260822', 'pt-m30', 30, NOW()),
+('pt-event-participant-m31', 'pt-tournament-20260822', 'pt-m31', 31, NOW()),
+('pt-event-participant-m32', 'pt-tournament-20260822', 'pt-m32', 32, NOW())
+ON CONFLICT ("tournamentId", "memberId") DO UPDATE
+SET "sortOrder" = EXCLUDED."sortOrder";
+
+INSERT INTO "TournamentGroupMember" ("id", "groupId", "memberId", "sortOrder", "createdAt")
+VALUES
+('pt-event-group-member-m01', 'pt-event-group', 'pt-m01', 1, NOW()),
+('pt-event-group-member-m02', 'pt-event-group', 'pt-m02', 2, NOW()),
+('pt-event-group-member-m03', 'pt-event-group', 'pt-m03', 3, NOW()),
+('pt-event-group-member-m04', 'pt-event-group', 'pt-m04', 4, NOW()),
+('pt-event-group-member-m05', 'pt-event-group', 'pt-m05', 5, NOW()),
+('pt-event-group-member-m06', 'pt-event-group', 'pt-m06', 6, NOW()),
+('pt-event-group-member-m07', 'pt-event-group', 'pt-m07', 7, NOW()),
+('pt-event-group-member-m08', 'pt-event-group', 'pt-m08', 8, NOW()),
+('pt-event-group-member-m09', 'pt-event-group', 'pt-m09', 9, NOW()),
+('pt-event-group-member-m10', 'pt-event-group', 'pt-m10', 10, NOW()),
+('pt-event-group-member-m11', 'pt-event-group', 'pt-m11', 11, NOW()),
+('pt-event-group-member-m12', 'pt-event-group', 'pt-m12', 12, NOW()),
+('pt-event-group-member-m13', 'pt-event-group', 'pt-m13', 13, NOW()),
+('pt-event-group-member-m14', 'pt-event-group', 'pt-m14', 14, NOW()),
+('pt-event-group-member-m15', 'pt-event-group', 'pt-m15', 15, NOW()),
+('pt-event-group-member-m16', 'pt-event-group', 'pt-m16', 16, NOW()),
+('pt-event-group-member-m17', 'pt-event-group', 'pt-m17', 17, NOW()),
+('pt-event-group-member-m18', 'pt-event-group', 'pt-m18', 18, NOW()),
+('pt-event-group-member-m19', 'pt-event-group', 'pt-m19', 19, NOW()),
+('pt-event-group-member-m20', 'pt-event-group', 'pt-m20', 20, NOW()),
+('pt-event-group-member-m21', 'pt-event-group', 'pt-m21', 21, NOW()),
+('pt-event-group-member-m22', 'pt-event-group', 'pt-m22', 22, NOW()),
+('pt-event-group-member-m23', 'pt-event-group', 'pt-m23', 23, NOW()),
+('pt-event-group-member-m24', 'pt-event-group', 'pt-m24', 24, NOW()),
+('pt-event-group-member-m25', 'pt-event-group', 'pt-m25', 25, NOW()),
+('pt-event-group-member-m26', 'pt-event-group', 'pt-m26', 26, NOW()),
+('pt-event-group-member-m27', 'pt-event-group', 'pt-m27', 27, NOW()),
+('pt-event-group-member-m28', 'pt-event-group', 'pt-m28', 28, NOW()),
+('pt-event-group-member-m29', 'pt-event-group', 'pt-m29', 29, NOW()),
+('pt-event-group-member-m30', 'pt-event-group', 'pt-m30', 30, NOW()),
+('pt-event-group-member-m31', 'pt-event-group', 'pt-m31', 31, NOW()),
+('pt-event-group-member-m32', 'pt-event-group', 'pt-m32', 32, NOW())
+ON CONFLICT ("groupId", "memberId") DO UPDATE
+SET "sortOrder" = EXCLUDED."sortOrder";
+
+INSERT INTO "Match" ("id", "tournamentId", "groupId", "matchNumber", "sideAPlayerIds", "sideBPlayerIds", "sideAScore", "sideBScore", "status", "sortOrder", "courtNumber", "roundNumber", "createdAt", "updatedAt")
+VALUES
+('pt-event-r1-c1', 'pt-tournament-20260822', 'pt-event-group', 1, ARRAY['pt-m31','pt-m10']::TEXT[], ARRAY['pt-m29','pt-m06']::TEXT[], NULL, NULL, 'scheduled', 1, '1', 1, NOW(), NOW()),
+('pt-event-r1-c2', 'pt-tournament-20260822', 'pt-event-group', 2, ARRAY['pt-m24','pt-m12']::TEXT[], ARRAY['pt-m23','pt-m17']::TEXT[], NULL, NULL, 'scheduled', 2, '2', 1, NOW(), NOW()),
+('pt-event-r1-c3', 'pt-tournament-20260822', 'pt-event-group', 3, ARRAY['pt-m30','pt-m21']::TEXT[], ARRAY['pt-m18','pt-m26']::TEXT[], NULL, NULL, 'scheduled', 3, '3', 1, NOW(), NOW()),
+('pt-event-r1-c4', 'pt-tournament-20260822', 'pt-event-group', 4, ARRAY['pt-m03','pt-m27']::TEXT[], ARRAY['pt-m04','pt-m22']::TEXT[], NULL, NULL, 'scheduled', 4, '4', 1, NOW(), NOW()),
+('pt-event-r2-c1', 'pt-tournament-20260822', 'pt-event-group', 5, ARRAY['pt-m32','pt-m01']::TEXT[], ARRAY['pt-m25','pt-m08']::TEXT[], NULL, NULL, 'scheduled', 5, '1', 2, NOW(), NOW()),
+('pt-event-r2-c2', 'pt-tournament-20260822', 'pt-event-group', 6, ARRAY['pt-m24','pt-m02']::TEXT[], ARRAY['pt-m09','pt-m12']::TEXT[], NULL, NULL, 'scheduled', 6, '2', 2, NOW(), NOW()),
+('pt-event-r2-c3', 'pt-tournament-20260822', 'pt-event-group', 7, ARRAY['pt-m28','pt-m10']::TEXT[], ARRAY['pt-m11','pt-m07']::TEXT[], NULL, NULL, 'scheduled', 7, '3', 2, NOW(), NOW()),
+('pt-event-r2-c4', 'pt-tournament-20260822', 'pt-event-group', 8, ARRAY['pt-m15','pt-m19']::TEXT[], ARRAY['pt-m05','pt-m13']::TEXT[], NULL, NULL, 'scheduled', 8, '4', 2, NOW(), NOW()),
+('pt-event-r3-c1', 'pt-tournament-20260822', 'pt-event-group', 9, ARRAY['pt-m13','pt-m15']::TEXT[], ARRAY['pt-m16','pt-m14']::TEXT[], NULL, NULL, 'scheduled', 9, '1', 3, NOW(), NOW()),
+('pt-event-r3-c2', 'pt-tournament-20260822', 'pt-event-group', 10, ARRAY['pt-m32','pt-m01']::TEXT[], ARRAY['pt-m29','pt-m07']::TEXT[], NULL, NULL, 'scheduled', 10, '2', 3, NOW(), NOW()),
+('pt-event-r3-c3', 'pt-tournament-20260822', 'pt-event-group', 11, ARRAY['pt-m18','pt-m27']::TEXT[], ARRAY['pt-m25','pt-m20']::TEXT[], NULL, NULL, 'scheduled', 11, '3', 3, NOW(), NOW()),
+('pt-event-r3-c4', 'pt-tournament-20260822', 'pt-event-group', 12, ARRAY['pt-m26','pt-m23']::TEXT[], ARRAY['pt-m28','pt-m22']::TEXT[], NULL, NULL, 'scheduled', 12, '4', 3, NOW(), NOW()),
+('pt-event-r4-c1', 'pt-tournament-20260822', 'pt-event-group', 13, ARRAY['pt-m30','pt-m04']::TEXT[], ARRAY['pt-m31','pt-m09']::TEXT[], NULL, NULL, 'scheduled', 13, '1', 4, NOW(), NOW()),
+('pt-event-r4-c2', 'pt-tournament-20260822', 'pt-event-group', 14, ARRAY['pt-m03','pt-m24']::TEXT[], ARRAY['pt-m08','pt-m06']::TEXT[], NULL, NULL, 'scheduled', 14, '2', 4, NOW(), NOW()),
+('pt-event-r4-c3', 'pt-tournament-20260822', 'pt-event-group', 15, ARRAY['pt-m10','pt-m11']::TEXT[], ARRAY['pt-m21','pt-m12']::TEXT[], NULL, NULL, 'scheduled', 15, '3', 4, NOW(), NOW()),
+('pt-event-r4-c4', 'pt-tournament-20260822', 'pt-event-group', 16, ARRAY['pt-m02','pt-m26']::TEXT[], ARRAY['pt-m17','pt-m19']::TEXT[], NULL, NULL, 'scheduled', 16, '4', 4, NOW(), NOW()),
+('pt-event-r5-c1', 'pt-tournament-20260822', 'pt-event-group', 17, ARRAY['pt-m05','pt-m07']::TEXT[], ARRAY['pt-m27','pt-m16']::TEXT[], NULL, NULL, 'scheduled', 17, '1', 5, NOW(), NOW()),
+('pt-event-r5-c2', 'pt-tournament-20260822', 'pt-event-group', 18, ARRAY['pt-m03','pt-m15']::TEXT[], ARRAY['pt-m28','pt-m01']::TEXT[], NULL, NULL, 'scheduled', 18, '2', 5, NOW(), NOW()),
+('pt-event-r5-c3', 'pt-tournament-20260822', 'pt-event-group', 19, ARRAY['pt-m14','pt-m22']::TEXT[], ARRAY['pt-m20','pt-m08']::TEXT[], NULL, NULL, 'scheduled', 19, '3', 5, NOW(), NOW()),
+('pt-event-r5-c4', 'pt-tournament-20260822', 'pt-event-group', 20, ARRAY['pt-m32','pt-m02']::TEXT[], ARRAY['pt-m18','pt-m13']::TEXT[], NULL, NULL, 'scheduled', 20, '4', 5, NOW(), NOW()),
+('pt-event-r6-c1', 'pt-tournament-20260822', 'pt-event-group', 21, ARRAY['pt-m30','pt-m05']::TEXT[], ARRAY['pt-m25','pt-m15']::TEXT[], NULL, NULL, 'scheduled', 21, '1', 6, NOW(), NOW()),
+('pt-event-r6-c2', 'pt-tournament-20260822', 'pt-event-group', 22, ARRAY['pt-m29','pt-m28']::TEXT[], ARRAY['pt-m18','pt-m22']::TEXT[], NULL, NULL, 'scheduled', 22, '2', 6, NOW(), NOW()),
+('pt-event-r6-c3', 'pt-tournament-20260822', 'pt-event-group', 23, ARRAY['pt-m32','pt-m23']::TEXT[], ARRAY['pt-m31','pt-m24']::TEXT[], NULL, NULL, 'scheduled', 23, '3', 6, NOW(), NOW()),
+('pt-event-r6-c4', 'pt-tournament-20260822', 'pt-event-group', 24, ARRAY['pt-m12','pt-m14']::TEXT[], ARRAY['pt-m07','pt-m27']::TEXT[], NULL, NULL, 'scheduled', 24, '4', 6, NOW(), NOW()),
+('pt-event-r7-c1', 'pt-tournament-20260822', 'pt-event-group', 25, ARRAY['pt-m11','pt-m01']::TEXT[], ARRAY['pt-m19','pt-m03']::TEXT[], NULL, NULL, 'scheduled', 25, '1', 7, NOW(), NOW()),
+('pt-event-r7-c2', 'pt-tournament-20260822', 'pt-event-group', 26, ARRAY['pt-m31','pt-m17']::TEXT[], ARRAY['pt-m29','pt-m16']::TEXT[], NULL, NULL, 'scheduled', 26, '2', 7, NOW(), NOW()),
+('pt-event-r7-c3', 'pt-tournament-20260822', 'pt-event-group', 27, ARRAY['pt-m26','pt-m06']::TEXT[], ARRAY['pt-m09','pt-m20']::TEXT[], NULL, NULL, 'scheduled', 27, '3', 7, NOW(), NOW()),
+('pt-event-r7-c4', 'pt-tournament-20260822', 'pt-event-group', 28, ARRAY['pt-m04','pt-m10']::TEXT[], ARRAY['pt-m02','pt-m21']::TEXT[], NULL, NULL, 'scheduled', 28, '4', 7, NOW(), NOW()),
+('pt-event-r8-c1', 'pt-tournament-20260822', 'pt-event-group', 29, ARRAY['pt-m25','pt-m19']::TEXT[], ARRAY['pt-m30','pt-m11']::TEXT[], NULL, NULL, 'scheduled', 29, '1', 8, NOW(), NOW()),
+('pt-event-r8-c2', 'pt-tournament-20260822', 'pt-event-group', 30, ARRAY['pt-m06','pt-m17']::TEXT[], ARRAY['pt-m13','pt-m14']::TEXT[], NULL, NULL, 'scheduled', 30, '2', 8, NOW(), NOW()),
+('pt-event-r8-c3', 'pt-tournament-20260822', 'pt-event-group', 31, ARRAY['pt-m04','pt-m20']::TEXT[], ARRAY['pt-m16','pt-m09']::TEXT[], NULL, NULL, 'scheduled', 31, '3', 8, NOW(), NOW()),
+('pt-event-r8-c4', 'pt-tournament-20260822', 'pt-event-group', 32, ARRAY['pt-m23','pt-m08']::TEXT[], ARRAY['pt-m21','pt-m05']::TEXT[], NULL, NULL, 'scheduled', 32, '4', 8, NOW(), NOW())
+ON CONFLICT ("id") DO UPDATE
+SET "tournamentId" = EXCLUDED."tournamentId",
+    "groupId" = EXCLUDED."groupId",
+    "matchNumber" = EXCLUDED."matchNumber",
+    "sideAPlayerIds" = EXCLUDED."sideAPlayerIds",
+    "sideBPlayerIds" = EXCLUDED."sideBPlayerIds",
+    "sortOrder" = EXCLUDED."sortOrder",
+    "courtNumber" = EXCLUDED."courtNumber",
+    "roundNumber" = EXCLUDED."roundNumber",
+    "updatedAt" = NOW();
