@@ -243,14 +243,31 @@ describe("TournamentManageClient save timing", () => {
     window.sessionStorage.clear();
   });
 
-  it("opens a locked event on the draw and keeps only score and ranking controls", () => {
-    const { container } = render(<TournamentManageClient initialState={makeLockedEventState()} clubSlug="pt" />);
+  it("shows locked event settings as read-only with an operator notice", () => {
+    const state = makeLockedEventState();
+    state.groups = [state.groups[0], { ...state.groups[0], id: "g2", name: "B조", sortOrder: 2 }];
+    state.groupMemberIds = { ...state.groupMemberIds, g2: [] };
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="pt" />);
 
-    expect(screen.queryByRole("button", { name: "설정" })).toBeNull();
+    expect(screen.getByRole("button", { name: "설정" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "대진표" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "순위" })).toBeTruthy();
-    expect(screen.queryByLabelText("대회명")).toBeNull();
-    expect(screen.queryByLabelText("날짜")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "설정" }));
+    expect(screen.getByText("이벤트 대회는 수정 불가합니다. J.H.Park에게 문의해주세요.")).toBeTruthy();
+    expect(container.querySelector("fieldset.locked-setup-fields")?.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText("대회명")).toBeTruthy();
+    expect(screen.getByLabelText("날짜")).toBeTruthy();
+    expect(screen.getAllByText("김철수").length).toBeGreaterThan(0);
+    expect(screen.getByText("참가자 명단")).toBeTruthy();
+    expect(container.querySelectorAll(".participant-option").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".group-setup-card")).toHaveLength(2);
+    expect(container.querySelector(".setup-group-tab-grid")).toBeNull();
+    const lockedPlayers = Array.from(container.querySelectorAll<HTMLButtonElement>(".sortable-participant"));
+    const lockedPlayerOrder = lockedPlayers.map((button) => button.textContent);
+    fireEvent.dragStart(lockedPlayers[0]);
+    fireEvent.drop(lockedPlayers[1]);
+    expect(Array.from(container.querySelectorAll<HTMLButtonElement>(".sortable-participant")).map((button) => button.textContent)).toEqual(lockedPlayerOrder);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
     expect(screen.queryByRole("button", { name: "경기 추가" })).toBeNull();
     expect(screen.queryByRole("button", { name: "경기 삭제" })).toBeNull();
     expect(screen.queryByText("선수 변경")).toBeNull();

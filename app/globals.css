@@ -2072,6 +2072,26 @@ textarea:focus-visible {
   line-height: 1.45;
 }
 
+.event-lock-notice {
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.locked-setup-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.locked-setup-fields:disabled {
+  opacity: 1;
+}
+
+.locked-setup-fields:disabled :is(button, input, select) {
+  cursor: not-allowed;
+}
+
 .score-input-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -170,7 +170,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const drawGroupId = activeDrawGroupId && state.groups.some((group) => group.id === activeDrawGroupId) ? activeDrawGroupId : state.groups[0]?.id;
   const rankingGroupId = activeRankingGroupId && state.groups.some((group) => group.id === activeRankingGroupId) ? activeRankingGroupId : state.groups[0]?.id;
   const setupGroupId = activeSetupGroupId && state.groups.some((group) => group.id === activeSetupGroupId) ? activeSetupGroupId : state.groups[0]?.id ?? null;
-  const visibleSetupGroups = state.groups.filter((group) => group.id === setupGroupId);
+  const visibleSetupGroups = scheduleLocked ? state.groups : state.groups.filter((group) => group.id === setupGroupId);
   const assignedGroupMemberIds = new Set(state.groups.flatMap((group) => state.groupMemberIds[group.id] ?? []));
   const unassignedGroupMembers = tournamentParticipants.filter((member) => !assignedGroupMemberIds.has(member.id));
 
@@ -898,7 +898,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function toggleGroupMember(groupId: string, memberId: string) {
-    if (isCompleted || isAssignedToOtherGroup(memberId, groupId)) return;
+    if (isCompleted || scheduleLocked || isAssignedToOtherGroup(memberId, groupId)) return;
     const currentIds = state.groupMemberIds[groupId] ?? [];
     const nextIds = currentIds.includes(memberId) ? currentIds.filter((id) => id !== memberId) : [...currentIds, memberId];
     updateLocal({
@@ -909,7 +909,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   }
 
   function moveGroupMember(groupId: string, memberId: string, targetMemberId: string) {
-    if (isCompleted || memberId === targetMemberId) return;
+    if (isCompleted || scheduleLocked || memberId === targetMemberId) return;
     const currentIds = state.groupMemberIds[groupId] ?? [];
     const fromIndex = currentIds.indexOf(memberId);
     const toIndex = currentIds.indexOf(targetMemberId);
@@ -1221,10 +1221,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
         <section className="section-card">
           <div className="tab-row">
-            {(scheduleLocked
-              ? [["draw", "대진표"], ["ranking", "순위"]]
-              : [["setup", "설정"], ["draw", "대진표"], ["ranking", "순위"]]
-            ).map(([id, label]) => (
+            {[["setup", "설정"], ["draw", "대진표"], ["ranking", "순위"]].map(([id, label]) => (
               <button className={`tab-button ${activeTab === id ? "active" : ""}`} key={id} onClick={() => setActiveTab(id as TabId)} type="button">
                 {label}
               </button>
@@ -1232,8 +1229,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
           </div>
         </section>
 
-        {!scheduleLocked && activeTab === "setup" && (
+        {activeTab === "setup" && (
           <div className="tab-panel stack" key="setup">
+            {scheduleLocked && <p className="notice-text event-lock-notice" role="note">이벤트 대회는 수정 불가합니다. J.H.Park에게 문의해주세요.</p>}
+            <fieldset className="locked-setup-fields stack" disabled={scheduleLocked}>
             <section className="section-card stack">
               <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentType === "general" ? "일반 대회" : tournamentType === "team-battle" ? "청백전 · 단체전" : "토너먼트"}</span></div>
               <label className="field boxed-field">
@@ -1253,9 +1252,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   <strong className="section-head">대회 참가자</strong>
                   <small>선택됨 {tournamentParticipants.length}명</small>
                 </span>
-                <b>{participantPanelOpen ? "닫기" : "참가자등록"}</b>
+                <b>{scheduleLocked ? "참가자 명단" : participantPanelOpen ? "닫기" : "참가자등록"}</b>
               </button>
-              {participantPanelOpen && (
+              {(participantPanelOpen || scheduleLocked) && (
                 <div className="stack soft-enter">
                   <div className="participant-bulk-actions" aria-label="성별 참가자 선택">
                     <button disabled={isCompleted} onClick={() => selectTournamentParticipantsByGender("male")} type="button">
@@ -1282,7 +1281,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   </button>
                 </div>
               )}
-              {!participantPanelOpen && (
+              {!participantPanelOpen && !scheduleLocked && (
                 <div className="selected-summary">
                   {tournamentParticipants.length > 0 ? tournamentParticipants.map((member) => <span key={member.id}>{member.name}</span>) : <p>참가자를 먼저 선택해주세요.</p>}
                 </div>
@@ -1445,7 +1444,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 </button>
               </div>
 
-              {state.groups.length > 1 && (
+              {state.groups.length > 1 && !scheduleLocked && (
                 <div className="setup-group-tab-grid" role="tablist" aria-label="편성 그룹 선택">
                   {state.groups.map((group) => {
                     const active = setupGroupId === group.id;
@@ -1583,7 +1582,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           <button
                             className={`participant-option sortable-participant ${isSeedSlot ? "seed-slot" : ""}`}
                             disabled={isCompleted}
-                            draggable={!isCompleted}
+                            draggable={!isCompleted && !scheduleLocked}
                             key={member.id}
                             onClick={() => toggleGroupMember(group.id, member.id)}
                             onDragEnd={() => setDraggingMember(null)}
@@ -1708,6 +1707,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 대진표 생성
               </button>
             </section>)}
+            </fieldset>
           </div>
         )}
 

@@ -147,8 +147,19 @@ describe("PublicTournamentView auto refresh", () => {
     expect(screen.getByText("2라운드")).toBeTruthy();
     expect(container.querySelector(".explicit-round-card")?.textContent).toContain("1번 코트");
     expect(container.querySelector(".group-format-badge")).toBeNull();
+    expect(Array.from(container.querySelectorAll(".tab-button")).map((button) => button.textContent)).toEqual(["대진표", "전체 순위"]);
+    expect(screen.queryByRole("tab", { name: "그룹 순위" })).toBeNull();
   });
 
+  it("keeps standard ranking tabs for locked non-general tournament data", () => {
+    const state = createInitialState();
+    state.tournament = { ...state.tournament, type: "tournament", scheduleLocked: true };
+    state.tournaments = [{ ...state.tournament }];
+
+    const { container } = render(<PublicTournamentView state={state} slug={state.tournament.publicSlug} clubSlug="pt" />);
+
+    expect(Array.from(container.querySelectorAll(".tab-button")).map((button) => button.textContent)).toEqual(["대진표", "그룹 순위", "전체 순위"]);
+  });
 it("removes overall ranking and renders team standings when a fixed pair league exists", () => {
     const state = createInitialState();
     state.groups = state.groups.map((group, index) => index === 0 ? { ...group, scheduleFormat: "fixed-pair-league" } : group);

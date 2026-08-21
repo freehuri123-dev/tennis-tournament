@@ -169,17 +169,21 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
   const teamBattleResult = useMemo(() => calculateTeamBattleResult(state.matches), [state.matches]);
   const hasFixedPairLeague = state.groups.some(isFixedPairLeagueFormat);
   const usesGroupOnlyRanking = hasTournamentFormat || hasFixedPairLeague || hasTeamBattle;
+  const hidesGroupRanking = scheduleLocked && tournamentType === "general" && !usesGroupOnlyRanking;
   const tabs: Array<[typeof activeTab, string]> = hasTeamBattle
     ? [["schedule", "대진표"], ["group", "팀 스코어"]]
     : hasTournamentFormat
       ? [["schedule", "대진표"], ["group", "결과"]]
+    : hidesGroupRanking
+      ? [["schedule", "대진표"], ["overall", "전체 순위"]]
     : usesGroupOnlyRanking
       ? [["schedule", "대진표"], ["group", "그룹 순위"]]
       : [["schedule", "대진표"], ["group", "그룹 순위"], ["overall", "전체 순위"]];
 
   useEffect(() => {
     if (usesGroupOnlyRanking && activeTab === "overall") setActiveTab("group");
-  }, [activeTab, usesGroupOnlyRanking]);
+    if (hidesGroupRanking && activeTab === "group") setActiveTab("overall");
+  }, [activeTab, hidesGroupRanking, usesGroupOnlyRanking]);
 
   function renderPublicMatch(group: TournamentGroup, match: Match, teamBattleRoundNumber?: number) {
     return hasTeamBattle ? (
@@ -344,7 +348,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
             </section>
           )}
 
-          {activeTab === "group" && (
+          {activeTab === "group" && !hidesGroupRanking && (
             <section className="section-card stack tab-panel" key="group">
               <strong className="section-head">{hasTeamBattle ? "청백전 팀 스코어" : hasTournamentFormat ? "토너먼트 결과" : "그룹별 순위"}</strong>
               {!hasTournamentFormat && !hasTeamBattle && renderGroupTabs(rankingGroupId, setActiveRankingGroupId)}
