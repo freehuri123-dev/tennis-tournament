@@ -9,6 +9,7 @@ const migrationPath = join(
   "20260821010000_add_play_tennis_event",
   "migration.sql"
 );
+const seedPath = join(process.cwd(), "prisma", "seed.ts");
 
 const approvedRoster = [
   ["pt-m01", "감독진", "male", "7"],
@@ -84,6 +85,10 @@ function migrationSql() {
   return readFileSync(migrationPath, "utf8");
 }
 
+function seedSource() {
+  return readFileSync(seedPath, "utf8");
+}
+
 function insertRows(sql: string, table: string) {
   const block = sql.match(new RegExp(`INSERT INTO "${table}"[\\s\\S]*?VALUES\\s*([\\s\\S]*?)\\s*ON CONFLICT`));
   expect(block, `missing conflict-safe ${table} insert`).not.toBeNull();
@@ -152,5 +157,40 @@ describe("Play Tennis event migration", () => {
     expect([...appearances.entries()].sort()).toEqual(
       approvedRoster.map(([memberId]) => [memberId, 4] as const).sort()
     );
+  });
+
+  it("keeps the disposable seed identity, roster, draw, and policies consistent", () => {
+    const seed = seedSource();
+    const rosterBlock = seed.match(/const playTennisMembers[^=]*= \[([\s\S]*?)\n\];/);
+    const matchBlock = seed.match(/const playTennisMatches = \[([\s\S]*?)\n\];/);
+    expect(rosterBlock).not.toBeNull();
+    expect(matchBlock).not.toBeNull();
+
+    const seedRoster = [...rosterBlock![1].matchAll(
+      /\{ id: "(pt-m\d{2})", name: "([^"]+)", gender: "(male|female)", level: "(\d+)" \}/g
+    )].map((values) => values.slice(1));
+    const seedPairings = [...matchBlock![1].matchAll(
+      /\{ id: "(pt-event-r\d-c\d)", sideAPlayerIds: \["(pt-m\d{2})", "(pt-m\d{2})"\], sideBPlayerIds: \["(pt-m\d{2})", "(pt-m\d{2})"\] \}/g
+    )].map((values) => [values[1], [values[2], values[3]], [values[4], values[5]]]);
+
+    expect(seed).toContain('id: seedClub.slug === "pt" ? "pt" : undefined');
+    expect(seedRoster).toEqual(approvedRoster);
+    expect(seedPairings).toEqual(approvedPairings);
+    expect(seed).toContain('id: "pt-tournament-20260822"');
+    expect(seed).toContain('id: "pt-event-group"');
+    expect(seed).toContain('date: toDbDate("2026-08-22")');
+    expect(seed).toContain('publicSlug: "2822"');
+    expect(seed).toContain('rankingExcludedMemberIds: ["pt-m01", "pt-m02"]');
+    expect(seed).toContain("scheduleLocked: true");
+    expect(seed).toContain("includeInClubRecords: false");
+  });
+
+  it("preserves entered scores and status when the migration is retried", () => {
+    const sql = migrationSql();
+    const matchUpsert = sql.match(
+      /INSERT INTO "Match"[\s\S]*?ON CONFLICT \("id"\) DO UPDATE\s+SET ([\s\S]*?);/
+    );
+    expect(matchUpsert).not.toBeNull();
+    expect(matchUpsert![1]).not.toMatch(/"(?:sideAScore|sideBScore|status)"\s*=/);
   });
 });

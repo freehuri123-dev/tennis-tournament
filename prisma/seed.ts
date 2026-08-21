@@ -131,6 +131,7 @@ async function main() {
   for (const seedClub of clubs) {
     const club = await prisma.club.create({
       data: {
+        id: seedClub.slug === "pt" ? "pt" : undefined,
         slug: seedClub.slug,
         name: seedClub.name,
         shortName: seedClub.shortName
