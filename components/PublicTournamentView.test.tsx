@@ -91,6 +91,32 @@ describe("PublicTournamentView auto refresh", () => {
     expect(container.querySelector(".public-records-link")).toBeNull();
   });
 
+  it("falls back to the legacy schedule without dropping matches when round metadata is partial", () => {
+    const state = createInitialState();
+    state.groups = [{ id: "mixed-group", tournamentId: state.tournament.id, name: "전체", scheduleFormat: "random", sortOrder: 1 }];
+    state.groupMemberIds = { "mixed-group": state.members.slice(0, 4).map((member) => member.id) };
+    const baseMatch = {
+      tournamentId: state.tournament.id,
+      groupId: "mixed-group",
+      sideAPlayerIds: state.members.slice(0, 2).map((member) => member.id),
+      sideBPlayerIds: state.members.slice(2, 4).map((member) => member.id),
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled" as const
+    };
+    state.matches = [
+      { ...baseMatch, id: "explicit-match", matchNumber: 1, sortOrder: 1, roundNumber: 1 },
+      { ...baseMatch, id: "legacy-match", matchNumber: 2, sortOrder: 2 }
+    ];
+
+    const { container } = render(<PublicTournamentView state={state} slug={state.tournament.publicSlug} clubSlug="stc" />);
+
+    expect(container.querySelectorAll(".explicit-round-card")).toHaveLength(0);
+    expect(container.querySelectorAll(".public-phone-view .public-match-card")).toHaveLength(2);
+    expect(container.querySelector(".public-phone-view")?.textContent).toContain("경기 1");
+    expect(container.querySelector(".public-phone-view")?.textContent).toContain("경기 2");
+  });
+
   it("renders persisted event rounds and court labels without the internal format badge", () => {
     const state = createInitialState();
     const tournament = { ...state.tournament, scheduleLocked: true };

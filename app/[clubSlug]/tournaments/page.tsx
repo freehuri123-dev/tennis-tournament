@@ -6,6 +6,7 @@ import { PendingLink } from "@/components/PendingLink";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TournamentCreateForm } from "@/components/TournamentCreateForm";
 import { buildClubPath, isKnownClubSlug, type ClubSlug } from "@/lib/domain/club";
+import { isScheduleLocked } from "@/lib/domain/tournament-policy";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import { createTournamentAction, deleteTournamentAction } from "@/lib/server/actions/tournament-actions";
 import { listTournamentsByClub } from "@/lib/server/repositories/tournament-repository";
@@ -59,13 +60,15 @@ async function TournamentListPage({ clubSlug, tab }: { clubSlug: ClubSlug; tab: 
                     <span>{tournament.type === "team-battle" ? "청백전 · 단체전" : tournament.type === "tournament" ? "토너먼트" : "일반 대회"}</span>
                   </div>
                 </PendingLink>
-                <ConfirmActionForm action={deleteTournamentAction} confirmMessage="대회를 삭제하시겠습니까?" pendingLabel="대회 삭제 중...">
-                  <input name="clubSlug" type="hidden" value={clubSlug} />
-                  <input name="id" type="hidden" value={tournament.id} />
-                  <PendingButton className="icon-danger-button tournament-delete-button" pendingLabel="삭제 중...">
-                    <Trash2 size={20} />
-                  </PendingButton>
-                </ConfirmActionForm>
+                {!isScheduleLocked(tournament) && (
+                  <ConfirmActionForm action={deleteTournamentAction} confirmMessage="대회를 삭제하시겠습니까?" pendingLabel="대회 삭제 중...">
+                    <input name="clubSlug" type="hidden" value={clubSlug} />
+                    <input name="id" type="hidden" value={tournament.id} />
+                    <PendingButton className="icon-danger-button tournament-delete-button" pendingLabel="삭제 중...">
+                      <Trash2 size={20} />
+                    </PendingButton>
+                  </ConfirmActionForm>
+                )}
               </div>
             ))}
             {visibleTournaments.length === 0 && <p className="lead">표시할 대회가 없습니다.</p>}

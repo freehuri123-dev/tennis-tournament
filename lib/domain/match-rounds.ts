@@ -6,10 +6,13 @@ export type ExplicitMatchRound = {
 };
 
 export function groupMatchesByExplicitRound(matches: Match[]): ExplicitMatchRound[] {
+  if (matches.length === 0 || matches.some((match) => !Number.isInteger(match.roundNumber) || (match.roundNumber ?? 0) < 1)) {
+    return [];
+  }
+
   const rounds = new Map<number, Match[]>();
 
   for (const match of matches) {
-    if (!Number.isInteger(match.roundNumber) || (match.roundNumber ?? 0) < 1) continue;
     const roundNumber = match.roundNumber as number;
     const roundMatches = rounds.get(roundNumber) ?? [];
     roundMatches.push(match);

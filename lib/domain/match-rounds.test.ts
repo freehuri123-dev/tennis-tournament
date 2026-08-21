@@ -22,4 +22,11 @@ describe("groupMatchesByExplicitRound", () => {
   it("returns no explicit rounds when round metadata is absent", () => {
     expect(groupMatchesByExplicitRound([{ ...match }])).toEqual([]);
   });
+
+  it("falls back when any match is missing valid round metadata", () => {
+    expect(groupMatchesByExplicitRound([
+      { ...match, id: "r1c1", roundNumber: 1 },
+      { ...match, id: "legacy", roundNumber: null, sortOrder: 2 }
+    ])).toEqual([]);
+  });
 });
