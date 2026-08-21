@@ -2,7 +2,7 @@
 
 ## Status
 
-Completed and committed as 5df18e2 (feat: register Play Tennis club).
+Completed and committed as 4a2e05fe35031e3e5180bb9d4f5bc1de51899498 (feat: register Play Tennis club).
 
 ## Changed files
 
@@ -32,3 +32,11 @@ GREEN:
 - No asset files or unrelated source changes were added.
 - git diff --check completed without whitespace errors.
 - Existing clubs and admin-session signing behavior remain covered by the regression suite.
+## Fix round 1
+
+- Corrected Play Tennis metadata to organizationLabel "클럽" and tournamentLabel "클럽대회".
+- Updated lib/domain/club.test.ts to assert both exact labels before implementation; RED showed 19/20 focused tests passing with the metadata assertion failing.
+- Focused GREEN: 4 test files passed, 20 tests passed.
+- Build: npm run build exited 0; Prisma client generated, Next.js compiled successfully, TypeScript validity checks completed, and static pages generated 10/10.
+- Fix round changed files: 2 (lib/domain/club.ts and lib/domain/club.test.ts).
+- Fix commit: 5cbf92e8a6d45ab6907b4eba085a04c195e9af40 (fix: correct Play Tennis club labels).
