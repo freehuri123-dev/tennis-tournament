@@ -3,7 +3,7 @@ import { deleteMemberAction } from "./actions/member-actions";
 import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "./actions/match-actions";
 import { createTournamentAction, deleteTournamentAction, persistTournamentStateAction, updateTournamentDateAction, updateTournamentNameAction } from "./actions/tournament-actions";
 import type { TournamentState } from "../store/tournament-store";
-import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema } from "./validation";
+import { matchScoreInputSchema, memberInputSchema, tournamentInputSchema, tournamentMatchStatesInputSchema } from "./validation";
 
 const { deleteTournament, redirect, revalidatePath, requireAdmin, replaceTournamentState, softDeleteMember, updateMatchScore, updateTournamentDate, updateTournamentMatchStates, updateTournamentName, upsertTournament } = vi.hoisted(() => ({
   deleteTournament: vi.fn(),
@@ -60,6 +60,30 @@ describe("server action validation", () => {
     });
   });
 
+  it("accepts six and null resets but rejects seven for single match scores", () => {
+    expect(matchScoreInputSchema.safeParse({ matchId: "match-1", sideAScore: 6, sideBScore: 0 }).success).toBe(true);
+    expect(matchScoreInputSchema.safeParse({ matchId: "match-1", sideAScore: null, sideBScore: null }).success).toBe(true);
+    expect(matchScoreInputSchema.safeParse({ matchId: "match-1", sideAScore: 7, sideBScore: 0 }).success).toBe(false);
+  });
+
+  it("accepts six and null resets but rejects seven for bulk match scores", () => {
+    const makeInput = (sideAScore: number | null, sideBScore: number | null) => ({
+      publicSlug: "1234",
+      matches: [{
+        matchId: "match-1",
+        sideAPlayerIds: ["member-1", "member-2"],
+        sideBPlayerIds: ["member-3", "member-4"],
+        sideAScore,
+        sideBScore,
+        status: sideAScore === null || sideBScore === null ? "scheduled" : "completed"
+      }]
+    });
+
+    expect(tournamentMatchStatesInputSchema.safeParse(makeInput(6, 0)).success).toBe(true);
+    expect(tournamentMatchStatesInputSchema.safeParse(makeInput(null, null)).success).toBe(true);
+    expect(tournamentMatchStatesInputSchema.safeParse(makeInput(7, 0)).success).toBe(false);
+  });
+
   it("accepts valid tournament input", () => {
     expect(
       tournamentInputSchema.parse({
@@ -98,6 +122,20 @@ describe("server action validation", () => {
     expect(requireAdmin).toHaveBeenCalledWith("stc");
     expect(softDeleteMember).toHaveBeenCalledWith("stc", "member-1");
     expect(revalidatePath).toHaveBeenCalledWith("/stc/members");
+  });
+
+  it("propagates a clear error when deleting a member referenced by a locked schedule", async () => {
+    softDeleteMember.mockRejectedValueOnce(new Error("잠긴 대회 대진표에 포함된 회원은 삭제할 수 없습니다."));
+    const formData = new FormData();
+    formData.set("clubSlug", "pt");
+    formData.set("id", "pt-m01");
+
+    await expect(deleteMemberAction(formData))
+      .rejects.toThrow("잠긴 대회 대진표에 포함된 회원은 삭제할 수 없습니다.");
+
+    expect(requireAdmin).toHaveBeenCalledWith("pt");
+    expect(softDeleteMember).toHaveBeenCalledWith("pt", "pt-m01");
+    expect(redirect).not.toHaveBeenCalledWith("/pt/members");
   });
 
   it("creates a default tournament for the requested club", async () => {

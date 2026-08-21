@@ -3,7 +3,7 @@ import { Trash2 } from "lucide-react";
 import { ConfirmActionForm, FormPendingOverlay, PendingButton } from "@/components/ActionFormControls";
 import { AppShell } from "@/components/AppShell";
 import { buildClubPath, type ClubSlug } from "@/lib/domain/club";
-import { normalizeTeamGrade } from "@/lib/domain/team-battle";
+import { getMemberLevelLabel, PLAY_TENNIS_LEVELS } from "@/lib/domain/member-level";
 import type { Member } from "@/lib/domain/types";
 import { deleteMemberAction, saveMemberAction } from "@/lib/server/actions/member-actions";
 
@@ -38,11 +38,10 @@ export function MemberForm({ member, clubSlug = "stc" }: MemberFormProps) {
             </label>
             <label className="field boxed-field">
               <span>등급</span>
-              <select defaultValue={normalizeTeamGrade(member?.level)} name="level">
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
-                <option value="D">D</option>
+              <select defaultValue={getMemberLevelLabel(member?.level, clubSlug)} name="level">
+                {(clubSlug === "pt" ? PLAY_TENNIS_LEVELS : ["A", "B", "C", "D"]).map((level) => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
               </select>
             </label>
             <label className="field boxed-field">

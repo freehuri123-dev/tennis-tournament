@@ -50,4 +50,3 @@ describe("ClubTournamentsPage", () => {
     expect(editableRow!.querySelector(".tournament-delete-button")).not.toBeNull();
   });
 });
-

@@ -12,10 +12,11 @@ import { getClubBySlug, type ClubSlug } from "@/lib/domain/club";
 import { getClubShareContent } from "@/lib/domain/club-share";
 import { openKakaoTournamentShare } from "@/lib/domain/kakao-share";
 import { groupMatchesByExplicitRound } from "@/lib/domain/match-rounds";
+import { getMemberLevelLabel } from "@/lib/domain/member-level";
 import { calculateFixedPairRankings, calculateRankings } from "@/lib/domain/ranking";
 import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
-import { balanceTeamAssignments, calculateTeamBattleResult, calculateTeamBattleSideGamePlan, generateTeamBattleMatches, getTeamBattleTargetAppearances, groupTeamBattleMatchesByRound, normalizeTeamGrade } from "@/lib/domain/team-battle";
+import { balanceTeamAssignments, calculateTeamBattleResult, calculateTeamBattleSideGamePlan, generateTeamBattleMatches, getTeamBattleTargetAppearances, groupTeamBattleMatchesByRound } from "@/lib/domain/team-battle";
 import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
 import { isScheduleLocked, rankingMembersForTournament } from "@/lib/domain/tournament-policy";
@@ -1308,7 +1309,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         <div className="participant-list">
                           {teamMembers.map((member) => (
                             <button className="participant-option active" disabled={isCompleted} key={member.id} onClick={() => setTeamSide(member.id, side === "blue" ? "white" : "blue")} type="button">
-                              <span className="order-badge">{normalizeTeamGrade(member.level)}</span>
+                              <span className="order-badge">{getMemberLevelLabel(member.level, clubSlug)}</span>
                               <strong>{member.name}</strong>
                               <small>{side === "blue" ? "백팀으로 이동" : "청팀으로 이동"}</small>
                             </button>
@@ -1417,7 +1418,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   <div className="participant-list">
                     {unassignedTeamMembers.map((member) => (
                       <div className="participant-option" key={member.id}>
-                        <span className="order-badge">{normalizeTeamGrade(member.level)}</span>
+                        <span className="order-badge">{getMemberLevelLabel(member.level, clubSlug)}</span>
                         <strong>{member.name}</strong>
                         <span className="team-assign-actions">
                           <button disabled={isCompleted} onClick={() => setTeamSide(member.id, "blue")} type="button">청팀</button>

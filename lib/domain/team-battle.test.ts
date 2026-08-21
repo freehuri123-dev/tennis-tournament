@@ -19,6 +19,19 @@ describe("team battle", () => {
     expect(teamGradeWeight(member("b", "B"))).toBe(3);
     expect(teamGradeWeight(member("c", "C"))).toBe(2);
     expect(teamGradeWeight(member("d", "D"))).toBe(1);
+    expect(teamGradeWeight(member("seven", "7"))).toBe(7);
+    expect(teamGradeWeight(member("one", "1"))).toBe(1);
+  });
+
+  it("balances Play Tennis numeric levels by their numeric strength", () => {
+    const members = [member("p7", "7"), member("p6", "6"), member("p2", "2"), member("p1", "1")];
+    const assignments = balanceTeamAssignments(members);
+    const strength = (side: "blue" | "white") => members
+      .filter((item) => assignments[item.id] === side)
+      .reduce((sum, item) => sum + teamGradeWeight(item), 0);
+
+    expect(strength("blue")).toBe(8);
+    expect(strength("white")).toBe(8);
   });
 
   it("balances uneven rosters by count and average grade strength", () => {

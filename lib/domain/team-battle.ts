@@ -16,7 +16,6 @@ export type TeamBattleResult = {
 };
 
 export type TeamGrade = "A" | "B" | "C" | "D";
-const TEAM_GRADE_ORDER: TeamGrade[] = ["A", "B", "C", "D"];
 
 export function normalizeTeamGrade(level?: string): TeamGrade {
   const normalized = level?.trim().toUpperCase() ?? "";
@@ -26,8 +25,14 @@ export function normalizeTeamGrade(level?: string): TeamGrade {
   return "B";
 }
 
+function numericTeamLevel(level?: string): number | null {
+  const value = level?.trim() ?? "";
+  if (!/^[1-7]$/.test(value)) return null;
+  return Number(value);
+}
+
 export function teamGradeWeight(member: Pick<Member, "level">): number {
-  return { A: 4, B: 3, C: 2, D: 1 }[normalizeTeamGrade(member.level)];
+  return numericTeamLevel(member.level) ?? { A: 4, B: 3, C: 2, D: 1 }[normalizeTeamGrade(member.level)];
 }
 
 function assignmentBalance(
@@ -168,15 +173,21 @@ function repeatedCombinationPenalty(counts: Map<string, number>) {
 }
 
 type FeaturedSameGradeMatch = {
-  grade: TeamGrade;
+  grade: string;
   blueIds: [string, string];
   whiteIds: [string, string];
 };
 
+function normalizedTeamLevel(level?: string): string {
+  return String(numericTeamLevel(level) ?? normalizeTeamGrade(level));
+}
+
 function findFeaturedSameGradeMatch(blueMembers: Member[], whiteMembers: Member[]): FeaturedSameGradeMatch | null {
-  for (const grade of TEAM_GRADE_ORDER) {
-    const blueIds = blueMembers.filter((member) => normalizeTeamGrade(member.level) === grade).map((member) => member.id);
-    const whiteIds = whiteMembers.filter((member) => normalizeTeamGrade(member.level) === grade).map((member) => member.id);
+  const levels = [...new Set([...blueMembers, ...whiteMembers].map((member) => normalizedTeamLevel(member.level)))]
+    .sort((left, right) => teamGradeWeight({ level: right }) - teamGradeWeight({ level: left }));
+  for (const grade of levels) {
+    const blueIds = blueMembers.filter((member) => normalizedTeamLevel(member.level) === grade).map((member) => member.id);
+    const whiteIds = whiteMembers.filter((member) => normalizedTeamLevel(member.level) === grade).map((member) => member.id);
     if (blueIds.length >= 2 && whiteIds.length >= 2) {
       return { grade, blueIds: [blueIds[0], blueIds[1]], whiteIds: [whiteIds[0], whiteIds[1]] };
     }

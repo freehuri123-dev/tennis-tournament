@@ -483,12 +483,33 @@ export async function deleteTournament(clubSlug: ClubSlug, tournamentId: string)
 export async function softDeleteMember(clubSlug: ClubSlug, memberId: string): Promise<void> {
   const prisma = await getPrisma();
   const club = await getClubOrThrow(clubSlug);
-  const result = await prisma.member.updateMany({
-    where: { id: memberId, clubId: club.id },
-    data: { active: false, deleted: true }
-  });
 
-  if (result.count !== 1) throw new Error(`Member not found: ${memberId}`);
+  await prisma.$transaction(async (transaction) => {
+    const lockedTournament = await transaction.tournament.findFirst({
+      where: {
+        clubId: club.id,
+        scheduleLocked: true,
+        OR: [
+          { participants: { some: { memberId } } },
+          { groups: { some: { members: { some: { memberId } } } } },
+          { matches: { some: { OR: [
+            { sideAPlayerIds: { has: memberId } },
+            { sideBPlayerIds: { has: memberId } }
+          ] } } }
+        ]
+      },
+      select: { id: true }
+    });
+    if (lockedTournament) {
+      throw new Error("잠긴 대회 대진표에 포함된 회원은 삭제할 수 없습니다.");
+    }
+
+    const result = await transaction.member.updateMany({
+      where: { id: memberId, clubId: club.id },
+      data: { active: false, deleted: true }
+    });
+    if (result.count !== 1) throw new Error(`Member not found: ${memberId}`);
+  });
 }
 
 export async function updateMatchScore(clubSlug: ClubSlug, input: MatchScoreInput): Promise<Match> {

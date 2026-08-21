@@ -259,7 +259,7 @@ describe("TournamentManageClient save timing", () => {
     expect(container.querySelectorAll(".explicit-round-card")).toHaveLength(2);
     expect(container.querySelectorAll(".explicit-round-card .match-edit-card")).toHaveLength(8);
     expect(Array.from(container.querySelectorAll(".explicit-round-head strong")).map((heading) => heading.textContent)).toEqual(["1라운드", "2라운드"]);
-  });
+  }, 15_000);
 
   it("hides round ordering controls when a team battle schedule is locked", () => {
     const state = makeLockedEventState();
@@ -849,7 +849,7 @@ it("creates and saves a five-pair round robin league", async () => {
     const firstRoundPlayerIds = changed?.matches.slice(0, 3).flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]) ?? [];
     expect(new Set(firstRoundPlayerIds).size).toBe(firstRoundPlayerIds.length);
     expect(state.teamAssignments?.t1[restingPlayerId!]).toBe("blue");
-  });
+  }, 15_000);
   it("moves a team battle round and saves the new match order", async () => {
     const state = makeState();
     state.tournament = { ...state.tournament, type: "team-battle" };

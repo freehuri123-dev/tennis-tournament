@@ -39,8 +39,8 @@ export const scheduleFormatSchema = z.enum(["hanul-aa", "kdk-v2010", "random", "
 
 export const matchScoreInputSchema = z.object({
   matchId: z.string().trim().min(1),
-  sideAScore: z.number().int().min(0).max(99).nullable(),
-  sideBScore: z.number().int().min(0).max(99).nullable()
+  sideAScore: z.number().int().min(0).max(6).nullable(),
+  sideBScore: z.number().int().min(0).max(6).nullable()
 });
 export const tournamentMatchStatesInputSchema = z.object({
   publicSlug: z.string().trim().min(1),
@@ -48,8 +48,8 @@ export const tournamentMatchStatesInputSchema = z.object({
     matchId: z.string().trim().min(1),
     sideAPlayerIds: z.array(z.string().trim().min(1)).max(2),
     sideBPlayerIds: z.array(z.string().trim().min(1)).max(2),
-    sideAScore: z.number().int().min(0).max(99).nullable(),
-    sideBScore: z.number().int().min(0).max(99).nullable(),
+    sideAScore: z.number().int().min(0).max(6).nullable(),
+    sideBScore: z.number().int().min(0).max(6).nullable(),
     status: z.enum(["scheduled", "completed"])
   })).min(1).max(32)
 });

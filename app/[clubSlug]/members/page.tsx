@@ -2,7 +2,7 @@ import { Mars, PhoneCall, Plus, Search, Venus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { InvalidClubPage } from "@/components/InvalidClubPage";
 import { PendingLink } from "@/components/PendingLink";
-import { normalizeTeamGrade } from "@/lib/domain/team-battle";
+import { getMemberLevelLabel } from "@/lib/domain/member-level";
 import { buildClubPath, isKnownClubSlug } from "@/lib/domain/club";
 import { requireAdmin } from "@/lib/server/auth/admin-session";
 import { listMembersByClub } from "@/lib/server/repositories/tournament-repository";
@@ -56,7 +56,7 @@ export default async function ClubMembersPage({
                       {member.gender === "female" ? <Venus size={20} /> : <Mars size={20} />}
                     </span>
                     <div>
-                      <span className="member-name-row"><strong className="member-name">{member.name}</strong><em className={`member-level-badge grade-${normalizeTeamGrade(member.level).toLowerCase()}`}>{normalizeTeamGrade(member.level)}</em></span>
+                      <span className="member-name-row"><strong className="member-name">{member.name}</strong><em className={`member-level-badge grade-${getMemberLevelLabel(member.level, clubSlug).toLowerCase()}`}>{getMemberLevelLabel(member.level, clubSlug)}</em></span>
                       <span className="member-phone">{maskPhone(member.phone)}</span>
                     </div>
                   </div>

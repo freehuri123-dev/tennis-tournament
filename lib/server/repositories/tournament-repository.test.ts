@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TournamentState } from "../../store/tournament-store";
-import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadClubRecordData, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentDate, updateTournamentMatchStates, updateTournamentName, upsertTournament } from "./tournament-repository";
+import { deleteTournament, fromDbScheduleFormat, listMembersByClub, listTournamentsByClub, loadClubRecordData, loadPublicTournamentState, loadTournamentStateFromDb, replaceTournamentState, softDeleteMember, toDbScheduleFormat, toDomainDate, updateMatchScore, updateTournamentDate, updateTournamentMatchStates, updateTournamentName, upsertTournament } from "./tournament-repository";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
     $transaction: vi.fn(),
     club: { findUnique: vi.fn() },
-    member: { findMany: vi.fn() },
+    member: { findMany: vi.fn(), updateMany: vi.fn() },
     match: { createMany: vi.fn(), deleteMany: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateManyAndReturn: vi.fn() },
     tournament: { delete: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     tournamentGroup: { createMany: vi.fn(), deleteMany: vi.fn() },
@@ -21,6 +21,44 @@ describe("tournament repository mapping", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prisma.$transaction.mockImplementation((input) => Array.isArray(input) ? Promise.all(input) : input(prisma));
+  });
+
+  it("prevents deleting a member referenced by a locked tournament schedule", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "pt", slug: "pt" });
+    prisma.tournament.findFirst.mockResolvedValue({ id: "pt-event" });
+
+    await expect(softDeleteMember("pt", "pt-m01"))
+      .rejects.toThrow("잠긴 대회 대진표에 포함된 회원은 삭제할 수 없습니다.");
+
+    expect(prisma.tournament.findFirst).toHaveBeenCalledWith({
+      where: {
+        clubId: "pt",
+        scheduleLocked: true,
+        OR: [
+          { participants: { some: { memberId: "pt-m01" } } },
+          { groups: { some: { members: { some: { memberId: "pt-m01" } } } } },
+          { matches: { some: { OR: [
+            { sideAPlayerIds: { has: "pt-m01" } },
+            { sideBPlayerIds: { has: "pt-m01" } }
+          ] } } }
+        ]
+      },
+      select: { id: true }
+    });
+    expect(prisma.member.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("allows deleting a member not referenced by any locked tournament schedule", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "pt", slug: "pt" });
+    prisma.tournament.findFirst.mockResolvedValue(null);
+    prisma.member.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(softDeleteMember("pt", "pt-free-member")).resolves.toBeUndefined();
+
+    expect(prisma.member.updateMany).toHaveBeenCalledWith({
+      where: { id: "pt-free-member", clubId: "pt" },
+      data: { active: false, deleted: true }
+    });
   });
 
   it.each([
