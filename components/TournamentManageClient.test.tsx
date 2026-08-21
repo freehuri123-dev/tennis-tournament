@@ -274,6 +274,19 @@ describe("TournamentManageClient save timing", () => {
     expect(screen.getAllByLabelText("위쪽 팀 점수")).toHaveLength(8);
   });
 
+  it("describes numeric team-battle levels for Play Tennis and keeps A through D guidance elsewhere", () => {
+    const state = makeState();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
+
+    const ptView = render(<TournamentManageClient initialState={state} clubSlug="pt" />);
+    expect(screen.getByText("회원 레벨 1~7을 기준으로 전력을 맞춥니다. 설정한 라운드와 코트 수에 맞춰 모든 코트를 채웁니다.")).toBeTruthy();
+    ptView.unmount();
+
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    expect(screen.getByText("회원 등급 A/B/C/D를 기준으로 전력을 맞춥니다. 설정한 라운드와 코트 수에 맞춰 모든 코트를 채웁니다.")).toBeTruthy();
+  });
+
   it("keeps participant clicks local until schedules are generated", () => {
     render(<TournamentManageClient initialState={makeState()} clubSlug="stc" />);
 

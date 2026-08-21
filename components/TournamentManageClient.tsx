@@ -1295,7 +1295,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   <strong className="section-head">청백 팀 편성</strong>
                   <button className="ghost-button team-balance-button" disabled={isCompleted || tournamentParticipants.length < 4} onClick={autoBalanceTeams} type="button">자동밸런스</button>
                 </div>
-                <p className="notice-text team-battle-setup-notice">회원 등급 A/B/C/D를 기준으로 전력을 맞춥니다. 설정한 라운드와 코트 수에 맞춰 모든 코트를 채웁니다.</p>
+                <p className="notice-text team-battle-setup-notice">{clubSlug === "pt" ? "회원 레벨 1~7을 기준으로 전력을 맞춥니다. 설정한 라운드와 코트 수에 맞춰 모든 코트를 채웁니다." : "회원 등급 A/B/C/D를 기준으로 전력을 맞춥니다. 설정한 라운드와 코트 수에 맞춰 모든 코트를 채웁니다."}</p>
                 {unassignedTeamMembers.length > 0 && <p className="notice-text">미배정 {unassignedTeamMembers.length}명 · 자동 밸런스를 누르거나 아래에서 팀을 선택해주세요.</p>}
                 <div className="team-battle-grid">
                   {(["blue", "white"] as const).map((side) => {
