@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { signAdminSessionValue, verifyAdminSessionValue } from "./admin-session";
 
 describe("admin session signing", () => {
+  it("clears the Play Tennis admin cookie on logout", () => {
+    const source = readFileSync("lib/server/auth/admin-session.ts", "utf8");
+
+    expect(source).toContain('cookieStore.delete(getAdminSessionCookieName("pt"));');
+  });
   it("verifies a signed session with the same secret", () => {
     const value = signAdminSessionValue("same-secret");
 

@@ -30,6 +30,13 @@ describe("RouteSplashScreen", () => {
     expect(firstSplash.dataset.club).toBe("stc");
   });
 
+  it("shows the Play Tennis splash for Play Tennis routes", () => {
+    route.pathname = "/pt/tournaments/manage";
+    render(<RouteSplashScreen />);
+
+    expect(screen.getByTestId("route-splash").dataset.club).toBe("pt");
+  });
+
   it("uses the public start label without remounting between public pages", () => {
     route.pathname = "/public/otc/2006";
     const view = render(<RouteSplashScreen />);

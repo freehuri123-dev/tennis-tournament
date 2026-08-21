@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildClubPath, getClubBySlug, isKnownClubSlug } from "./club";
+import { getClubShareContent } from "./club-share";
 
 describe("club routing", () => {
   it("등록된 클럽/모임 slug만 허용한다", () => {
@@ -8,6 +9,7 @@ describe("club routing", () => {
     expect(isKnownClubSlug("joogo")).toBe(true);
     expect(isKnownClubSlug("army")).toBe(true);
     expect(isKnownClubSlug("queensday")).toBe(true);
+    expect(isKnownClubSlug("pt")).toBe(true);
     expect(isKnownClubSlug("admin")).toBe(false);
     expect(isKnownClubSlug("")).toBe(false);
   });
@@ -18,6 +20,7 @@ describe("club routing", () => {
     expect(buildClubPath("joogo", "tournaments")).toBe("/joogo/tournaments");
     expect(buildClubPath("army", "tournaments")).toBe("/army/tournaments");
     expect(buildClubPath("queensday", "tournaments")).toBe("/queensday/tournaments");
+    expect(buildClubPath("pt", "tournaments/manage")).toBe("/pt/tournaments/manage");
     expect(buildClubPath("stc")).toBe("/stc");
   });
 
@@ -32,5 +35,9 @@ describe("club routing", () => {
     expect(getClubBySlug("army")?.tournamentLabel).toBe("모임대회");
     expect(getClubBySlug("queensday")?.name).toBe("퀸즈데이");
     expect(getClubBySlug("queensday")?.organizationLabel).toBe("모임");
+    expect(getClubBySlug("pt")).toMatchObject({ name: "Play Tennis", shortName: "Play Tennis", organizationLabel: "\uB300\uD68C" });
+  });
+  it("uses the Play Tennis Kakao share image", () => {
+    expect(getClubShareContent("pt").imagePath).toBe("/kakao-share-pt.jpg");
   });
 });

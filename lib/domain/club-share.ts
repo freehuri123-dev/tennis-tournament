@@ -25,6 +25,10 @@ const clubShareContent: Record<ClubSlug, ClubShareContent> = {
   queensday: {
     description: "퀸즈데이 경기 일정과 실시간 순위를 확인하세요.",
     imagePath: "/kakao-share-queensday.jpg"
+  },
+  pt: {
+    description: "Play Tennis 경기 일정과 실시간 순위를 확인하세요.",
+    imagePath: "/kakao-share-pt.jpg"
   }
 };
 

@@ -97,5 +97,6 @@ export async function logoutAdminAction() {
   cookieStore.delete(getAdminSessionCookieName("joogo"));
   cookieStore.delete(getAdminSessionCookieName("army"));
   cookieStore.delete(getAdminSessionCookieName("queensday"));
+  cookieStore.delete(getAdminSessionCookieName("pt"));
   redirect("/stc/login");
 }

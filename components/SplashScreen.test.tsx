@@ -33,6 +33,10 @@ describe("SplashScreen", () => {
     expect(source).toContain('army: "/army_intro.jpg"');
   });
 
+  it("uses the Play Tennis intro image", () => {
+    expect(source).toContain('pt: "/pt_intro_summer_coast.webp"');
+  });
+
   it("uses the queensday intro image for the queensday meeting", () => {
     expect(source).toContain('queensday: "/queensday_intro_ai_design_1.webp"');
   });

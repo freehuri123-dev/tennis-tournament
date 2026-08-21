@@ -1,4 +1,4 @@
-export type ClubSlug = "stc" | "otc" | "joogo" | "army" | "queensday";
+export type ClubSlug = "stc" | "otc" | "joogo" | "army" | "queensday" | "pt";
 
 export type Club = {
   slug: ClubSlug;
@@ -14,7 +14,8 @@ export const clubs: Club[] = [
   { slug: "otc", name: "OTC 테니스 클럽", shortName: "OTC", organizationLabel: "클럽", tournamentLabel: "클럽대회" },
   { slug: "joogo", name: "주고받고", shortName: "주고받고", organizationLabel: "모임", tournamentLabel: "모임대회", seedSampleData: false },
   { slug: "army", name: "천하제일1사단", shortName: "천하제일1사단", organizationLabel: "모임", tournamentLabel: "모임대회", seedSampleData: false },
-  { slug: "queensday", name: "퀸즈데이", shortName: "퀸즈데이", organizationLabel: "모임", tournamentLabel: "모임대회", seedSampleData: false }
+  { slug: "queensday", name: "퀸즈데이", shortName: "퀸즈데이", organizationLabel: "모임", tournamentLabel: "모임대회", seedSampleData: false },
+  { slug: "pt", name: "Play Tennis", shortName: "Play Tennis", organizationLabel: "대회", tournamentLabel: "대회대회", seedSampleData: false }
 ];
 
 export function isKnownClubSlug(slug: string | undefined): slug is ClubSlug {
