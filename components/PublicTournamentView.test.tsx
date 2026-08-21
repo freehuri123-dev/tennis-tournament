@@ -91,6 +91,38 @@ describe("PublicTournamentView auto refresh", () => {
     expect(container.querySelector(".public-records-link")).toBeNull();
   });
 
+  it("renders persisted event rounds and court labels without the internal format badge", () => {
+    const state = createInitialState();
+    const tournament = { ...state.tournament, scheduleLocked: true };
+    state.tournament = tournament;
+    state.tournaments = [tournament];
+    state.groups = [{ id: "event-group", tournamentId: tournament.id, name: "이벤트", scheduleFormat: "random", sortOrder: 1 }];
+    state.groupMemberIds = { "event-group": state.members.slice(0, 4).map((member) => member.id) };
+    state.matches = Array.from({ length: 8 }, (_, index) => ({
+      id: `event-match-${index + 1}`,
+      tournamentId: tournament.id,
+      groupId: "event-group",
+      matchNumber: index + 1,
+      sideAPlayerIds: state.members.slice(0, 2).map((member) => member.id),
+      sideBPlayerIds: state.members.slice(2, 4).map((member) => member.id),
+      sideAScore: null,
+      sideBScore: null,
+      status: "scheduled" as const,
+      sortOrder: index + 1,
+      roundNumber: Math.floor(index / 4) + 1,
+      courtNumber: String((index % 4) + 1)
+    }));
+
+    const { container } = render(<PublicTournamentView state={state} slug={tournament.publicSlug} clubSlug="pt" />);
+
+    expect(container.querySelectorAll(".explicit-round-card")).toHaveLength(2);
+    expect(container.querySelectorAll(".explicit-round-card .public-match-card")).toHaveLength(8);
+    expect(screen.getByText("1라운드")).toBeTruthy();
+    expect(screen.getByText("2라운드")).toBeTruthy();
+    expect(container.querySelector(".explicit-round-card")?.textContent).toContain("1번 코트");
+    expect(container.querySelector(".group-format-badge")).toBeNull();
+  });
+
 it("removes overall ranking and renders team standings when a fixed pair league exists", () => {
     const state = createInitialState();
     state.groups = state.groups.map((group, index) => index === 0 ? { ...group, scheduleFormat: "fixed-pair-league" } : group);

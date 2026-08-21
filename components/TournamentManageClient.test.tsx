@@ -70,6 +70,21 @@ function makeStateWithMatch(): TournamentState {
   };
 }
 
+function makeLockedEventState(): TournamentState {
+  const state = makeStateWithMatch();
+  const tournament = { ...state.tournament, scheduleLocked: true };
+  return {
+    ...state,
+    tournament,
+    tournaments: [tournament],
+    matches: Array.from({ length: 8 }, (_, index) => ({
+      ...state.matches[0], id: `match-${index + 1}`, matchNumber: index + 1,
+      sortOrder: index + 1, roundNumber: Math.floor(index / 4) + 1,
+      courtNumber: String((index % 4) + 1)
+    }))
+  };
+}
+
 function makeHanulStateWithCustomOrder(): TournamentState {
   const state = makeState();
   const members = Array.from({ length: 10 }, (_, index) => ({
@@ -226,6 +241,37 @@ describe("TournamentManageClient save timing", () => {
     vi.useRealTimers();
     vi.clearAllMocks();
     window.sessionStorage.clear();
+  });
+
+  it("opens a locked event on the draw and keeps only score and ranking controls", () => {
+    const { container } = render(<TournamentManageClient initialState={makeLockedEventState()} clubSlug="pt" />);
+
+    expect(screen.queryByRole("button", { name: "설정" })).toBeNull();
+    expect(screen.getByRole("button", { name: "대진표" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "순위" })).toBeTruthy();
+    expect(screen.queryByLabelText("대회명")).toBeNull();
+    expect(screen.queryByLabelText("날짜")).toBeNull();
+    expect(screen.queryByRole("button", { name: "경기 추가" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "경기 삭제" })).toBeNull();
+    expect(screen.queryByText("선수 변경")).toBeNull();
+    expect(screen.getAllByLabelText("위쪽 팀 점수")).toHaveLength(8);
+    expect(screen.getAllByRole("button", { name: "점수 입력 완료" })).toHaveLength(8);
+    expect(container.querySelectorAll(".explicit-round-card")).toHaveLength(2);
+    expect(container.querySelectorAll(".explicit-round-card .match-edit-card")).toHaveLength(8);
+    expect(Array.from(container.querySelectorAll(".explicit-round-head strong")).map((heading) => heading.textContent)).toEqual(["1라운드", "2라운드"]);
+  });
+
+  it("hides round ordering controls when a team battle schedule is locked", () => {
+    const state = makeLockedEventState();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [state.tournament];
+    state.groups = [{ ...state.groups[0], scheduleFormat: "team-battle" }];
+    state.teamAssignments = { t1: { m1: "blue", m2: "blue", m3: "white", m4: "white" } };
+
+    render(<TournamentManageClient initialState={state} clubSlug="pt" />);
+
+    expect(screen.queryByLabelText("1라운드 순서 변경")).toBeNull();
+    expect(screen.getAllByLabelText("위쪽 팀 점수")).toHaveLength(8);
   });
 
   it("keeps participant clicks local until schedules are generated", () => {

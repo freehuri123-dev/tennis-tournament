@@ -4932,3 +4932,42 @@ body,
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
+
+.explicit-round-card {
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #cbded8;
+  border-radius: 8px;
+  background: #f7fbfa;
+}
+
+.explicit-round-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dce9e5;
+}
+
+.explicit-round-head > span {
+  color: #287f73;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.explicit-round-head > strong {
+  color: #173f3a;
+  font-size: 18px;
+}
+
+.explicit-round-head > small {
+  color: #607b77;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.public-explicit-round-card + .public-explicit-round-card {
+  margin-top: 4px;
+}

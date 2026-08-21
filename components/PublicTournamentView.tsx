@@ -8,8 +8,9 @@ import { RankingTable } from "./RankingTable";
 import { TeamRankingTable } from "./TeamRankingTable";
 import { TeamBattleContributionDetails, TeamBattleRoster } from "./TeamBattleDetails";
 import { getClubBySlug, type ClubSlug } from "../lib/domain/club";
+import { groupMatchesByExplicitRound } from "../lib/domain/match-rounds";
 import { calculateFixedPairRankings, calculateRankings } from "../lib/domain/ranking";
-import { rankingMembersForTournament } from "../lib/domain/tournament-policy";
+import { isScheduleLocked, rankingMembersForTournament } from "../lib/domain/tournament-policy";
 import { getFixedPairTournamentRoundCounts, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel } from "../lib/domain/schedule";
 import { getPublicTournamentAccess } from "../lib/domain/public-access";
 import { calculateTeamBattleResult, getTeamBattleRoundNumber, groupTeamBattleMatchesByRound } from "../lib/domain/team-battle";
@@ -28,6 +29,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
 
   const access = useMemo(() => getPublicTournamentAccess(slug, state.tournaments, state.deletedPublicSlugs), [slug, state.deletedPublicSlugs, state.tournaments]);
   const displayTournament = access.type === "live" ? access.tournament : state.tournament;
+  const scheduleLocked = isScheduleLocked(displayTournament);
   const tournamentType = displayTournament.type ?? (state.groups.some((group) => group.scheduleFormat === "team-battle") ? "team-battle" : state.groups.some((group) => group.scheduleFormat === "fixed-pair-tournament" || group.scheduleFormat === "single-tournament") ? "tournament" : "general");
   const clubName = getClubBySlug(clubSlug)?.name ?? "테니스 클럽";
   const publicPageTitle = `${clubName} - ${displayTournament.name} - 대진표`;
@@ -285,7 +287,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
                   <div className="today-card-top">
                     <div className="draw-group-title">
                       <strong>{displayGroupName(group.name)}</strong>
-                      <span className="group-format-badge">{getScheduleFormatLabel(group.scheduleFormat)}</span>
+                      {!scheduleLocked && <span className="group-format-badge">{getScheduleFormatLabel(group.scheduleFormat)}</span>}
                     </div>
                     <span className="group-chip">{matchesByGroupId.get(group.id)?.length ?? 0}경기</span>
                   </div>
@@ -319,6 +321,19 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
                         </details>
                       );
                     })
+                  ) : groupMatchesByExplicitRound(matchesByGroupId.get(group.id) ?? []).length > 0 ? (
+                    groupMatchesByExplicitRound(matchesByGroupId.get(group.id) ?? []).map((round) => (
+                      <section className="explicit-round-card public-explicit-round-card" key={`round-${round.roundNumber}`}>
+                        <div className="explicit-round-head">
+                          <span>ROUND {String(round.roundNumber).padStart(2, "0")}</span>
+                          <strong>{round.roundNumber}라운드</strong>
+                          <small>{round.matches.length}경기</small>
+                        </div>
+                        <div className="stack">
+                          {round.matches.map((match) => renderPublicMatch(group, match))}
+                        </div>
+                      </section>
+                    ))
                   ) : (
                     [...(matchesByGroupId.get(group.id) ?? [])]
                       .sort((a, b) => a.sortOrder - b.sortOrder)

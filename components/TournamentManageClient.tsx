@@ -11,13 +11,14 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { getClubBySlug, type ClubSlug } from "@/lib/domain/club";
 import { getClubShareContent } from "@/lib/domain/club-share";
 import { openKakaoTournamentShare } from "@/lib/domain/kakao-share";
+import { groupMatchesByExplicitRound } from "@/lib/domain/match-rounds";
 import { calculateFixedPairRankings, calculateRankings } from "@/lib/domain/ranking";
 import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
 import { balanceTeamAssignments, calculateTeamBattleResult, calculateTeamBattleSideGamePlan, generateTeamBattleMatches, getTeamBattleTargetAppearances, groupTeamBattleMatchesByRound, normalizeTeamGrade } from "@/lib/domain/team-battle";
 import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
-import { rankingMembersForTournament } from "@/lib/domain/tournament-policy";
+import { isScheduleLocked, rankingMembersForTournament } from "@/lib/domain/tournament-policy";
 import { withDateStatus } from "@/lib/domain/tournament-status";
 import type { Match, TeamSide, TournamentGroup } from "@/lib/domain/types";
 import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "@/lib/server/actions/match-actions";
@@ -89,9 +90,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     ? groupTeamBattleMatchesByRound(initialState.matches).length
     : 0;
   const [state, setState] = useState(initialState);
+  const scheduleLocked = isScheduleLocked(state.tournament);
   const [, startTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("setup");
+  const [activeTab, setActiveTab] = useState<TabId>(scheduleLocked ? "draw" : "setup");
   const [helpImage, setHelpImage] = useState<HelpImage>(null);
   const [participantPanelOpen, setParticipantPanelOpen] = useState(false);
   const [activeDrawGroupId, setActiveDrawGroupId] = useState<string | null>(null);
@@ -1218,11 +1220,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
         <section className="section-card">
           <div className="tab-row">
-            {[
-              ["setup", "설정"],
-              ["draw", "대진표"],
-              ["ranking", "순위"]
-            ].map(([id, label]) => (
+            {(scheduleLocked
+              ? [["draw", "대진표"], ["ranking", "순위"]]
+              : [["setup", "설정"], ["draw", "대진표"], ["ranking", "순위"]]
+            ).map(([id, label]) => (
               <button className={`tab-button ${activeTab === id ? "active" : ""}`} key={id} onClick={() => setActiveTab(id as TabId)} type="button">
                 {label}
               </button>
@@ -1230,7 +1231,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
           </div>
         </section>
 
-        {activeTab === "setup" && (
+        {!scheduleLocked && activeTab === "setup" && (
           <div className="tab-panel stack" key="setup">
             <section className="section-card stack">
               <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentType === "general" ? "일반 대회" : tournamentType === "team-battle" ? "청백전 · 단체전" : "토너먼트"}</span></div>
@@ -1718,9 +1719,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 <div className="today-card-top">
                   <div className="draw-group-title">
                     <strong>{displayGroupName(group)}</strong>
-                    <span className="group-format-badge">{getScheduleFormatLabel(group.scheduleFormat)}</span>
+                    {!scheduleLocked && <span className="group-format-badge">{getScheduleFormatLabel(group.scheduleFormat)}</span>}
                   </div>
-                  {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <button className="ghost-button" disabled={isCompleted} onClick={() => addMatch(group.id)} type="button">
+                  {!scheduleLocked && group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <button className="ghost-button" disabled={isCompleted} onClick={() => addMatch(group.id)} type="button">
                     <Plus size={18} />
                     경기 추가
                   </button>}
@@ -1728,22 +1729,33 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                 {group.scheduleFormat === "team-battle" && <TeamBattleRoster blueMembers={blueTeamMembers} whiteMembers={whiteTeamMembers} />}
                 {(group.scheduleFormat === "team-battle"
                   ? groupTeamBattleMatchesByRound(matchesByGroupId.get(group.id) ?? [])
-                  : [{ roundNumber: 0, matches: [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) }]
+                  : groupMatchesByExplicitRound(matchesByGroupId.get(group.id) ?? []).length > 0
+                    ? groupMatchesByExplicitRound(matchesByGroupId.get(group.id) ?? [])
+                    : [{ roundNumber: 0, matches: [...(matchesByGroupId.get(group.id) ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) }]
                 ).map((round, roundIndex, rounds) => (
-                  <section className={group.scheduleFormat === "team-battle" ? "team-battle-round-card admin-team-battle-round-card" : "stack"} key={`round-${round.roundNumber}`}>
+                  <section className={group.scheduleFormat === "team-battle" ? "team-battle-round-card admin-team-battle-round-card" : round.roundNumber > 0 ? "explicit-round-card stack" : "stack"} key={`round-${round.roundNumber}`}>
                     {group.scheduleFormat === "team-battle" && (
                       <div className="team-battle-round-card-head">
                         <span>ROUND {String(roundIndex + 1).padStart(2, "0")}</span>
                         <strong>{roundIndex + 1}라운드</strong>
                         <small>{round.matches.length}경기</small>
-                        <div className="round-order-controls" aria-label={`${roundIndex + 1}라운드 순서 변경`}>
-                          <button aria-label={`${roundIndex + 1}라운드 위로 이동`} className="round-order-button" disabled={isCompleted || roundIndex === 0} onClick={() => moveTeamBattleRound(group.id, round.roundNumber, "up")} type="button">
-                            <ChevronUp size={16} />
-                          </button>
-                          <button aria-label={`${roundIndex + 1}라운드 아래로 이동`} className="round-order-button" disabled={isCompleted || roundIndex === rounds.length - 1} onClick={() => moveTeamBattleRound(group.id, round.roundNumber, "down")} type="button">
-                            <ChevronDown size={16} />
-                          </button>
-                        </div>
+                        {!scheduleLocked && (
+                          <div className="round-order-controls" aria-label={`${roundIndex + 1}라운드 순서 변경`}>
+                            <button aria-label={`${roundIndex + 1}라운드 위로 이동`} className="round-order-button" disabled={isCompleted || roundIndex === 0} onClick={() => moveTeamBattleRound(group.id, round.roundNumber, "up")} type="button">
+                              <ChevronUp size={16} />
+                            </button>
+                            <button aria-label={`${roundIndex + 1}라운드 아래로 이동`} className="round-order-button" disabled={isCompleted || roundIndex === rounds.length - 1} onClick={() => moveTeamBattleRound(group.id, round.roundNumber, "down")} type="button">
+                              <ChevronDown size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {group.scheduleFormat !== "team-battle" && round.roundNumber > 0 && (
+                      <div className="explicit-round-head">
+                        <span>ROUND {String(round.roundNumber).padStart(2, "0")}</span>
+                        <strong>{round.roundNumber}라운드</strong>
+                        <small>{round.matches.length}경기</small>
                       </div>
                     )}
                     <div className={group.scheduleFormat === "team-battle" ? "team-battle-round-match-list" : "stack"}>
@@ -1756,7 +1768,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     const scoreReady = match.sideAScore !== null && match.sideBScore !== null;
                     return (
                     <div className="stack" key={match.id}>
-                      {byeSelection && (
+                      {!scheduleLocked && byeSelection && (
                         <div className="bye-selection-box">
                           <div>
                             <strong>부전승 선택</strong>
@@ -1780,7 +1792,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       )}
                     <div className="match-edit-card stack" id={`match-${match.id}`}>
                       <div className="tournament-round-head match-edit-head">
-                        <span>{group.scheduleFormat === "team-battle" ? `${round.roundNumber}라운드` : isTournamentFormat(group) ? tournamentMatchRoundLabel(group, match) : displayGroupName(group)}</span>
+                        <span>{group.scheduleFormat === "team-battle" || match.roundNumber ? `${round.roundNumber}라운드` : isTournamentFormat(group) ? tournamentMatchRoundLabel(group, match) : displayGroupName(group)}</span>
                         <strong>경기 {match.sortOrder}</strong>
                         {match.courtNumber && <em className="court-badge tournament-round-court">{courtLabel(match)}</em>}
                       </div>
@@ -1821,7 +1833,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           </button>
                         )}
                       </div>
-                      {group.scheduleFormat === "team-battle" && match.status !== "completed" && (
+                      {!scheduleLocked && group.scheduleFormat === "team-battle" && match.status !== "completed" && (
                         <details className="player-edit-box team-battle-player-edit" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                           <summary>선수 변경</summary>
                           <p className="notice-text">같은 팀의 이번 라운드 휴식 선수와 교체할 수 있습니다.</p>
@@ -1861,7 +1873,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           {scoreSaveStatus === "reset-error" && "점수 초기화에 실패했습니다. 다시 초기화해 주세요."}
                         </p>
                       )}
-                      {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
+                      {!scheduleLocked && group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <details className="player-edit-box" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                         <summary>선수 변경</summary>
                         <div className="score-input-grid compact">
                           {(["A", "A", "B", "B"] as const).map((side, index) => {
@@ -1880,7 +1892,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                           })}
                         </div>
                       </details>}
-                      {group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
+                      {!scheduleLocked && group.scheduleFormat !== "team-battle" && !isTournamentFormat(group) && !isFixedPairLeagueFormat(group) && <button className="danger-button" disabled={isCompleted} onClick={() => deleteMatch(match.id)} type="button">
                         <Trash2 size={18} />
                         경기 삭제
                       </button>}
