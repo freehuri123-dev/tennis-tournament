@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTournamentStorageKey } from "./tournament-store";
+import { createInitialState, getTournamentStorageKey, loadTournamentState } from "./tournament-store";
 
 describe("getTournamentStorageKey", () => {
   it("separates localStorage keys by club slug", () => {
@@ -12,5 +12,32 @@ describe("getTournamentStorageKey", () => {
 
   it("uses the legacy storage key when no club slug is provided", () => {
     expect(getTournamentStorageKey()).toBe("tennis-monthly-tournament-state");
+  });
+  it("normalizes legacy tournament policy fields and match round metadata", () => {
+    const initial = createInitialState();
+    const legacyState = {
+      ...initial,
+      tournaments: initial.tournaments.map(({ type: _type, ...tournament }) => tournament),
+      tournament: (({ type: _type, ...tournament }) => tournament)(initial.tournament),
+      matches: initial.matches.map(({ roundNumber: _roundNumber, ...match }) => match)
+    };
+
+    window.localStorage.setItem(getTournamentStorageKey("stc"), JSON.stringify(legacyState));
+
+    const loaded = loadTournamentState("stc");
+
+    expect(loaded.tournament).toMatchObject({
+      scheduleLocked: false,
+      rankingExcludedMemberIds: [],
+      includeInClubRecords: true
+    });
+    expect(loaded.tournaments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        scheduleLocked: false,
+        rankingExcludedMemberIds: [],
+        includeInClubRecords: true
+      })
+    ]));
+    expect(loaded.matches.every((match) => match.roundNumber === null)).toBe(true);
   });
 });

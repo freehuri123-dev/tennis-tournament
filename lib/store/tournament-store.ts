@@ -34,7 +34,13 @@ export function inferTournamentType(tournament: Partial<Tournament>, groups: Tou
 }
 
 function normalizeTournamentType(tournament: Tournament, groups: TournamentGroup[]): Tournament {
-  return { ...tournament, type: inferTournamentType(tournament, groups.filter((group) => group.tournamentId === tournament.id)) };
+  return {
+    ...tournament,
+    type: inferTournamentType(tournament, groups.filter((group) => group.tournamentId === tournament.id)),
+    scheduleLocked: tournament.scheduleLocked ?? false,
+    rankingExcludedMemberIds: tournament.rankingExcludedMemberIds ?? [],
+    includeInClubRecords: tournament.includeInClubRecords ?? true
+  };
 }
 
 function collectParticipantIds(groupMemberIds: Record<string, string[]>) {
@@ -57,7 +63,7 @@ export function createInitialState(): TournamentState {
     tournamentParticipantIds: { [sampleTournament.id]: collectParticipantIds(sampleGroupMemberIds) },
     groupMemberIds: sampleGroupMemberIds,
     teamAssignments: {},
-    matches: createSampleMatches(),
+    matches: createSampleMatches().map((match) => ({ ...match, roundNumber: match.roundNumber ?? null })),
     deletedPublicSlugs: []
   };
 }
@@ -91,7 +97,7 @@ export function loadTournamentState(clubSlug?: ClubSlug): TournamentState {
     },
     groupMemberIds: parsed.groupMemberIds ?? initial.groupMemberIds,
     teamAssignments: parsed.teamAssignments ?? {},
-    matches: parsed.matches ?? initial.matches,
+    matches: (parsed.matches ?? initial.matches).map((match) => ({ ...match, roundNumber: match.roundNumber ?? null })),
     members: parsed.members ?? initial.members,
     deletedPublicSlugs: parsed.deletedPublicSlugs ?? []
   };

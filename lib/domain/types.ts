@@ -19,6 +19,9 @@ export type Tournament = {
   publicSlug: string;
   status: "draft" | "active" | "completed";
   type?: TournamentType;
+  scheduleLocked?: boolean;
+  rankingExcludedMemberIds?: string[];
+  includeInClubRecords?: boolean;
 };
 
 export type TournamentGroup = {
@@ -46,6 +49,7 @@ export type Match = {
   status: MatchStatus;
   sortOrder: number;
   courtNumber?: string | null;
+  roundNumber?: number | null;
 };
 
 export type RankingRow = {
