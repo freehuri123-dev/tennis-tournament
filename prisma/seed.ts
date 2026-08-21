@@ -76,7 +76,7 @@ const playTennisMembers: Array<{
   { id: "pt-m28", name: "최동렬", gender: "male", level: "2" },
   { id: "pt-m29", name: "윤진", gender: "female", level: "3" },
   { id: "pt-m30", name: "김경아", gender: "female", level: "3" },
-  { id: "pt-m31", name: "이나현", gender: "female", level: "3" },
+  { id: "pt-m31", name: "유나현", gender: "female", level: "3" },
   { id: "pt-m32", name: "이화주", gender: "female", level: "1" }
 ];
 

@@ -9,6 +9,13 @@ const migrationPath = join(
   "20260821010000_add_play_tennis_event",
   "migration.sql"
 );
+const renameMigrationPath = join(
+  process.cwd(),
+  "prisma",
+  "migrations",
+  "20260821020000_rename_play_tennis_member",
+  "migration.sql"
+);
 const seedPath = join(process.cwd(), "prisma", "seed.ts");
 
 const approvedRoster = [
@@ -42,7 +49,7 @@ const approvedRoster = [
   ["pt-m28", "최동렬", "male", "2"],
   ["pt-m29", "윤진", "female", "3"],
   ["pt-m30", "김경아", "female", "3"],
-  ["pt-m31", "이나현", "female", "3"],
+  ["pt-m31", "유나현", "female", "3"],
   ["pt-m32", "이화주", "female", "1"]
 ] as const;
 
@@ -85,6 +92,10 @@ function migrationSql() {
   return readFileSync(migrationPath, "utf8");
 }
 
+function renameMigrationSql() {
+  return readFileSync(renameMigrationPath, "utf8");
+}
+
 function seedSource() {
   return readFileSync(seedPath, "utf8");
 }
@@ -107,13 +118,24 @@ describe("Play Tennis event migration", () => {
       return values!.slice(1);
     });
 
-    expect(roster).toEqual(approvedRoster);
+    expect(roster).toEqual(
+      approvedRoster.map((member) => member[0] === "pt-m31" ? [member[0], "이나현", member[2], member[3]] : member)
+    );
     expect(insertRows(sql, "Club")).toHaveLength(1);
     expect(insertRows(sql, "Tournament")).toHaveLength(1);
     expect(insertRows(sql, "TournamentGroup")).toHaveLength(1);
     expect(insertRows(sql, "TournamentParticipant")).toHaveLength(32);
     expect(insertRows(sql, "TournamentGroupMember")).toHaveLength(32);
     expect(sql).not.toMatch(/\b(?:DELETE|TRUNCATE)\b/i);
+  });
+
+  it("renames only the corrected Play Tennis member", () => {
+    const sql = renameMigrationSql();
+
+    expect(sql).toContain("UPDATE \"Member\"");
+    expect(sql).toContain("SET \"name\" = '유나현'");
+    expect(sql).toContain("WHERE \"id\" = 'pt-m31'");
+    expect(sql).toContain("AND \"clubId\" = 'pt'");
   });
 
   it("sets the approved tournament identity and policies", () => {
