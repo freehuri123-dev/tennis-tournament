@@ -35,7 +35,7 @@ describe("club routing", () => {
     expect(getClubBySlug("army")?.tournamentLabel).toBe("모임대회");
     expect(getClubBySlug("queensday")?.name).toBe("퀸즈데이");
     expect(getClubBySlug("queensday")?.organizationLabel).toBe("모임");
-    expect(getClubBySlug("pt")).toMatchObject({ name: "Play Tennis", shortName: "Play Tennis", organizationLabel: "\uB300\uD68C" });
+    expect(getClubBySlug("pt")).toMatchObject({ name: "Play Tennis", shortName: "Play Tennis", organizationLabel: "클럽", tournamentLabel: "클럽대회" });
   });
   it("uses the Play Tennis Kakao share image", () => {
     expect(getClubShareContent("pt").imagePath).toBe("/kakao-share-pt.jpg");
