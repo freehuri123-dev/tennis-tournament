@@ -9,7 +9,7 @@ import { TeamRankingTable } from "./TeamRankingTable";
 import { TeamBattleContributionDetails, TeamBattleRoster } from "./TeamBattleDetails";
 import { getClubBySlug, type ClubSlug } from "../lib/domain/club";
 import { groupMatchesByExplicitRound } from "../lib/domain/match-rounds";
-import { calculateFixedPairRankings, calculateRankings } from "../lib/domain/ranking";
+import { calculateFixedPairRankings, calculateRankings, rankRankingRows } from "../lib/domain/ranking";
 import { isScheduleLocked, rankingMembersForTournament } from "../lib/domain/tournament-policy";
 import { getFixedPairTournamentRoundCounts, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel } from "../lib/domain/schedule";
 import { getPublicTournamentAccess } from "../lib/domain/public-access";
@@ -81,17 +81,7 @@ export function PublicTournamentView({ state, slug, clubSlug }: { state: Tournam
   const overallRanking = useMemo(() => {
     const rows = groupRankings.flatMap(({ group, rows }) => rows.map((row) => ({ ...row, groupName: state.groups.length === 1 ? undefined : group.name })));
 
-    return rows
-      .sort(
-        (a, b) =>
-          b.rankingPoints - a.rankingPoints ||
-          b.wins - a.wins ||
-          b.pointDiff - a.pointDiff ||
-          b.pointsFor - a.pointsFor ||
-          a.pointsAgainst - b.pointsAgainst ||
-          a.name.localeCompare(b.name, "ko")
-      )
-      .map((row, index) => ({ ...row, rank: index + 1 }));
+    return rankRankingRows(rows);
   }, [groupRankings, state.groups.length]);
 
   function displayGroupName(groupName: string) {

@@ -31,19 +31,9 @@ export function calculateRankings(members: Member[], matches: Match[]): RankingR
     applyResult(rows, match.sideBPlayerIds, match.sideBScore, match.sideAScore, sideBResult);
   }
 
-  const sorted = [...rows.values()]
-    .map((row) => ({ ...row, pointDiff: row.pointsFor - row.pointsAgainst }))
-    .sort(compareRankingRows);
-
-  let previous: MutableRanking | undefined;
-  let previousRank = 0;
-
-  return sorted.map((row, index) => {
-    const rank = previous && sameRankingValue(row, previous) ? previousRank : index + 1;
-    previous = row;
-    previousRank = rank;
-    return { ...row, rank };
-  });
+  return rankRankingRows(
+    [...rows.values()].map((row) => ({ ...row, pointDiff: row.pointsFor - row.pointsAgainst }))
+  );
 }
 
 function applyResult(
@@ -91,6 +81,19 @@ function sameRankingValue(a: MutableRanking, b: MutableRanking) {
     a.pointsFor === b.pointsFor &&
     a.pointsAgainst === b.pointsAgainst
   );
+}
+
+export function rankRankingRows<T extends MutableRanking>(rows: T[]): Array<T & { rank: number }> {
+  const sortedRows = [...rows].sort(compareRankingRows);
+  let previous: MutableRanking | undefined;
+  let previousRank = 0;
+
+  return sortedRows.map((row, index) => {
+    const rank = previous && sameRankingValue(row, previous) ? previousRank : index + 1;
+    previous = row;
+    previousRank = rank;
+    return { ...row, rank };
+  });
 }
 
 type MutableTeamRanking = Omit<TeamRankingRow, "rank">;

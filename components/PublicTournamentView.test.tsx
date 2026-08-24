@@ -81,6 +81,40 @@ describe("PublicTournamentView auto refresh", () => {
     expect(Array.from(container.querySelectorAll(".ranking-card")).find((card) => card.textContent?.includes("Partner"))?.textContent).toContain("+2");
   });
 
+  it("keeps joint ranks when every public ranking tiebreak value is equal", () => {
+    const state = createInitialState();
+    state.members = [
+      { id: "m1", name: "김철수", gender: "male", notes: "" },
+      { id: "m2", name: "박영희", gender: "male", notes: "" },
+      { id: "m3", name: "이민수", gender: "male", notes: "" },
+      { id: "m4", name: "최은정", gender: "male", notes: "" }
+    ];
+    state.tournament = { ...state.tournament, scheduleLocked: true };
+    state.tournaments = [{ ...state.tournament }];
+    state.groups = [{ id: "g1", tournamentId: state.tournament.id, name: "전체", scheduleFormat: "random", sortOrder: 1 }];
+    state.groupMemberIds = { g1: state.members.map((member) => member.id) };
+    state.matches = [{
+      id: "match-1",
+      tournamentId: state.tournament.id,
+      groupId: "g1",
+      matchNumber: 1,
+      sideAPlayerIds: ["m1", "m2"],
+      sideBPlayerIds: ["m3", "m4"],
+      sideAScore: 6,
+      sideBScore: 4,
+      status: "completed",
+      sortOrder: 1
+    }];
+
+    const { container } = render(<PublicTournamentView state={state} slug={state.tournament.publicSlug} clubSlug="pt" />);
+    fireEvent.click(screen.getByRole("tab", { name: "전체 순위" }));
+
+    const ranks = Object.fromEntries(Array.from(container.querySelectorAll(".ranking-card")).map((card) => [
+      card.querySelector("strong")?.textContent,
+      card.querySelector(".ranking-badge")?.textContent
+    ]));
+    expect(ranks).toEqual({ 김철수: "1위", 박영희: "1위", 이민수: "3위", 최은정: "3위" });
+  });
   it("hides the annual records link for tournaments excluded from club records", () => {
     const state = createInitialState();
     state.tournament = { ...state.tournament, includeInClubRecords: false };
