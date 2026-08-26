@@ -880,6 +880,48 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(new Set(firstRoundPlayerIds).size).toBe(firstRoundPlayerIds.length);
     expect(state.teamAssignments?.t1[restingPlayerId!]).toBe("blue");
   }, 15_000);
+  it("groups team battle replacement candidates and swaps players between matches in the same round", async () => {
+    const state = makeState();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
+    state.members = [
+      ...Array.from({ length: 10 }, (_, index) => ({ id: "m" + (index + 1), name: "선수" + (index + 1), level: "B", notes: "" })),
+      { id: "m11", name: "미참여선수", level: "B", notes: "" }
+    ];
+    state.groups = [{ id: "g1", tournamentId: "t1", name: "청백전", scheduleFormat: "team-battle", sortOrder: 1 }];
+    state.groupMemberIds = { g1: state.members.slice(0, 10).map((member) => member.id) };
+    state.tournamentParticipantIds = { t1: state.members.slice(0, 10).map((member) => member.id) };
+    state.teamAssignments = {
+      t1: {
+        m1: "blue", m2: "blue", m3: "blue", m4: "blue", m9: "blue",
+        m5: "white", m6: "white", m7: "white", m8: "white", m10: "white"
+      }
+    };
+    state.matches = [
+      { id: "match-1", tournamentId: "t1", groupId: "g1", matchNumber: 1, sideAPlayerIds: ["m1", "m2"], sideBPlayerIds: ["m5", "m6"], sideAScore: null, sideBScore: null, status: "scheduled", sortOrder: 1, courtNumber: "1", roundNumber: 1 },
+      { id: "match-2", tournamentId: "t1", groupId: "g1", matchNumber: 2, sideAPlayerIds: ["m3", "m4"], sideBPlayerIds: ["m7", "m8"], sideAScore: null, sideBScore: null, status: "scheduled", sortOrder: 2, courtNumber: "2", roundNumber: 1 }
+    ];
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="joogo" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    const editBox = container.querySelector<HTMLDetailsElement>(".team-battle-player-edit");
+    fireEvent.click(editBox!.querySelector("summary")!);
+    const blueSelect = screen.getAllByLabelText("청팀 1 선수 변경")[0] as HTMLSelectElement;
+
+    expect(Array.from(blueSelect.querySelectorAll("optgroup")).map((group) => group.label)).toEqual([
+      "현재 선수", "다른 경기 출전", "휴식 선수", "미참여 선수"
+    ]);
+    expect(blueSelect.querySelector('optgroup[label="다른 경기 출전"] option[value="m3"]')?.textContent).toContain("2경기");
+    expect(blueSelect.querySelector('optgroup[label="휴식 선수"] option[value="m9"]')).toBeTruthy();
+    expect(blueSelect.querySelector('optgroup[label="미참여 선수"] option[value="m11"]')).toBeTruthy();
+
+    fireEvent.change(blueSelect, { target: { value: "m3" } });
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
+    expect(saved?.matches[0].sideAPlayerIds).toEqual(["m3", "m2"]);
+    expect(saved?.matches[1].sideAPlayerIds).toEqual(["m1", "m4"]);
+  });
   it("moves a team battle round and saves the new match order", async () => {
     const state = makeState();
     state.tournament = { ...state.tournament, type: "team-battle" };

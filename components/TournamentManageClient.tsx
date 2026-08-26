@@ -1113,7 +1113,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       .filter((member): member is typeof state.members[number] => Boolean(member));
   }
 
-  function teamBattleReplacementCandidates(roundMatches: Match[], match: Match, side: "A" | "B", index: number, selected?: string) {
+  function teamBattleReplacementCandidateGroups(roundMatches: Match[], match: Match, side: "A" | "B", selected?: string) {
+    const sideKey = side === "A" ? "sideAPlayerIds" : "sideBPlayerIds";
     const playingIds = new Set(roundMatches.flatMap((roundMatch) => [...roundMatch.sideAPlayerIds, ...roundMatch.sideBPlayerIds]));
     const teamMembers = side === "A" ? blueTeamMembers : whiteTeamMembers;
     const tournamentParticipantIdSet = new Set(tournamentParticipantIds);
@@ -1121,15 +1122,26 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       ...tournamentParticipants.filter((member) => !teamAssignment[member.id]),
       ...state.members.filter((member) => !member.deleted && member.active !== false && !tournamentParticipantIdSet.has(member.id))
     ];
-    const candidateMap = new Map<string, typeof state.members[number]>();
-    if (selected) {
-      const selectedMember = membersById.get(selected);
-      if (selectedMember) candidateMap.set(selectedMember.id, selectedMember);
-    }
-    [...teamMembers, ...temporaryMembers].forEach((member) => {
-      if (!playingIds.has(member.id)) candidateMap.set(member.id, member);
-    });
-    return [...candidateMap.values()];
+    const selectedMember = selected ? membersById.get(selected) : undefined;
+    const otherMatchCandidates = new Map<string, { member: typeof state.members[number]; matchNumber: number }>();
+
+    roundMatches
+      .filter((roundMatch) => roundMatch.id !== match.id && roundMatch.status !== "completed")
+      .forEach((roundMatch) => {
+        roundMatch[sideKey].forEach((memberId) => {
+          const member = membersById.get(memberId);
+          if (member) otherMatchCandidates.set(member.id, { member, matchNumber: roundMatch.matchNumber });
+        });
+      });
+
+    const groups: Array<{ label: string; candidates: Array<{ member: typeof state.members[number]; matchNumber?: number }> }> = [
+      { label: "현재 선수", candidates: selectedMember ? [{ member: selectedMember }] : [] },
+      { label: "다른 경기 출전", candidates: [...otherMatchCandidates.values()] },
+      { label: "휴식 선수", candidates: teamMembers.filter((member) => !playingIds.has(member.id)).map((member) => ({ member })) },
+      { label: "미참여 선수", candidates: temporaryMembers.filter((member) => !playingIds.has(member.id)).map((member) => ({ member })) }
+    ];
+
+    return groups.filter((group) => group.candidates.length > 0);
   }
 
   function replaceTeamBattlePlayer(matchId: string, roundMatches: Match[], side: "A" | "B", index: number, memberId: string) {
@@ -1140,6 +1152,27 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const sourceIds = [...selectedMatch[sourceKey]];
     const sourceMemberId = sourceIds[index];
     if (!sourceMemberId || sourceMemberId === memberId) return;
+
+    const targetMatch = roundMatches.find((roundMatch) =>
+      roundMatch.id !== matchId &&
+      roundMatch.status !== "completed" &&
+      roundMatch[sourceKey].includes(memberId)
+    );
+    if (targetMatch) {
+      const targetIds = [...targetMatch[sourceKey]];
+      const targetIndex = targetIds.indexOf(memberId);
+      sourceIds[index] = memberId;
+      targetIds[targetIndex] = sourceMemberId;
+      persist({
+        ...state,
+        matches: state.matches.map((match) => {
+          if (match.id === matchId) return { ...match, [sourceKey]: sourceIds };
+          if (match.id === targetMatch.id) return { ...match, [sourceKey]: targetIds };
+          return match;
+        })
+      });
+      return;
+    }
 
     const expectedTeam: TeamSide = side === "A" ? "blue" : "white";
     const roundPlayingIds = new Set(roundMatches.flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]));
@@ -1837,24 +1870,31 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       {!scheduleLocked && group.scheduleFormat === "team-battle" && match.status !== "completed" && (
                         <details className="player-edit-box team-battle-player-edit" onToggle={(event) => setOpenPlayerEditMatchId(event.currentTarget.open ? match.id : null)} open={openPlayerEditMatchId === match.id}>
                           <summary>선수 변경</summary>
-                          <p className="notice-text">같은 팀의 이번 라운드 휴식 선수와 교체할 수 있습니다.</p>
+                          <p className="notice-text">같은 팀의 다른 경기 선수와 맞교환하거나, 이번 라운드 휴식·미참여 선수로 변경할 수 있습니다.</p>
                           <div className="score-input-grid compact">
                             {(["A", "A", "B", "B"] as const).map((side, slotIndex) => {
                               const sideIndex = slotIndex % 2;
                               const selected = side === "A" ? match.sideAPlayerIds[sideIndex] : match.sideBPlayerIds[sideIndex];
-                              const candidates = teamBattleReplacementCandidates(round.matches, match, side, sideIndex, selected);
+                              const candidateGroups = teamBattleReplacementCandidateGroups(round.matches, match, side, selected);
+                              const candidateCount = candidateGroups.reduce((count, group) => count + group.candidates.length, 0);
                               return (
                                 <label className="mini-select-field" key={`${side}-${sideIndex}`}>
                                   <span>{side === "A" ? "청팀" : "백팀"} {sideIndex + 1}</span>
                                   <select
                                     aria-label={`${side === "A" ? "청팀" : "백팀"} ${sideIndex + 1} 선수 변경`}
                                     className="select-input"
-                                    disabled={isCompleted || candidates.length <= 1}
+                                    disabled={isCompleted || candidateCount <= 1}
                                     onChange={(event) => replaceTeamBattlePlayer(match.id, round.matches, side, sideIndex, event.target.value)}
                                     value={selected ?? ""}
                                   >
-                                    {candidates.map((member) => (
-                                      <option key={member.id} value={member.id}>{member.name}</option>
+                                    {candidateGroups.map((group) => (
+                                      <optgroup key={group.label} label={group.label}>
+                                        {group.candidates.map(({ member, matchNumber }) => (
+                                          <option key={member.id} value={member.id}>
+                                            {member.name}{matchNumber ? ` · ${matchNumber}경기` : ""}
+                                          </option>
+                                        ))}
+                                      </optgroup>
                                     ))}
                                   </select>
                                 </label>
