@@ -711,6 +711,40 @@ it("creates and saves a five-pair round robin league", async () => {
     expectGeneralFormatsOnly();
     expect(container.querySelectorAll(".group-setup-card")).toHaveLength(1);
   });
+
+  it("creates fixed pair leagues for multiple groups", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const state = makeState();
+    const members = Array.from({ length: 20 }, (_, index) => ({
+      id: `m${index + 1}`,
+      name: `Member ${index + 1}`,
+      gender: index % 2 === 0 ? "male" as const : "female" as const,
+      notes: ""
+    }));
+    state.members = members;
+    state.tournamentParticipantIds = { t1: members.map((member) => member.id) };
+    state.groups = [
+      { ...state.groups[0], name: "A조", scheduleFormat: "kdk-v2010" },
+      { ...state.groups[0], id: "g2", name: "B조", scheduleFormat: "kdk-v2010", sortOrder: 2 }
+    ];
+    state.groupMemberIds = {
+      g1: members.slice(0, 10).map((member) => member.id),
+      g2: members.slice(10).map((member) => member.id)
+    };
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.change(container.querySelector<HTMLSelectElement>(".format-field select")!, { target: { value: "fixed-pair-league" } });
+    fireEvent.click(screen.getByRole("tab", { name: /B조.*10명/ }));
+    fireEvent.change(container.querySelector<HTMLSelectElement>(".format-field select")!, { target: { value: "fixed-pair-league" } });
+    fireEvent.click(screen.getByRole("button", { name: "대진표 생성" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    const savedState = vi.mocked(persistTournamentStateAction).mock.calls[0][1];
+    expect(savedState.groups.map((group) => group.scheduleFormat)).toEqual(["fixed-pair-league", "fixed-pair-league"]);
+    expect(savedState.matches.filter((match) => match.groupId === "g1")).toHaveLength(10);
+    expect(savedState.matches.filter((match) => match.groupId === "g2")).toHaveLength(10);
+  });
+
   it("shows dynamic setup tabs and only unassigned players for the active group", () => {
     const state = makeStateWithParticipants();
     state.groups = [

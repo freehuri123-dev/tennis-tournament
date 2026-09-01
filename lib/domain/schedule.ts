@@ -27,7 +27,7 @@ const MIN_MAX: Record<ScheduleFormat, { min: number; max: number }> = {
   "kdk-v2010": { min: 5, max: 10 },
   "hanul-aa": { min: 5, max: 16 },
   random: { min: 4, max: Number.POSITIVE_INFINITY },
-  "fixed-pair-league": { min: 10, max: 10 },
+  "fixed-pair-league": { min: 6, max: 14 },
   "fixed-pair-tournament": { min: 4, max: Number.POSITIVE_INFINITY },
   "single-tournament": { min: 2, max: Number.POSITIVE_INFINITY },
   "team-battle": { min: 4, max: Number.POSITIVE_INFINITY }
@@ -79,7 +79,10 @@ export function getScheduleRequirement(format: ScheduleFormat) {
 export function validateScheduleParticipants(format: ScheduleFormat, count: number) {
   const requirement = getScheduleRequirement(format);
   if (format === "fixed-pair-league") {
-    return count === 10 ? "" : `${requirement.label} 방식은 10명(5페어)일 때 대진표를 생성할 수 있습니다.`;
+    const supportedCounts = [6, 8, 10, 12, 14];
+    return supportedCounts.includes(count)
+      ? ""
+      : `${requirement.label} 방식은 6, 8, 10, 12, 14명일 때 대진표를 생성할 수 있습니다.`;
   }
   if (format === "fixed-pair-tournament") {
     if (count < requirement.min) return `${requirement.label} 방식은 ${requirement.min}명 이상일 때 대진표를 생성할 수 있습니다.`;
@@ -145,7 +148,7 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
 
 function generateFixedPairLeagueMatches(input: GenerateInitialMatchesInput): Match[] {
   const teams = createTournamentTeams(input.participants, 2);
-  const rotation: Array<string[] | null> = [...teams, null];
+  const rotation: Array<string[] | null> = teams.length % 2 === 0 ? [...teams] : [...teams, null];
   const matches: Match[] = [];
 
   for (let round = 0; round < rotation.length - 1; round += 1) {

@@ -767,7 +767,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
   function addGroup() {
     if (isCompleted || tournamentType === "team-battle") return;
-    if ((tournamentType === "tournament" || state.groups.some((group) => group.scheduleFormat === "random" || group.scheduleFormat === "fixed-pair-league")) && state.groups.length > 0) return;
+    if ((tournamentType === "tournament" || state.groups.some((group) => group.scheduleFormat === "random")) && state.groups.length > 0) return;
     if (state.groups.some(isTournamentFormat)) {
       window.alert("토너먼트 방식은 한 그룹으로만 진행할 수 있습니다.");
       return;
@@ -821,7 +821,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (isCompleted) return;
     const targetGroup = state.groups.find((group) => group.id === groupId);
     const tournamentMode = scheduleFormat === "fixed-pair-tournament" || scheduleFormat === "single-tournament";
-    const singleGroupMode = tournamentMode || scheduleFormat === "random" || scheduleFormat === "fixed-pair-league";
+    const singleGroupMode = tournamentMode || scheduleFormat === "random";
     if (singleGroupMode && state.groups.length > 1) return;
     const nextGroups = singleGroupMode && targetGroup
       ? [{ ...targetGroup, scheduleFormat, seedPlayerIds: [], name: "전체", sortOrder: 1 }]
@@ -1471,7 +1471,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
             {tournamentType !== "team-battle" && (<section className="section-card stack">
               <div className="today-card-top">
                 <strong className="section-head" style={{ marginBottom: 0 }}>{tournamentType === "tournament" ? "토너먼트 구성" : "그룹 편성"}</strong>
-                <button className="ghost-button" disabled={isCompleted || ((tournamentType === "tournament" || state.groups.some((group) => group.scheduleFormat === "random" || group.scheduleFormat === "fixed-pair-league")) && state.groups.length > 0)} onClick={addGroup} type="button">
+                <button className="ghost-button" disabled={isCompleted || ((tournamentType === "tournament" || state.groups.some((group) => group.scheduleFormat === "random")) && state.groups.length > 0)} onClick={addGroup} type="button">
                   <Plus size={18} />
                   {tournamentType === "tournament" ? "토너먼트 구성" : "그룹 추가"}
                 </button>
@@ -1596,7 +1596,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     )}
                     {(isTournamentFormat(group) || isFixedPairLeagueFormat(group)) && (
                       <div className="fixed-pair-tools">
-                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? selectedMembers.length !== 10 : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
+                        <button className="ghost-button" disabled={isCompleted || (group.scheduleFormat === "fixed-pair-league" ? Boolean(validateScheduleParticipants(group.scheduleFormat, selectedMembers.length)) : selectedMembers.length < (group.scheduleFormat === "single-tournament" ? 2 : 4))} onClick={() => randomizeTournamentSeeds(group.id)} type="button">
                           {group.scheduleFormat === "single-tournament" ? "랜덤 시드 생성" : "랜덤 페어 구성"}
                         </button>
                         <p className="notice-text">

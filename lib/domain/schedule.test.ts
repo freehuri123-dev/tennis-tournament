@@ -445,26 +445,31 @@ describe("generateInitialMatches", () => {
 });
 
 describe("fixed pair league round robin", () => {
-  it("creates ten unique matches so every one of five pairs plays four times", () => {
-    const members = makeMembers(10);
+  it.each([6, 8, 10, 12, 14])("creates a complete round robin for %i participants", (participantCount) => {
+    const members = makeMembers(participantCount);
     const matches = generateInitialMatches({ tournamentId: "t1", groupId: "g1", format: "fixed-pair-league", participants: members });
-    const pairIds = Array.from({ length: 5 }, (_, index) => [`m${index * 2 + 1}`, `m${index * 2 + 2}`].sort().join(":"));
+    const pairCount = participantCount / 2;
+    const pairIds = Array.from({ length: pairCount }, (_, index) => [`m${index * 2 + 1}`, `m${index * 2 + 2}`].sort().join(":"));
     const playCounts = new Map(pairIds.map((id) => [id, 0]));
     const opponents = new Map(pairIds.map((id) => [id, new Set<string>()]));
 
     for (const match of matches) {
       const sideA = [...match.sideAPlayerIds].sort().join(":");
       const sideB = [...match.sideBPlayerIds].sort().join(":");
+      expect(sideA).not.toBe(sideB);
       playCounts.set(sideA, (playCounts.get(sideA) ?? 0) + 1);
       playCounts.set(sideB, (playCounts.get(sideB) ?? 0) + 1);
       opponents.get(sideA)?.add(sideB);
       opponents.get(sideB)?.add(sideA);
     }
 
-    expect(matches).toHaveLength(10);
-    expect([...playCounts.values()]).toEqual([4, 4, 4, 4, 4]);
-    expect([...opponents.values()].map((items) => items.size)).toEqual([4, 4, 4, 4, 4]);
-    expect(validateScheduleParticipants("fixed-pair-league", 8)).toContain("10명(5페어)");
-    expect(validateScheduleParticipants("fixed-pair-league", 10)).toBe("");
+    expect(matches).toHaveLength((pairCount * (pairCount - 1)) / 2);
+    expect([...playCounts.values()]).toEqual(Array(pairCount).fill(pairCount - 1));
+    expect([...opponents.values()].map((items) => items.size)).toEqual(Array(pairCount).fill(pairCount - 1));
+    expect(validateScheduleParticipants("fixed-pair-league", participantCount)).toBe("");
+  });
+
+  it.each([4, 7, 9, 16])("rejects unsupported participant count %i", (participantCount) => {
+    expect(validateScheduleParticipants("fixed-pair-league", participantCount)).toContain("6, 8, 10, 12, 14명");
   });
 });
