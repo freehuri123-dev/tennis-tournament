@@ -1150,6 +1150,86 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+.kdk-player-game-settings {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(65, 125, 112, 0.18);
+  border-radius: 8px;
+  background: rgba(244, 250, 247, 0.9);
+}
+
+.kdk-player-game-settings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kdk-player-game-settings-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.kdk-player-game-settings-head small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.kdk-player-game-settings-head > span {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #e1f1ec;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.kdk-player-game-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.kdk-player-game-grid label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(31, 87, 76, 0.12);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.kdk-player-game-grid label strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kdk-player-game-grid .select-input {
+  width: 82px;
+  min-height: 38px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.duplicate-pair-badge {
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: #fff1d5;
+  color: #8a5600;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .random-kdk-settings {
   display: grid;
   grid-template-columns: 1fr;

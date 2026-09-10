@@ -57,6 +57,39 @@ describe("generateInitialMatches", () => {
     expect(matches[4].sideBPlayerIds).toEqual(["m3", "m4"]);
   });
 
+  it("KDK-V2010은 개인별로 지정한 경기 수를 정확히 맞춘다", () => {
+    const members = makeMembers(6);
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "kdk-v2010",
+      participants: members,
+      kdkPlayerGameCounts: { m1: 2, m2: 6 }
+    });
+
+    const playCounts = new Map(members.map((member) => [member.id, 0]));
+    for (const match of matches) {
+      const playerIds = [...match.sideAPlayerIds, ...match.sideBPlayerIds];
+      expect(new Set(playerIds).size).toBe(4);
+      for (const playerId of playerIds) playCounts.set(playerId, (playCounts.get(playerId) ?? 0) + 1);
+    }
+
+    expect(matches).toHaveLength(6);
+    expect(Object.fromEntries(playCounts)).toEqual({ m1: 2, m2: 6, m3: 4, m4: 4, m5: 4, m6: 4 });
+  });
+
+  it("KDK-V2010은 개인별 경기 수 합계가 4의 배수가 아니면 생성하지 않는다", () => {
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "kdk-v2010",
+      participants: makeMembers(6),
+      kdkPlayerGameCounts: { m1: 2 }
+    });
+
+    expect(matches).toEqual([]);
+  });
+
   it("한울AA방식 KDK 이미지 표의 A~G 표기를 10~16번 선수로 해석한다", () => {
     const matches = generateInitialMatches({
       tournamentId: "t1",

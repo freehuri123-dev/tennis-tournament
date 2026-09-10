@@ -9,6 +9,7 @@ type GenerateInitialMatchesInput = {
   courtNumbers?: string[];
   courtStartIndex?: number;
   randomGamesPerPlayer?: number;
+  kdkPlayerGameCounts?: Record<string, number>;
 };
 
 type ScheduleFormat = TournamentGroup["scheduleFormat"];
@@ -125,6 +126,12 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   if (input.format === "fixed-pair-tournament") return assignCourtNumbers(generateTournamentMatches(input, 2), input.courtNumbers, input.courtStartIndex);
   if (input.format === "single-tournament") return assignCourtNumbers(generateTournamentMatches(input, 1), input.courtNumbers, input.courtStartIndex);
 
+  if (input.format === "kdk-v2010" && input.kdkPlayerGameCounts) {
+    const targetCounts = new Map(input.participants.map((member) => [member.id, input.kdkPlayerGameCounts?.[member.id] ?? 4]));
+    const hasCustomCount = [...targetCounts.values()].some((count) => count !== 4);
+    if (hasCustomCount) return assignCourtNumbers(generateVariableKdkMatches(input, targetCounts), input.courtNumbers, input.courtStartIndex);
+  }
+
   const playerMap = createDefaultSeedMap(input.participants);
   const templates = input.format === "kdk-v2010" ? KDK_TEMPLATES[participantCount] : HANUL_TEMPLATES[participantCount];
 
@@ -144,6 +151,69 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
       courtNumber: null
     };
   }), input.courtNumbers, input.courtStartIndex);
+}
+
+function generateVariableKdkMatches(input: GenerateInitialMatchesInput, targetCounts: Map<string, number>): Match[] {
+  const totalAppearances = [...targetCounts.values()].reduce((sum, count) => sum + count, 0);
+  if (totalAppearances % 4 !== 0) return [];
+  const matchCount = totalAppearances / 4;
+  if ([...targetCounts.values()].some((count) => count < 2 || count > 6 || count > matchCount)) return [];
+
+  const playerSets = createVariableKdkPlayerSets(input.participants, targetCounts, matchCount);
+  if (!playerSets) return [];
+
+  const memberById = new Map(input.participants.map((member) => [member.id, member]));
+  const partnerCounts = new Map<string, number>();
+  return playerSets.map((playerIds, index) => {
+    const pairings = [
+      [[playerIds[0], playerIds[1]], [playerIds[2], playerIds[3]]],
+      [[playerIds[0], playerIds[2]], [playerIds[1], playerIds[3]]],
+      [[playerIds[0], playerIds[3]], [playerIds[1], playerIds[2]]]
+    ];
+    const [sideAPlayerIds, sideBPlayerIds] = pairings.sort((left, right) => {
+      const score = (pairing: string[][]) => {
+        const repeatCount = pairCount(partnerCounts, pairing[0][0], pairing[0][1]) + pairCount(partnerCounts, pairing[1][0], pairing[1][1]);
+        const sideAStrength = pairing[0].reduce((sum, id) => sum + memberStrength(memberById.get(id)), 0);
+        const sideBStrength = pairing[1].reduce((sum, id) => sum + memberStrength(memberById.get(id)), 0);
+        return repeatCount * 100 + Math.abs(sideAStrength - sideBStrength);
+      };
+      return score(left) - score(right);
+    })[0];
+    bumpPairCount(partnerCounts, sideAPlayerIds[0], sideAPlayerIds[1]);
+    bumpPairCount(partnerCounts, sideBPlayerIds[0], sideBPlayerIds[1]);
+    return createMatch(input, index + 1, sideAPlayerIds, sideBPlayerIds);
+  });
+}
+
+function createVariableKdkPlayerSets(participants: Member[], targetCounts: Map<string, number>, matchCount: number): string[][] | null {
+  const remaining = new Map(targetCounts);
+  const result: string[][] = [];
+
+  function build(matchIndex: number): boolean {
+    if (matchIndex === matchCount) return [...remaining.values()].every((count) => count === 0);
+    const remainingMatches = matchCount - matchIndex - 1;
+    const eligible = participants.filter((member) => (remaining.get(member.id) ?? 0) > 0);
+    const candidates = combinations(eligible, 4).sort((left, right) => {
+      const total = (members: Member[]) => members.reduce((sum, member) => sum + (remaining.get(member.id) ?? 0), 0);
+      return total(right) - total(left);
+    });
+
+    for (const candidate of candidates) {
+      for (const member of candidate) remaining.set(member.id, (remaining.get(member.id) ?? 0) - 1);
+      const positiveCount = [...remaining.values()].filter((count) => count > 0).length;
+      const feasible = [...remaining.values()].every((count) => count >= 0 && count <= remainingMatches)
+        && (remainingMatches === 0 || positiveCount >= 4);
+      if (feasible) {
+        result.push(candidate.map((member) => member.id));
+        if (build(matchIndex + 1)) return true;
+        result.pop();
+      }
+      for (const member of candidate) remaining.set(member.id, (remaining.get(member.id) ?? 0) + 1);
+    }
+    return false;
+  }
+
+  return build(0) ? result : null;
 }
 
 function generateFixedPairLeagueMatches(input: GenerateInitialMatchesInput): Match[] {

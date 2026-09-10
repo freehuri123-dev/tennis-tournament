@@ -9,7 +9,8 @@ const groups: TournamentGroup[] = [
     name: "A조",
     scheduleFormat: "kdk-v2010",
     sortOrder: 1,
-    seedPlayerIds: ["m1", "m3"]
+    seedPlayerIds: ["m1", "m3"],
+    kdkPlayerGameCounts: { m1: 2, m3: 6 }
   },
   {
     id: "g2",
@@ -37,6 +38,7 @@ describe("filterGroupMembersByTournamentParticipants", () => {
       g2: ["m4"]
     });
     expect(result.groups.map((group) => group.seedPlayerIds)).toEqual([[], []]);
+    expect(result.groups[0].kdkPlayerGameCounts).toEqual({ m1: 2 });
   });
 });
 

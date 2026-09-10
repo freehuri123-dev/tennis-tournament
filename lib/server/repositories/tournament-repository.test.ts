@@ -176,7 +176,8 @@ describe("tournament repository mapping", () => {
         sortOrder: 1,
         seedPlayerIds: [],
         members: [],
-        teamBattleMatchMode: "similar-level"
+        teamBattleMatchMode: "similar-level",
+        kdkPlayerGameCounts: { "member-1": 2, "member-2": 6 }
       }],
       matches: [{
         id: "match-1",
@@ -207,7 +208,10 @@ describe("tournament repository mapping", () => {
       rankingExcludedMemberIds: ["member-2"],
       includeInClubRecords: false
     })]);
-    expect(state.groups).toEqual([expect.objectContaining({ teamBattleMatchMode: "similar-level" })]);
+    expect(state.groups).toEqual([expect.objectContaining({
+      teamBattleMatchMode: "similar-level",
+      kdkPlayerGameCounts: { "member-1": 2, "member-2": 6 }
+    })]);
     expect(state.matches).toEqual([expect.objectContaining({ roundNumber: 3 })]);
   });
 
@@ -276,7 +280,8 @@ describe("tournament repository mapping", () => {
         name: "A",
         scheduleFormat: "random",
         sortOrder: 1,
-        teamBattleMatchMode: "similar-level"
+        teamBattleMatchMode: "similar-level",
+        kdkPlayerGameCounts: { "member-1": 2 }
       }],
       tournamentParticipantIds: { "tournament-1": ["member-1"] },
       groupMemberIds: { "group-1": ["member-1"] },
@@ -311,7 +316,10 @@ describe("tournament repository mapping", () => {
       })
     });
     expect(prisma.tournamentGroup.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({ teamBattleMatchMode: "similar-level" })]
+      data: [expect.objectContaining({
+        teamBattleMatchMode: "similar-level",
+        kdkPlayerGameCounts: { "member-1": 2 }
+      })]
     });
     expect(prisma.match.createMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({ roundNumber: 4 })]

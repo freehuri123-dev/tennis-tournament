@@ -152,6 +152,14 @@ function toDomainTournament(tournament: {
   });
 }
 
+function normalizeKdkPlayerGameCounts(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => {
+    const count = entry[1];
+    return typeof count === "number" && Number.isInteger(count) && count >= 2 && count <= 6;
+  }));
+}
+
 function toDomainGroup(group: {
   id: string;
   tournamentId: string;
@@ -161,6 +169,7 @@ function toDomainGroup(group: {
   seedPlayerIds: string[];
   randomCourtCount?: number | null;
   randomGamesPerPlayer?: number | null;
+  kdkPlayerGameCounts?: unknown;
   teamBattleMatchMode?: string | null;
 }): TournamentGroup {
   return {
@@ -172,6 +181,7 @@ function toDomainGroup(group: {
     seedPlayerIds: group.seedPlayerIds,
     randomCourtCount: group.randomCourtCount ?? undefined,
     randomGamesPerPlayer: group.randomGamesPerPlayer ?? undefined,
+    kdkPlayerGameCounts: normalizeKdkPlayerGameCounts(group.kdkPlayerGameCounts),
     teamBattleMatchMode: group.teamBattleMatchMode === "similar-level" ? "similar-level" : "balanced"
   };
 }
@@ -716,6 +726,7 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
       assertAllowedIds(groupMemberIds, clubMemberIds, "Group member is not an active club member");
       assertAllowedIds(groupMemberIds, participantIdSet, "Group member is not a tournament participant");
       assertAllowedIds(group.seedPlayerIds ?? [], new Set(groupMemberIds), "Seed player is not assigned to group");
+      assertAllowedIds(Object.keys(group.kdkPlayerGameCounts ?? {}), new Set(groupMemberIds), "KDK game count player is not assigned to group");
     }
 
     for (const [groupId, memberIds] of Object.entries(state.groupMemberIds)) {
@@ -775,6 +786,7 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
           seedPlayerIds: group.seedPlayerIds ?? [],
           randomCourtCount: group.randomCourtCount ?? null,
           randomGamesPerPlayer: group.randomGamesPerPlayer ?? null,
+          kdkPlayerGameCounts: group.kdkPlayerGameCounts ?? {},
           teamBattleMatchMode: group.teamBattleMatchMode === "similar-level" ? "similar-level" : "balanced"
         }))
       });

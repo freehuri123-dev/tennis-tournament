@@ -395,6 +395,26 @@ describe("TournamentManageClient save timing", () => {
     await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
   });
 
+  it("lets the manager set individual KDK game counts before generating the schedule", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<TournamentManageClient initialState={makeKdkTenParticipantState()} clubSlug="stc" />);
+
+    expect((screen.getByLabelText("Member 1 경기 수") as HTMLSelectElement).value).toBe("4");
+    fireEvent.change(screen.getByLabelText("Member 1 경기 수"), { target: { value: "2" } });
+    expect(screen.getByText("2경기를 다른 선수에게 추가 배정해주세요.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "대진표 생성" }).hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Member 2 경기 수"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: "대진표 생성" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalledTimes(1));
+    const savedState = vi.mocked(persistTournamentStateAction).mock.calls[0][1];
+    expect(savedState.groups[0].kdkPlayerGameCounts).toEqual({ m1: 2, m2: 6 });
+    const appearances = savedState.matches.flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]);
+    expect(appearances.filter((id) => id === "m1")).toHaveLength(2);
+    expect(appearances.filter((id) => id === "m2")).toHaveLength(6);
+  });
+
   it("assigns and displays default court numbers when court assignment is enabled before generating schedules", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const state = makeStateWithParticipants();
@@ -499,6 +519,7 @@ describe("TournamentManageClient save timing", () => {
     expect(screen.getByText("중복 팀 안내")).toBeTruthy();
     expect(screen.getByText("김철수 · 이민준 — 경기 1, 경기 2")).toBeTruthy();
     expect(screen.getByText("박영희 · 최지은 — 경기 1, 경기 2")).toBeTruthy();
+    expect(screen.getAllByText("중복 페어")).toHaveLength(2);
     expect((screen.getAllByLabelText("위쪽 2")[0] as HTMLSelectElement).value).toBe("m3");
     alertSpy.mockRestore();
   });

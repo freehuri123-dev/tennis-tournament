@@ -34,6 +34,7 @@ export type TournamentGroup = {
   seedPlayerIds?: string[];
   randomCourtCount?: number;
   randomGamesPerPlayer?: number;
+  kdkPlayerGameCounts?: Record<string, number>;
   teamBattleMatchMode?: TeamBattleMatchMode;
 };
 

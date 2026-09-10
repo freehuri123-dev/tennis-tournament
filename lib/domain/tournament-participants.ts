@@ -10,7 +10,13 @@ export function filterGroupMembersByTournamentParticipants({ participantIds, gro
   const participantSet = new Set(participantIds);
 
   return {
-    groups: groups.map((group) => ({ ...group, seedPlayerIds: [] })),
+    groups: groups.map((group) => ({
+      ...group,
+      seedPlayerIds: [],
+      kdkPlayerGameCounts: Object.fromEntries(
+        Object.entries(group.kdkPlayerGameCounts ?? {}).filter(([memberId]) => participantSet.has(memberId))
+      )
+    })),
     groupMemberIds: Object.fromEntries(
       Object.entries(groupMemberIds).map(([groupId, memberIds]) => [
         groupId,

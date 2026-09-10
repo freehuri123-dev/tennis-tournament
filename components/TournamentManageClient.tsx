@@ -33,6 +33,7 @@ type ScoreSaveStatus = "dirty" | "saving" | "saved" | "error" | "resetting" | "r
 const COURT_NUMBER_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 const COURT_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
 const RANDOM_GAMES_PER_PLAYER_OPTIONS = [2, 3, 4, 5, 6, 7, 8];
+const KDK_PLAYER_GAME_OPTIONS = [2, 3, 4, 5, 6];
 function changedMatchStatePayload(previousMatches: Match[], nextMatches: Match[]) {
   return nextMatches.filter((nextMatch) => {
     const previousMatch = previousMatches.find((item) => item.id === nextMatch.id);
@@ -749,6 +750,18 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const participants = groupParticipants(group.id);
     const rangeMessage = validateScheduleParticipants(group.scheduleFormat, participants.length);
     if (rangeMessage) return rangeMessage;
+    if (group.scheduleFormat === "kdk-v2010") {
+      const totalGames = participants.reduce((sum, member) => sum + (group.kdkPlayerGameCounts?.[member.id] ?? 4), 0);
+      if (totalGames % 4 !== 0) {
+        const baselineGames = participants.length * 4;
+        if (totalGames < baselineGames) return ((4 - (totalGames % 4)) % 4) + "경기를 다른 선수에게 추가 배정해주세요.";
+        return "전체 경기 수를 4의 배수로 맞춰주세요.";
+      }
+      const matchCount = totalGames / 4;
+      if (participants.some((member) => (group.kdkPlayerGameCounts?.[member.id] ?? 4) > matchCount)) {
+        return "한 선수의 경기 수가 전체 경기 수보다 많습니다. 경기 수를 조정해주세요.";
+      }
+    }
     if (group.scheduleFormat === "hanul-aa") {
       const seedSlots = getHanulSeedSlots(participants.length);
       if (seedSlots.length > 0 && participants.length > 0) return "";
@@ -840,6 +853,21 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     });
   }
 
+  function updateKdkPlayerGameCount(groupId: string, memberId: string, value: number) {
+    if (isCompleted) return;
+    updateLocal({
+      ...state,
+      groups: state.groups.map((group) => {
+        if (group.id !== groupId) return group;
+        const nextCounts = { ...(group.kdkPlayerGameCounts ?? {}) };
+        if (value === 4) delete nextCounts[memberId];
+        else nextCounts[memberId] = value;
+        return { ...group, kdkPlayerGameCounts: nextCounts };
+      }),
+      matches: state.matches.filter((match) => match.groupId !== groupId)
+    });
+  }
+
   function updateRandomGroupOption(groupId: string, field: "randomCourtCount" | "randomGamesPerPlayer", value: number) {
     if (isCompleted) return;
     const normalized = field === "randomCourtCount"
@@ -906,7 +934,12 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     updateLocal({
       ...state,
       groupMemberIds: { ...state.groupMemberIds, [groupId]: nextIds },
-      groups: state.groups.map((group) => (group.id === groupId ? { ...group, seedPlayerIds: [] } : group))
+      groups: state.groups.map((group) => {
+        if (group.id !== groupId) return group;
+        const nextCounts = { ...(group.kdkPlayerGameCounts ?? {}) };
+        if (!nextIds.includes(memberId)) delete nextCounts[memberId];
+        return { ...group, seedPlayerIds: [], kdkPlayerGameCounts: nextCounts };
+      })
     });
   }
 
@@ -1005,7 +1038,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         participants,
         courtNumbers: groupCourtNumbers,
         courtStartIndex,
-        randomGamesPerPlayer: group.randomGamesPerPlayer ?? 2
+        randomGamesPerPlayer: group.randomGamesPerPlayer ?? 2,
+        kdkPlayerGameCounts: group.kdkPlayerGameCounts
       });
       courtStartIndex += matches.length;
       return matches;
@@ -1564,6 +1598,33 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       </div>
                     </div>
                     {validation && <p className="notice-text">{validation}</p>}
+                    {group.scheduleFormat === "kdk-v2010" && (
+                      <div className="kdk-player-game-settings">
+                        <div className="kdk-player-game-settings-head">
+                          <div>
+                            <strong>개인별 경기 수</strong>
+                            <small>기본 4경기이며, 필요한 선수만 변경하세요.</small>
+                          </div>
+                          <span>총 {selectedMembers.reduce((sum, member) => sum + (group.kdkPlayerGameCounts?.[member.id] ?? 4), 0)}회 출전</span>
+                        </div>
+                        <div className="kdk-player-game-grid">
+                          {selectedMembers.map((member) => (
+                            <label key={member.id}>
+                              <strong>{member.name}</strong>
+                              <select
+                                aria-label={member.name + " 경기 수"}
+                                className="select-input"
+                                disabled={isCompleted}
+                                onChange={(event) => updateKdkPlayerGameCount(group.id, member.id, Number(event.target.value))}
+                                value={group.kdkPlayerGameCounts?.[member.id] ?? 4}
+                              >
+                                {KDK_PLAYER_GAME_OPTIONS.map((count) => <option key={count} value={count}>{count}경기</option>)}
+                              </select>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {group.scheduleFormat === "random" && (() => {
                       const minimumGames = group.randomGamesPerPlayer ?? 2;
                       const extraCount = randomExtraGameCount(selectedMembers.length, minimumGames);
@@ -1820,6 +1881,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     const scoreInputDisabled = isCompleted || scoreOperationPending || (isTournamentFormat(group) && !canEnterMatchScore(match));
                     const scoreCanReset = match.status === "completed" && match.sideAScore !== null && match.sideBScore !== null;
                     const scoreReady = match.sideAScore !== null && match.sideBScore !== null;
+                    const hasDuplicatePair = !isFixedPairLeagueFormat(group) && !isTournamentFormat(group)
+                      && (duplicateTeamsByGroupId.get(group.id) ?? []).some((team) => team.matchOrders.includes(match.sortOrder));
                     return (
                     <div className="stack" key={match.id}>
                       {!scheduleLocked && byeSelection && (
@@ -1849,6 +1912,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         <span>{group.scheduleFormat === "team-battle" || match.roundNumber ? `${round.roundNumber}라운드` : isTournamentFormat(group) ? tournamentMatchRoundLabel(group, match) : displayGroupName(group)}</span>
                         <strong>경기 {match.sortOrder}</strong>
                         {match.courtNumber && <em className="court-badge tournament-round-court">{courtLabel(match)}</em>}
+                        {hasDuplicatePair && <em className="duplicate-pair-badge">중복 페어</em>}
                       </div>
                       <div className="score-panel vertical">
                         <label>
