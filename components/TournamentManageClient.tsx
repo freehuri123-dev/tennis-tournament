@@ -459,6 +459,28 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     });
     persist({ ...state, matches: nextMatches });
   }
+  function moveKdkMatch(groupId: string, matchId: string, direction: "up" | "down") {
+    if (isCompleted || scheduleLocked) return;
+    const groupMatches = [...(matchesByGroupId.get(groupId) ?? [])].sort((left, right) => left.sortOrder - right.sortOrder);
+    const currentIndex = groupMatches.findIndex((match) => match.id === matchId);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= groupMatches.length) return;
+
+    [groupMatches[currentIndex], groupMatches[targetIndex]] = [groupMatches[targetIndex], groupMatches[currentIndex]];
+    const reorderedGroupMatches = groupMatches.map((match, index) => ({
+      ...match,
+      matchNumber: index + 1,
+      sortOrder: index + 1
+    }));
+    let groupInserted = false;
+    const nextMatches = state.matches.flatMap((match) => {
+      if (match.groupId !== groupId) return [match];
+      if (groupInserted) return [];
+      groupInserted = true;
+      return reorderedGroupMatches;
+    });
+    persist({ ...state, matches: nextMatches });
+  }
   function displayGroupName(group: TournamentGroup) {
     return tournamentType === "team-battle" ? "청백전" : state.groups.length === 1 ? "전체" : group.name;
   }
@@ -1885,6 +1907,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                     const scoreReady = match.sideAScore !== null && match.sideBScore !== null;
                     const hasDuplicatePair = !isFixedPairLeagueFormat(group) && !isTournamentFormat(group)
                       && (duplicateTeamsByGroupId.get(group.id) ?? []).some((team) => team.matchOrders.includes(match.sortOrder));
+                    const orderedGroupMatches = [...(matchesByGroupId.get(group.id) ?? [])].sort((left, right) => left.sortOrder - right.sortOrder);
+                    const matchOrderIndex = orderedGroupMatches.findIndex((item) => item.id === match.id);
                     return (
                     <div className="stack" key={match.id}>
                       {!scheduleLocked && byeSelection && (
@@ -1915,6 +1939,16 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                         <strong>경기 {match.sortOrder}</strong>
                         {match.courtNumber && <em className="court-badge tournament-round-court">{courtLabel(match)}</em>}
                         {hasDuplicatePair && <em className="duplicate-pair-badge">중복 페어</em>}
+                        {!scheduleLocked && group.scheduleFormat === "kdk-v2010" && (
+                          <div className="round-order-controls" aria-label={`경기 ${match.sortOrder} 순서 변경`}>
+                            <button aria-label={`경기 ${match.sortOrder} 위로 이동`} className="round-order-button" disabled={isCompleted || matchOrderIndex === 0} onClick={() => moveKdkMatch(group.id, match.id, "up")} type="button">
+                              <ChevronUp size={16} />
+                            </button>
+                            <button aria-label={`경기 ${match.sortOrder} 아래로 이동`} className="round-order-button" disabled={isCompleted || matchOrderIndex === orderedGroupMatches.length - 1} onClick={() => moveKdkMatch(group.id, match.id, "down")} type="button">
+                              <ChevronDown size={16} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="score-panel vertical">
                         <label>

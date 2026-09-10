@@ -4948,6 +4948,21 @@ body,
   cursor: not-allowed;
 }
 
+.match-edit-head {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.match-edit-head .round-order-controls {
+  margin-left: auto;
+}
+
+.match-edit-head .round-order-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
 .team-battle-round-match-list {
   display: grid;
   gap: 10px;

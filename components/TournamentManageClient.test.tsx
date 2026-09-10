@@ -1032,6 +1032,25 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(saved?.matches[0].sideAPlayerIds).toEqual(["m3", "m2"]);
     expect(saved?.matches[1].sideAPlayerIds).toEqual(["m1", "m4"]);
   });
+  it("moves a KDK match and saves the renumbered order", async () => {
+    const state = makeStateWithMatch();
+    state.groups = [{ ...state.groups[0], scheduleFormat: "kdk-v2010" }];
+    state.matches = [
+      { ...state.matches[0], courtNumber: "1" },
+      { ...state.matches[0], id: "match-2", matchNumber: 2, sortOrder: 2, sideAPlayerIds: ["m1", "m3"], sideBPlayerIds: ["m2", "m4"], courtNumber: "2" }
+    ];
+
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.click(screen.getByRole("button", { name: "경기 1 아래로 이동" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
+    expect(saved?.matches.map((match) => match.id)).toEqual(["match-2", "match-1"]);
+    expect(saved?.matches.map((match) => match.sortOrder)).toEqual([1, 2]);
+    expect(saved?.matches.map((match) => match.matchNumber)).toEqual([1, 2]);
+    expect(saved?.matches.map((match) => match.courtNumber)).toEqual(["2", "1"]);
+  });
   it("moves a team battle round and saves the new match order", async () => {
     const state = makeState();
     state.tournament = { ...state.tournament, type: "team-battle" };
