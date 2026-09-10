@@ -10,6 +10,7 @@ import { TeamBattleContributionDetails, TeamBattleRoster } from "@/components/Te
 import { StatusBadge } from "@/components/StatusBadge";
 import { getClubBySlug, type ClubSlug } from "@/lib/domain/club";
 import { getClubShareContent } from "@/lib/domain/club-share";
+import { scheduleMatchesAcrossCourts } from "@/lib/domain/court-schedule";
 import { openKakaoTournamentShare } from "@/lib/domain/kakao-share";
 import { groupMatchesByExplicitRound } from "@/lib/domain/match-rounds";
 import { getMemberLevelLabel } from "@/lib/domain/member-level";
@@ -105,7 +106,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [openPlayerEditMatchId, setOpenPlayerEditMatchId] = useState<string | null>(null);
   const [draggingMember, setDraggingMember] = useState<{ groupId: string; memberId: string } | null>(null);
   const [scoreSaveStatusByMatchId, setScoreSaveStatusByMatchId] = useState<Record<string, ScoreSaveStatus>>({});
-  const [courtAssignmentEnabled, setCourtAssignmentEnabled] = useState(initialIsTeamBattle || (initialState.groups.length === 1 && initialCourtNumbers.length > 0));
+  const [courtAssignmentEnabled, setCourtAssignmentEnabled] = useState(initialIsTeamBattle || initialCourtNumbers.length > 0);
   const [courtCount, setCourtCount] = useState(Math.min(6, Math.max(1, initialCourtNumbers.length || (initialIsTeamBattle ? 3 : 2))));
   const [teamBattleRoundCount, setTeamBattleRoundCount] = useState(initialTeamBattleRoundCount || 5);
   const [teamBattleMatchMode, setTeamBattleMatchMode] = useState<TeamBattleMatchMode>(initialTeamBattleMatchMode);
@@ -142,7 +143,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const isCompleted = tournament.status === "completed";
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
   const isRandomKdkTournament = tournamentType === "general" && state.groups.some((group) => group.scheduleFormat === "random");
-  const canUseCourtAssignment = tournamentType === "team-battle" || (state.groups.length === 1 && !isRandomKdkTournament);
+  const usesKdkCourtScheduling = state.groups.length > 0 && state.groups.every((group) => group.scheduleFormat === "kdk-v2010" || group.scheduleFormat === "hanul-aa");
+  const canUseCourtAssignment = tournamentType === "team-battle"
+    || (state.groups.length === 1 && !isRandomKdkTournament)
+    || (state.groups.length > 1 && usesKdkCourtScheduling);
 
   const tournamentParticipants = useMemo(
     () => tournamentParticipantIds.map((id) => membersById.get(id)).filter((member): member is typeof state.members[number] => Boolean(member)),
@@ -466,11 +470,17 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
     if (currentIndex < 0 || targetIndex < 0 || targetIndex >= groupMatches.length) return;
 
+    const usesExplicitRounds = groupMatches.every((match) => (match.roundNumber ?? 0) > 0);
+    const scheduleSlots = groupMatches.map((match) => ({
+      roundNumber: match.roundNumber,
+      courtNumber: match.courtNumber
+    }));
     [groupMatches[currentIndex], groupMatches[targetIndex]] = [groupMatches[targetIndex], groupMatches[currentIndex]];
     const reorderedGroupMatches = groupMatches.map((match, index) => ({
       ...match,
       matchNumber: index + 1,
-      sortOrder: index + 1
+      sortOrder: index + 1,
+      ...(usesExplicitRounds ? scheduleSlots[index] : {})
     }));
     let groupInserted = false;
     const nextMatches = state.matches.flatMap((match) => {
@@ -479,6 +489,21 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       groupInserted = true;
       return reorderedGroupMatches;
     });
+
+    if (usesExplicitRounds) {
+      const playerIdsByRound = new Map<number, Set<string>>();
+      for (const match of nextMatches) {
+        if (!match.roundNumber) continue;
+        const playerIds = [...match.sideAPlayerIds, ...match.sideBPlayerIds].filter(Boolean);
+        const roundPlayerIds = playerIdsByRound.get(match.roundNumber) ?? new Set<string>();
+        if (playerIds.some((playerId) => roundPlayerIds.has(playerId))) {
+          window.alert("같은 회차에 중복 출전하는 선수가 생겨 순서를 변경할 수 없습니다.");
+          return;
+        }
+        playerIds.forEach((playerId) => roundPlayerIds.add(playerId));
+        playerIdsByRound.set(match.roundNumber, roundPlayerIds);
+      }
+    }
     persist({ ...state, matches: nextMatches });
   }
   function displayGroupName(group: TournamentGroup) {
@@ -819,7 +844,9 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     const groupId = `group-${Date.now()}`;
     const nextGroupNumber = state.groups.length + 1;
     setActiveSetupGroupId(groupId);
-    setCourtAssignmentEnabled(false);
+    if (!state.groups.every((group) => group.scheduleFormat === "kdk-v2010" || group.scheduleFormat === "hanul-aa")) {
+      setCourtAssignmentEnabled(false);
+    }
     updateLocal({
       ...state,
       groups: [
@@ -1049,7 +1076,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       return;
     }
 
-    const courtNumbers = selectedCourtNumbersForSchedule();
+    const optimizeKdkCourtSchedule = courtAssignmentEnabled && usesKdkCourtScheduling;
+    const courtNumbers = optimizeKdkCourtSchedule ? [] : selectedCourtNumbersForSchedule();
     let courtStartIndex = 0;
     const generated = state.groups.flatMap((group) => {
       const participants = groupParticipants(group.id);
@@ -1069,12 +1097,16 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       return matches;
     });
 
+    const scheduledMatches = optimizeKdkCourtSchedule
+      ? scheduleMatchesAcrossCourts(generated, selectedCourtNumbersForSchedule())
+      : generated;
+
     persist({
       ...state,
       tournament,
-      matches: generated
+      matches: scheduledMatches
     });
-    setActiveDrawGroupId(generated[0]?.groupId ?? state.groups[0]?.id ?? null);
+    setActiveDrawGroupId(scheduledMatches[0]?.groupId ?? state.groups[0]?.id ?? null);
     setActiveTab("draw");
   }
 
@@ -1084,6 +1116,10 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
     if (!group || isTournamentFormat(group) || isFixedPairLeagueFormat(group) || group.scheduleFormat === "team-battle") return;
     const groupMatches = matchesByGroupId.get(groupId) ?? [];
     const nextNumber = groupMatches.length + 1;
+    const usesExplicitRounds = groupMatches.length > 0 && groupMatches.every((match) => (match.roundNumber ?? 0) > 0);
+    const nextRoundNumber = usesExplicitRounds
+      ? Math.max(...groupMatches.map((match) => match.roundNumber ?? 0)) + 1
+      : undefined;
     const matchId = `${groupId}-manual-${Date.now()}`;
     pendingScrollMatchId.current = `match-${matchId}`;
     setOpenPlayerEditMatchId(matchId);
@@ -1102,6 +1138,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
           sideBScore: null,
           status: "scheduled",
           sortOrder: nextNumber,
+          roundNumber: nextRoundNumber,
           courtNumber: selectedCourtNumbersForSchedule()[(nextNumber - 1) % Math.max(selectedCourtNumbersForSchedule().length, 1)] ?? null
         }
       ]
@@ -1788,7 +1825,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                   <div className="court-toggle-row">
                     <div>
                       <strong>코트 배정</strong>
-                      <p className="notice-text">사용함을 켜면 경기 순서대로 코트 번호가 자동 배정됩니다.</p>
+                      <p className="notice-text">{usesKdkCourtScheduling ? "사용 코트 수에 맞춰 같은 선수가 겹치지 않도록 회차와 코트를 자동 배정합니다." : "사용함을 켜면 경기 순서대로 코트 번호가 자동 배정됩니다."}</p>
                     </div>
                     <button
                       className={`toggle-pill ${courtAssignmentEnabled ? "active" : ""}`}

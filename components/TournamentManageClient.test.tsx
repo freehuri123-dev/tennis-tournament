@@ -463,22 +463,54 @@ describe("TournamentManageClient save timing", () => {
     expect(screen.getAllByText("1번 코트").length).toBeGreaterThan(0);
   });
 
-  it("hides court assignment when a second group is added", () => {
+  it("keeps tournament court assignment available when a second KDK group is added", () => {
     const state = makeStateWithParticipants();
     state.groups = state.groups.map((group) => ({ ...group, scheduleFormat: "kdk-v2010" }));
     render(<TournamentManageClient initialState={state} clubSlug="stc" />);
 
     fireEvent.click(screen.getByRole("button", { name: "사용안함" }));
-    expect(screen.getByRole("button", { name: "사용함" })).toBeTruthy();
-    expect(screen.getByLabelText("코트 개수")).toBeTruthy();
-
     fireEvent.click(screen.getByRole("button", { name: "그룹 추가" }));
 
     expect(screen.getByRole("tab", { name: /B조.*0명/ }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.queryByText("코트 배정")).toBeNull();
-    expect(screen.queryByRole("button", { name: "사용불가" })).toBeNull();
-    expect(screen.queryByLabelText("코트 개수")).toBeNull();
-    expect(screen.queryByText("코트 배정은 그룹이 1개일 때만 사용할 수 있습니다.")).toBeNull();
+    expect(screen.getByText("코트 배정")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "사용함" })).toBeTruthy();
+    expect(screen.getByLabelText("코트 개수")).toBeTruthy();
+  });
+
+  it("schedules multiple KDK groups across the selected courts without simultaneous duplicate players", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const state = makeState();
+    state.members = Array.from({ length: 16 }, (_, index) => ({ id: `m${index + 1}`, name: `선수${index + 1}`, gender: "male" as const, notes: "" }));
+    state.groups = [
+      { ...state.groups[0], scheduleFormat: "kdk-v2010" },
+      { ...state.groups[0], id: "g2", name: "B조", scheduleFormat: "kdk-v2010", sortOrder: 2 }
+    ];
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    state.groupMemberIds = {
+      g1: state.members.slice(0, 8).map((member) => member.id),
+      g2: state.members.slice(8).map((member) => member.id)
+    };
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "사용안함" }));
+    fireEvent.change(screen.getByLabelText("코트 개수"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "대진표 생성" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
+    const rounds = new Map<number, NonNullable<typeof saved>["matches"]>();
+    for (const match of saved?.matches ?? []) {
+      expect(match.roundNumber).toBeTypeOf("number");
+      const round = rounds.get(match.roundNumber!) ?? [];
+      round.push(match);
+      rounds.set(match.roundNumber!, round);
+    }
+    expect([...rounds.values()].some((round) => round.length === 3)).toBe(true);
+    for (const round of rounds.values()) {
+      const playerIds = round.flatMap((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds]);
+      expect(new Set(playerIds).size).toBe(playerIds.length);
+      expect(new Set(round.map((match) => match.courtNumber)).size).toBe(round.length);
+    }
   });
   it("swaps only the dragged participant and drop target in group order", () => {
     const { container } = render(<TournamentManageClient initialState={makeStateWithMatch()} clubSlug="stc" />);
@@ -1050,6 +1082,65 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(saved?.matches.map((match) => match.sortOrder)).toEqual([1, 2]);
     expect(saved?.matches.map((match) => match.matchNumber)).toEqual([1, 2]);
     expect(saved?.matches.map((match) => match.courtNumber)).toEqual(["2", "1"]);
+  });
+  it("keeps explicit court rounds when adding a manual KDK match", () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const state = makeStateWithMatch();
+    state.groups = [{ ...state.groups[0], scheduleFormat: "kdk-v2010" }];
+    state.matches = [
+      { ...state.matches[0], roundNumber: 1, courtNumber: "1" },
+      { ...state.matches[0], id: "match-2", matchNumber: 2, sortOrder: 2, roundNumber: 2, courtNumber: "2" }
+    ];
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.click(screen.getByRole("button", { name: "경기 추가" }));
+
+    expect(container.querySelectorAll(".explicit-round-card")).toHaveLength(3);
+    expect(Array.from(container.querySelectorAll(".explicit-round-head strong")).map((heading) => heading.textContent)).toContain("3라운드");
+  });
+  it("moves a court-scheduled KDK match into the adjacent round slot", async () => {
+    const state = makeStateWithMatch();
+    state.groups = [{ ...state.groups[0], scheduleFormat: "kdk-v2010" }];
+    state.matches = [
+      { ...state.matches[0], roundNumber: 1, courtNumber: "1" },
+      { ...state.matches[0], id: "match-2", matchNumber: 2, sortOrder: 2, roundNumber: 2, courtNumber: "2", sideAPlayerIds: ["m1", "m3"], sideBPlayerIds: ["m2", "m4"] }
+    ];
+
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.click(screen.getByRole("button", { name: "경기 1 아래로 이동" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls.at(-1)?.[1];
+    expect(saved?.matches.map((match) => ({ id: match.id, round: match.roundNumber, court: match.courtNumber }))).toEqual([
+      { id: "match-2", round: 1, court: "1" },
+      { id: "match-1", round: 2, court: "2" }
+    ]);
+  });
+
+  it("blocks a KDK order change that would duplicate a player in one court round", () => {
+    const state = makeStateWithMatch();
+    state.members.push(
+      { id: "m5", name: "선수5", gender: "male", notes: "" },
+      { id: "m6", name: "선수6", gender: "male", notes: "" },
+      { id: "m7", name: "선수7", gender: "male", notes: "" },
+      { id: "m8", name: "선수8", gender: "male", notes: "" }
+    );
+    state.groups = [{ ...state.groups[0], scheduleFormat: "kdk-v2010" }];
+    state.matches = [
+      { ...state.matches[0], roundNumber: 1, courtNumber: "1" },
+      { ...state.matches[0], id: "match-2", matchNumber: 2, sortOrder: 2, roundNumber: 2, courtNumber: "1", sideAPlayerIds: ["m5", "m6"], sideBPlayerIds: ["m7", "m8"] },
+      { ...state.matches[0], id: "match-3", matchNumber: 3, sortOrder: 3, roundNumber: 2, courtNumber: "2" }
+    ];
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "대진표" }));
+    fireEvent.click(screen.getByRole("button", { name: "경기 1 아래로 이동" }));
+
+    expect(alertSpy).toHaveBeenCalledWith("같은 회차에 중복 출전하는 선수가 생겨 순서를 변경할 수 없습니다.");
+    expect(persistTournamentStateAction).not.toHaveBeenCalled();
   });
   it("moves a team battle round and saves the new match order", async () => {
     const state = makeState();
