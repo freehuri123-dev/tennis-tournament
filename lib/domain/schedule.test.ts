@@ -90,6 +90,59 @@ describe("generateInitialMatches", () => {
     expect(matches).toEqual([]);
   });
 
+  it("KDK-V2010은 여성 2명이 출전하는 경기를 혼복 대 혼복으로 구성한다", () => {
+    const members = makeMembers(6).map((member, index) => ({ ...member, gender: index < 2 ? "female" as const : "male" as const }));
+    const matches = generateInitialMatches({ tournamentId: "t1", groupId: "g1", format: "kdk-v2010", participants: members });
+
+    const genderById = new Map(members.map((member) => [member.id, member.gender]));
+    const femaleMatches = matches.filter((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds].some((id) => genderById.get(id) === "female"));
+    expect(femaleMatches).toHaveLength(4);
+    for (const match of femaleMatches) {
+      expect(match.sideAPlayerIds.filter((id) => genderById.get(id) === "female")).toHaveLength(1);
+      expect(match.sideBPlayerIds.filter((id) => genderById.get(id) === "female")).toHaveLength(1);
+    }
+  });
+
+  it("KDK-V2010은 여성 3명이 출전하는 경기를 여성 3명과 남성 1명으로 구성한다", () => {
+    const members = makeMembers(7).map((member, index) => ({ ...member, gender: index < 3 ? "female" as const : "male" as const }));
+    const matches = generateInitialMatches({ tournamentId: "t1", groupId: "g1", format: "kdk-v2010", participants: members });
+
+    const genderById = new Map(members.map((member) => [member.id, member.gender]));
+    const femaleMatches = matches.filter((match) => [...match.sideAPlayerIds, ...match.sideBPlayerIds].some((id) => genderById.get(id) === "female"));
+    expect(femaleMatches).toHaveLength(4);
+    for (const match of femaleMatches) {
+      expect([...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => genderById.get(id) === "female")).toHaveLength(3);
+    }
+  });
+
+  it("KDK-V2010은 여성 4명이 출전하는 경기를 혼복 또는 여복으로만 구성한다", () => {
+    const members = makeMembers(8).map((member, index) => ({ ...member, gender: index < 4 ? "female" as const : "male" as const }));
+    const matches = generateInitialMatches({ tournamentId: "t1", groupId: "g1", format: "kdk-v2010", participants: members });
+
+    const genderById = new Map(members.map((member) => [member.id, member.gender]));
+    for (const match of matches) {
+      const femaleCount = [...match.sideAPlayerIds, ...match.sideBPlayerIds].filter((id) => genderById.get(id) === "female").length;
+      expect([0, 2, 4]).toContain(femaleCount);
+      if (femaleCount === 2) {
+        expect(match.sideAPlayerIds.filter((id) => genderById.get(id) === "female")).toHaveLength(1);
+        expect(match.sideBPlayerIds.filter((id) => genderById.get(id) === "female")).toHaveLength(1);
+      }
+    }
+  });
+
+  it("KDK-V2010은 여성 2명의 목표 경기 수가 다르면 대진을 생성하지 않는다", () => {
+    const members = makeMembers(6).map((member, index) => ({ ...member, gender: index < 2 ? "female" as const : "male" as const }));
+    const matches = generateInitialMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      format: "kdk-v2010",
+      participants: members,
+      kdkPlayerGameCounts: { m1: 2, m2: 6 }
+    });
+
+    expect(matches).toEqual([]);
+  });
+
   it("한울AA방식 KDK 이미지 표의 A~G 표기를 10~16번 선수로 해석한다", () => {
     const matches = generateInitialMatches({
       tournamentId: "t1",

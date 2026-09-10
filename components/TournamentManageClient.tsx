@@ -14,7 +14,7 @@ import { openKakaoTournamentShare } from "@/lib/domain/kakao-share";
 import { groupMatchesByExplicitRound } from "@/lib/domain/match-rounds";
 import { getMemberLevelLabel } from "@/lib/domain/member-level";
 import { calculateFixedPairRankings, calculateRankings } from "@/lib/domain/ranking";
-import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateScheduleParticipants } from "@/lib/domain/schedule";
+import { applyTournamentAdvancement, generateInitialMatches, getFixedPairTournamentRoundCounts, getHanulSeedSlots, getScheduleFormatLabel, getTournamentByeSelectionOptions, getTournamentRoundLabel, selectTournamentBye, validateKdkGenderConfiguration, validateScheduleParticipants } from "@/lib/domain/schedule";
 import { normalizeMatchScore } from "@/lib/domain/score";
 import { balanceTeamAssignments, calculateTeamBattleResult, calculateTeamBattleSideGamePlan, generateTeamBattleMatches, getTeamBattleTargetAppearances, groupTeamBattleMatchesByRound } from "@/lib/domain/team-battle";
 import { shareTournamentLink } from "@/lib/domain/share";
@@ -761,6 +761,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       if (participants.some((member) => (group.kdkPlayerGameCounts?.[member.id] ?? 4) > matchCount)) {
         return "한 선수의 경기 수가 전체 경기 수보다 많습니다. 경기 수를 조정해주세요.";
       }
+      const genderMessage = validateKdkGenderConfiguration(participants, group.kdkPlayerGameCounts);
+      if (genderMessage) return genderMessage;
     }
     if (group.scheduleFormat === "hanul-aa") {
       const seedSlots = getHanulSeedSlots(participants.length);

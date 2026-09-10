@@ -116,6 +116,24 @@ export function getScheduleFormatLabel(format: ScheduleFormat) {
   return FORMAT_LABELS[format];
 }
 
+export function validateKdkGenderConfiguration(participants: Member[], gameCounts: Record<string, number> = {}) {
+  const femaleMembers = participants.filter((member) => member.gender === "female");
+  if (femaleMembers.length !== 2 && femaleMembers.length !== 3) return "";
+
+  const femaleGameCounts = femaleMembers.map((member) => gameCounts[member.id] ?? 4);
+  if (new Set(femaleGameCounts).size > 1) return `여성 ${femaleMembers.length}명의 경기 수를 동일하게 맞춰주세요.`;
+
+  const totalAppearances = participants.reduce((sum, member) => sum + (gameCounts[member.id] ?? 4), 0);
+  if (totalAppearances % 4 !== 0) return "";
+  const femaleMatchCount = femaleGameCounts[0] ?? 0;
+  const menOnlyMatchCount = totalAppearances / 4 - femaleMatchCount;
+  const maleCount = participants.filter((member) => member.gender === "male").length;
+  if (menOnlyMatchCount > 0 && maleCount < 4) {
+    return `여성 ${femaleMembers.length}명 규칙으로 남은 경기를 구성하려면 남성이 4명 이상 필요합니다.`;
+  }
+  return "";
+}
+
 export function generateInitialMatches(input: GenerateInitialMatchesInput): Match[] {
   const participantCount = input.participants.length;
   const validationMessage = validateScheduleParticipants(input.format, participantCount);
@@ -126,10 +144,14 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   if (input.format === "fixed-pair-tournament") return assignCourtNumbers(generateTournamentMatches(input, 2), input.courtNumbers, input.courtStartIndex);
   if (input.format === "single-tournament") return assignCourtNumbers(generateTournamentMatches(input, 1), input.courtNumbers, input.courtStartIndex);
 
-  if (input.format === "kdk-v2010" && input.kdkPlayerGameCounts) {
+  if (input.format === "kdk-v2010") {
     const targetCounts = new Map(input.participants.map((member) => [member.id, input.kdkPlayerGameCounts?.[member.id] ?? 4]));
+    const femaleCount = input.participants.filter((member) => member.gender === "female").length;
     const hasCustomCount = [...targetCounts.values()].some((count) => count !== 4);
-    if (hasCustomCount) return assignCourtNumbers(generateVariableKdkMatches(input, targetCounts), input.courtNumbers, input.courtStartIndex);
+    const usesGenderRules = femaleCount >= 2 && femaleCount <= 4;
+    if (hasCustomCount || usesGenderRules) {
+      return assignCourtNumbers(generateVariableKdkMatches(input, targetCounts, femaleCount), input.courtNumbers, input.courtStartIndex);
+    }
   }
 
   const playerMap = createDefaultSeedMap(input.participants);
@@ -153,13 +175,14 @@ export function generateInitialMatches(input: GenerateInitialMatchesInput): Matc
   }), input.courtNumbers, input.courtStartIndex);
 }
 
-function generateVariableKdkMatches(input: GenerateInitialMatchesInput, targetCounts: Map<string, number>): Match[] {
+function generateVariableKdkMatches(input: GenerateInitialMatchesInput, targetCounts: Map<string, number>, femaleCount = 0): Match[] {
   const totalAppearances = [...targetCounts.values()].reduce((sum, count) => sum + count, 0);
   if (totalAppearances % 4 !== 0) return [];
   const matchCount = totalAppearances / 4;
   if ([...targetCounts.values()].some((count) => count < 2 || count > 6 || count > matchCount)) return [];
+  if (validateKdkGenderConfiguration(input.participants, Object.fromEntries(targetCounts))) return [];
 
-  const playerSets = createVariableKdkPlayerSets(input.participants, targetCounts, matchCount);
+  const playerSets = createVariableKdkPlayerSets(input.participants, targetCounts, matchCount, femaleCount);
   if (!playerSets) return [];
 
   const memberById = new Map(input.participants.map((member) => [member.id, member]));
@@ -170,7 +193,13 @@ function generateVariableKdkMatches(input: GenerateInitialMatchesInput, targetCo
       [[playerIds[0], playerIds[2]], [playerIds[1], playerIds[3]]],
       [[playerIds[0], playerIds[3]], [playerIds[1], playerIds[2]]]
     ];
-    const [sideAPlayerIds, sideBPlayerIds] = pairings.sort((left, right) => {
+    const validPairings = pairings.filter((pairing) => {
+      const matchFemaleCount = playerIds.filter((id) => memberById.get(id)?.gender === "female").length;
+      if (matchFemaleCount !== 2) return true;
+      return pairing[0].filter((id) => memberById.get(id)?.gender === "female").length === 1
+        && pairing[1].filter((id) => memberById.get(id)?.gender === "female").length === 1;
+    });
+    const [sideAPlayerIds, sideBPlayerIds] = validPairings.sort((left, right) => {
       const score = (pairing: string[][]) => {
         const repeatCount = pairCount(partnerCounts, pairing[0][0], pairing[0][1]) + pairCount(partnerCounts, pairing[1][0], pairing[1][1]);
         const sideAStrength = pairing[0].reduce((sum, id) => sum + memberStrength(memberById.get(id)), 0);
@@ -185,7 +214,7 @@ function generateVariableKdkMatches(input: GenerateInitialMatchesInput, targetCo
   });
 }
 
-function createVariableKdkPlayerSets(participants: Member[], targetCounts: Map<string, number>, matchCount: number): string[][] | null {
+function createVariableKdkPlayerSets(participants: Member[], targetCounts: Map<string, number>, matchCount: number, femaleCount: number): string[][] | null {
   const remaining = new Map(targetCounts);
   const result: string[][] = [];
 
@@ -193,7 +222,13 @@ function createVariableKdkPlayerSets(participants: Member[], targetCounts: Map<s
     if (matchIndex === matchCount) return [...remaining.values()].every((count) => count === 0);
     const remainingMatches = matchCount - matchIndex - 1;
     const eligible = participants.filter((member) => (remaining.get(member.id) ?? 0) > 0);
-    const candidates = combinations(eligible, 4).sort((left, right) => {
+    const candidates = combinations(eligible, 4).filter((candidate) => {
+      const matchFemaleCount = candidate.filter((member) => member.gender === "female").length;
+      if (femaleCount === 2) return matchFemaleCount === 0 || matchFemaleCount === 2;
+      if (femaleCount === 3) return matchFemaleCount === 0 || matchFemaleCount === 3;
+      if (femaleCount === 4) return matchFemaleCount === 0 || matchFemaleCount === 2 || matchFemaleCount === 4;
+      return true;
+    }).sort((left, right) => {
       const total = (members: Member[]) => members.reduce((sum, member) => sum + (remaining.get(member.id) ?? 0), 0);
       return total(right) - total(left);
     });

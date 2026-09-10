@@ -415,11 +415,37 @@ describe("TournamentManageClient save timing", () => {
     expect(appearances.filter((id) => id === "m2")).toHaveLength(6);
   });
 
+  it("blocks KDK generation when two women have different target game counts", () => {
+    const state = makeKdkTenParticipantState();
+    state.members = state.members.map((member, index) => ({ ...member, gender: index < 2 ? "female" : "male" }));
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+
+    fireEvent.change(screen.getByLabelText("Member 1 경기 수"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Member 3 경기 수"), { target: { value: "6" } });
+
+    expect(screen.getByText("여성 2명의 경기 수를 동일하게 맞춰주세요.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "대진표 생성" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("explains when three-women KDK rules cannot fill the remaining men-only matches", () => {
+    const state = makeKdkTenParticipantState();
+    state.members = state.members.slice(0, 6).map((member, index) => ({ ...member, gender: index < 3 ? "female" : "male" }));
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    state.groupMemberIds = { g1: state.members.map((member) => member.id) };
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+
+    expect(screen.getByText("여성 3명 규칙으로 남은 경기를 구성하려면 남성이 4명 이상 필요합니다.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "대진표 생성" }).hasAttribute("disabled")).toBe(true);
+  });
+
   it("assigns and displays default court numbers when court assignment is enabled before generating schedules", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const state = makeStateWithParticipants();
     state.groups = state.groups.map((group) => ({ ...group, scheduleFormat: "kdk-v2010" }));
-    state.members = [...state.members, { id: "m5", name: "추가회원", gender: "female", notes: "" }];
+    state.members = [
+      ...state.members.map((member) => (member.id === "m4" ? { ...member, gender: "male" as const } : member)),
+      { id: "m5", name: "추가회원", gender: "male", notes: "" }
+    ];
     state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
     render(<TournamentManageClient initialState={state} clubSlug="stc" />);
 
