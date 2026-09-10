@@ -1,4 +1,4 @@
-import type { Match, Member, TeamSide } from "./types";
+import type { Match, Member, TeamBattleMatchMode, TeamSide } from "./types";
 
 export const TEAM_BATTLE_MAXIMUM_GAMES = 4;
 
@@ -153,6 +153,7 @@ function pairKey(ids: string[]) {
 }
 
 type TeamBattleBalanceScore = {
+  similarLevelViolationCount: number;
   severeMatchCount: number;
   maximumGap: number;
   squaredGapTotal: number;
@@ -161,7 +162,8 @@ type TeamBattleBalanceScore = {
 };
 
 function compareTeamBattleBalanceScore(left: TeamBattleBalanceScore, right: TeamBattleBalanceScore) {
-  return left.severeMatchCount - right.severeMatchCount
+  return left.similarLevelViolationCount - right.similarLevelViolationCount
+    || left.severeMatchCount - right.severeMatchCount
     || left.maximumGap - right.maximumGap
     || left.squaredGapTotal - right.squaredGapTotal
     || left.partnerRepeatPenalty - right.partnerRepeatPenalty
@@ -201,14 +203,31 @@ function isFeaturedSameGradeMatch(match: Pick<Match, "sideAPlayerIds" | "sideBPl
     && pairKey(match.sideBPlayerIds) === pairKey(featuredMatch.whiteIds);
 }
 
-function teamBattleBalanceScore(matches: Match[], membersById: Map<string, Member>): TeamBattleBalanceScore {
+function similarLevelViolationCount(blue: Member[], white: Member[]) {
+  const blueWeights = blue.map(teamGradeWeight);
+  const whiteWeights = white.map(teamGradeWeight);
+  const bluePairGap = Math.abs(blueWeights[0] - blueWeights[1]);
+  const whitePairGap = Math.abs(whiteWeights[0] - whiteWeights[1]);
+  const strengthGap = Math.abs(blueWeights[0] + blueWeights[1] - whiteWeights[0] - whiteWeights[1]);
+  return Number(bluePairGap > 1) + Number(whitePairGap > 1) + Number(strengthGap > 1);
+}
+
+function teamBattleBalanceScore(matches: Match[], membersById: Map<string, Member>, matchingMode: TeamBattleMatchMode): TeamBattleBalanceScore {
   const partnerCounts = new Map<string, number>();
   const opponentCounts = new Map<string, number>();
+  let similarLevelViolations = 0;
   let severeMatchCount = 0;
   let maximumGap = 0;
   let squaredGapTotal = 0;
 
   for (const match of matches) {
+    if (matchingMode === "similar-level") {
+      const blueMembers = match.sideAPlayerIds.map((memberId) => membersById.get(memberId)!).filter(Boolean);
+      const whiteMembers = match.sideBPlayerIds.map((memberId) => membersById.get(memberId)!).filter(Boolean);
+      if (blueMembers.length === 2 && whiteMembers.length === 2) {
+        similarLevelViolations += similarLevelViolationCount(blueMembers, whiteMembers);
+      }
+    }
     const blueStrength = match.sideAPlayerIds.reduce((sum, memberId) => sum + teamGradeWeight(membersById.get(memberId)!), 0);
     const whiteStrength = match.sideBPlayerIds.reduce((sum, memberId) => sum + teamGradeWeight(membersById.get(memberId)!), 0);
     const gap = Math.abs(blueStrength - whiteStrength);
@@ -228,6 +247,7 @@ function teamBattleBalanceScore(matches: Match[], membersById: Map<string, Membe
   }
 
   return {
+    similarLevelViolationCount: similarLevelViolations,
     severeMatchCount,
     maximumGap,
     squaredGapTotal,
@@ -246,7 +266,7 @@ function playerAppearsElsewhereInRound(matches: Match[], roundSize: number, matc
   return false;
 }
 
-function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], roundSize: number, protectedMatchIds = new Set<string>()): Match[] {
+function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], roundSize: number, matchingMode: TeamBattleMatchMode, protectedMatchIds = new Set<string>()): Match[] {
   if (matches.length < 2) return matches;
   const membersById = new Map(members.map((member) => [member.id, member]));
   let optimized = matches.map((match) => ({
@@ -254,7 +274,7 @@ function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], rou
     sideAPlayerIds: [...match.sideAPlayerIds],
     sideBPlayerIds: [...match.sideBPlayerIds]
   }));
-  let currentScore = teamBattleBalanceScore(optimized, membersById);
+  let currentScore = teamBattleBalanceScore(optimized, membersById, matchingMode);
   const maximumIterations = Math.min(16, Math.max(1, matches.length * 2));
 
   for (let iteration = 0; iteration < maximumIterations; iteration += 1) {
@@ -283,7 +303,7 @@ function optimizeTeamBattleMatchBalance(matches: Match[], members: Member[], rou
               const candidate = [...optimized];
               candidate[leftIndex] = { ...candidate[leftIndex], [sideKey]: leftSide };
               candidate[rightIndex] = { ...candidate[rightIndex], [sideKey]: rightSide };
-              const score = teamBattleBalanceScore(candidate, membersById);
+              const score = teamBattleBalanceScore(candidate, membersById, matchingMode);
               if (compareTeamBattleBalanceScore(score, currentScore) >= 0) continue;
               const key = `${leftIndex}:${rightIndex}:${sideKey}:${leftSlot}:${rightSlot}`;
               if (!best || compareTeamBattleBalanceScore(score, best.score) < 0
@@ -325,7 +345,8 @@ export function generateTeamBattleMatches({
   existingMatches = [],
   targetGamesByMemberId,
   courtNumbers = [],
-  roundCount
+  roundCount,
+  matchingMode = "balanced"
 }: {
   tournamentId: string;
   groupId: string;
@@ -335,6 +356,7 @@ export function generateTeamBattleMatches({
   targetGamesByMemberId?: Record<string, number>;
   courtNumbers?: string[];
   roundCount?: number;
+  matchingMode?: TeamBattleMatchMode;
 }): Match[] {
   if (blueMembers.length < 2 || whiteMembers.length < 2) throw new Error("청팀과 백팀에 각각 최소 2명이 필요합니다.");
 
@@ -465,7 +487,7 @@ export function generateTeamBattleMatches({
       register(match);
     }
   }
-  const balancedGenerated = optimizeTeamBattleMatchBalance(generated, [...blueMembers, ...whiteMembers], requestedRoundSize, protectedGeneratedMatchIds);
+  const balancedGenerated = optimizeTeamBattleMatchBalance(generated, [...blueMembers, ...whiteMembers], requestedRoundSize, matchingMode, protectedGeneratedMatchIds);
   return [...preserved, ...balancedGenerated].map((match, index) => ({ ...match, matchNumber: index + 1, sortOrder: index + 1 }));
 }
 

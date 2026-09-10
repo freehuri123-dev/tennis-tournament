@@ -4482,6 +4482,55 @@ body,
   box-sizing: border-box;
 }
 
+.team-battle-match-mode {
+  display: grid;
+  gap: 10px;
+}
+
+.team-battle-match-mode > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.team-battle-match-mode > div:first-child .notice-text {
+  margin: 0;
+}
+
+.team-battle-match-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-battle-match-mode-options button {
+  min-width: 0;
+  min-height: 76px;
+  padding: 12px 10px;
+  border: 1px solid #d8e2df;
+  border-radius: 8px;
+  background: #fff;
+  color: #26423c;
+  text-align: left;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.team-battle-match-mode-options button small {
+  color: #6b7f7a;
+  line-height: 1.35;
+}
+
+.team-battle-match-mode-options button.active {
+  border-color: #2e8b7d;
+  background: #e9f6f2;
+  box-shadow: inset 0 0 0 1px #2e8b7d;
+}
+
+.team-battle-match-mode-options button.active small {
+  color: #315f57;
+}
+
 .team-battle-contribution-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

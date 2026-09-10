@@ -161,6 +161,7 @@ function toDomainGroup(group: {
   seedPlayerIds: string[];
   randomCourtCount?: number | null;
   randomGamesPerPlayer?: number | null;
+  teamBattleMatchMode?: string | null;
 }): TournamentGroup {
   return {
     id: group.id,
@@ -170,7 +171,8 @@ function toDomainGroup(group: {
     sortOrder: group.sortOrder,
     seedPlayerIds: group.seedPlayerIds,
     randomCourtCount: group.randomCourtCount ?? undefined,
-    randomGamesPerPlayer: group.randomGamesPerPlayer ?? undefined
+    randomGamesPerPlayer: group.randomGamesPerPlayer ?? undefined,
+    teamBattleMatchMode: group.teamBattleMatchMode === "similar-level" ? "similar-level" : "balanced"
   };
 }
 
@@ -772,7 +774,8 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
           sortOrder: group.sortOrder || index + 1,
           seedPlayerIds: group.seedPlayerIds ?? [],
           randomCourtCount: group.randomCourtCount ?? null,
-          randomGamesPerPlayer: group.randomGamesPerPlayer ?? null
+          randomGamesPerPlayer: group.randomGamesPerPlayer ?? null,
+          teamBattleMatchMode: group.teamBattleMatchMode === "similar-level" ? "similar-level" : "balanced"
         }))
       });
     }

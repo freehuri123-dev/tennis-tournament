@@ -21,7 +21,7 @@ import { shareTournamentLink } from "@/lib/domain/share";
 import { canAddTournamentGroup, filterGroupMembersByTournamentParticipants, updateTournamentParticipantSelection } from "@/lib/domain/tournament-participants";
 import { isScheduleLocked, rankingMembersForTournament } from "@/lib/domain/tournament-policy";
 import { withDateStatus } from "@/lib/domain/tournament-status";
-import type { Match, TeamSide, TournamentGroup } from "@/lib/domain/types";
+import type { Match, TeamBattleMatchMode, TeamSide, TournamentGroup } from "@/lib/domain/types";
 import { updateMatchScoreAction, updateTournamentMatchStatesAction } from "@/lib/server/actions/match-actions";
 import { persistTournamentStateAction, updateTournamentDateAction, updateTournamentNameAction } from "@/lib/server/actions/tournament-actions";
 import type { TournamentState } from "@/lib/store/tournament-store";
@@ -90,6 +90,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const initialTeamBattleRoundCount = initialIsTeamBattle
     ? groupTeamBattleMatchesByRound(initialState.matches).length
     : 0;
+  const initialTeamBattleMatchMode = initialState.groups.find((group) => group.scheduleFormat === "team-battle")?.teamBattleMatchMode ?? "balanced";
   const [state, setState] = useState(initialState);
   const scheduleLocked = isScheduleLocked(state.tournament);
   const [, startTransition] = useTransition();
@@ -106,6 +107,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
   const [courtAssignmentEnabled, setCourtAssignmentEnabled] = useState(initialIsTeamBattle || (initialState.groups.length === 1 && initialCourtNumbers.length > 0));
   const [courtCount, setCourtCount] = useState(Math.min(6, Math.max(1, initialCourtNumbers.length || (initialIsTeamBattle ? 3 : 2))));
   const [teamBattleRoundCount, setTeamBattleRoundCount] = useState(initialTeamBattleRoundCount || 5);
+  const [teamBattleMatchMode, setTeamBattleMatchMode] = useState<TeamBattleMatchMode>(initialTeamBattleMatchMode);
   const [selectedCourtNumbers, setSelectedCourtNumbers] = useState<string[]>(initialCourtNumbers.length > 0 ? initialCourtNumbers : initialIsTeamBattle ? ["1", "2", "3"] : []);
   const [teamBattleExtraGamePlayerIds, setTeamBattleExtraGamePlayerIds] = useState<Record<TeamSide, string[]>>({ blue: [], white: [] });
   const [teamBattleScheduleError, setTeamBattleScheduleError] = useState("");
@@ -937,7 +939,8 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
         name: "청백전",
         scheduleFormat: "team-battle",
         sortOrder: 1,
-        seedPlayerIds: []
+        seedPlayerIds: [],
+        teamBattleMatchMode
       };
       const teamBattleSeedPlayerIds = [
         ...teamBattleExtraGamePlayerIds.blue,
@@ -958,13 +961,14 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
           existingMatches: [],
           targetGamesByMemberId: teamBattleTargetGames(),
           courtNumbers: selectedCourtNumbersForSchedule(),
-          roundCount: teamBattleRoundCount
+          roundCount: teamBattleRoundCount,
+          matchingMode: teamBattleMatchMode
         });
         setTeamBattleScheduleError("");
         persist({
           ...state,
           tournament: { ...tournament, type: "team-battle" },
-          groups: [{ ...group, seedPlayerIds: teamBattleSeedPlayerIds }],
+          groups: [{ ...group, seedPlayerIds: teamBattleSeedPlayerIds, teamBattleMatchMode }],
           groupMemberIds: { [group.id]: tournamentParticipantIds },
           matches
         });
@@ -1351,6 +1355,22 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       </div>
                     );
                   })}
+                </div>
+                <div className="team-battle-match-mode">
+                  <div>
+                    <strong>대진 매칭 방식</strong>
+                    <p className="notice-text">대진표를 생성할 때 적용할 선수 조합 기준입니다.</p>
+                  </div>
+                  <div className="team-battle-match-mode-options" role="group" aria-label="대진 매칭 방식">
+                    <button aria-pressed={teamBattleMatchMode === "balanced"} className={teamBattleMatchMode === "balanced" ? "active" : ""} disabled={isCompleted} onClick={() => setTeamBattleMatchMode("balanced")} type="button">
+                      <strong>밸런스 매칭</strong>
+                      <small>두 팀의 합산 전력을 맞춥니다.</small>
+                    </button>
+                    <button aria-pressed={teamBattleMatchMode === "similar-level"} className={teamBattleMatchMode === "similar-level" ? "active" : ""} disabled={isCompleted} onClick={() => setTeamBattleMatchMode("similar-level")} type="button">
+                      <strong>등급 근접 매칭</strong>
+                      <small>비슷한 등급끼리 페어를 우선합니다.</small>
+                    </button>
+                  </div>
                 </div>
                 <div className="court-assignment-box">
                   <div className="court-toggle-row">

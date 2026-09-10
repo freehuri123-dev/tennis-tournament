@@ -109,6 +109,35 @@ describe("team battle", () => {
     });
   });
 
+  it("keeps partners and opponents close in level when similar-level matching is selected", () => {
+    const blueMembers = [
+      member("b1", "A"), member("b2", "A"), member("b3", "B"), member("b4", "B"),
+      member("b5", "C"), member("b6", "C"), member("b7", "D"), member("b8", "D")
+    ];
+    const whiteMembers = [
+      member("w1", "A"), member("w2", "A"), member("w3", "B"), member("w4", "B"),
+      member("w5", "C"), member("w6", "C"), member("w7", "D"), member("w8", "D")
+    ];
+    const matches = generateTeamBattleMatches({
+      tournamentId: "t1",
+      groupId: "g1",
+      blueMembers,
+      whiteMembers,
+      courtNumbers: ["1", "2", "3"],
+      roundCount: 5,
+      matchingMode: "similar-level"
+    });
+
+    const membersById = new Map([...blueMembers, ...whiteMembers].map((item) => [item.id, item]));
+    for (const match of matches) {
+      const blueWeights = match.sideAPlayerIds.map((id) => teamGradeWeight(membersById.get(id)!));
+      const whiteWeights = match.sideBPlayerIds.map((id) => teamGradeWeight(membersById.get(id)!));
+      expect(Math.abs(blueWeights[0] - blueWeights[1])).toBeLessThanOrEqual(1);
+      expect(Math.abs(whiteWeights[0] - whiteWeights[1])).toBeLessThanOrEqual(1);
+      expect(Math.abs(blueWeights[0] + blueWeights[1] - whiteWeights[0] - whiteWeights[1])).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("allows women-only pairs", () => {
     const blueMembers = [member("bf1", "A", "female"), member("bf2", "B", "female")];
     const whiteMembers = [member("wf1", "A", "female"), member("wf2", "B", "female")];

@@ -850,6 +850,35 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(saved.matches.every((match) => match.courtNumber === "1")).toBe(true);
     expect(document.querySelectorAll(".admin-team-battle-round-card")).toHaveLength(4);
   });
+  it("saves the selected team battle matching mode with the generated schedule", async () => {
+    const state = makeState();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
+    state.members = [
+      { id: "m1", name: "청A", level: "A", notes: "" },
+      { id: "m2", name: "청B", level: "B", notes: "" },
+      { id: "m3", name: "백A", level: "A", notes: "" },
+      { id: "m4", name: "백B", level: "B", notes: "" }
+    ];
+    state.groups = [];
+    state.groupMemberIds = {};
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    state.teamAssignments = { t1: { m1: "blue", m2: "blue", m3: "white", m4: "white" } };
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    expect(screen.getByRole("button", { name: /밸런스 매칭/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /등급 근접 매칭/ }));
+    expect(screen.getByRole("button", { name: /등급 근접 매칭/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.change(screen.getByLabelText("코트 개수"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("라운드 수"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "청백전 대진 생성" }));
+
+    await waitFor(() => expect(persistTournamentStateAction).toHaveBeenCalled());
+    const saved = vi.mocked(persistTournamentStateAction).mock.calls[0][1];
+    expect(saved.groups[0].teamBattleMatchMode).toBe("similar-level");
+  });
+
   it("fills five rounds and lets the manager choose the smaller uneven-game groups", async () => {
     const state = makeState();
     state.tournament = { ...state.tournament, type: "team-battle" };

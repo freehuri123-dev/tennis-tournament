@@ -11,6 +11,7 @@ export type Member = {
 
 export type TournamentType = "general" | "team-battle" | "tournament";
 export type TeamSide = "blue" | "white";
+export type TeamBattleMatchMode = "balanced" | "similar-level";
 
 export type Tournament = {
   id: string;
@@ -33,6 +34,7 @@ export type TournamentGroup = {
   seedPlayerIds?: string[];
   randomCourtCount?: number;
   randomGamesPerPlayer?: number;
+  teamBattleMatchMode?: TeamBattleMatchMode;
 };
 
 export type MatchStatus = "scheduled" | "completed";
