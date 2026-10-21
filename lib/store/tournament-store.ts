@@ -38,6 +38,7 @@ function normalizeTournamentType(tournament: Tournament, groups: TournamentGroup
     ...tournament,
     type: inferTournamentType(tournament, groups.filter((group) => group.tournamentId === tournament.id)),
     scheduleLocked: tournament.scheduleLocked ?? false,
+    nameEditableWhenLocked: tournament.nameEditableWhenLocked ?? false,
     rankingExcludedMemberIds: tournament.rankingExcludedMemberIds ?? [],
     includeInClubRecords: tournament.includeInClubRecords ?? true
   };

@@ -21,6 +21,7 @@ export type Tournament = {
   status: "draft" | "active" | "completed";
   type?: TournamentType;
   scheduleLocked?: boolean;
+  nameEditableWhenLocked?: boolean;
   rankingExcludedMemberIds?: string[];
   includeInClubRecords?: boolean;
 };

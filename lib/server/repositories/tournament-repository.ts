@@ -136,6 +136,7 @@ function toDomainTournament(tournament: {
   status: "draft" | "active" | "completed";
   type: DbTournamentType;
   scheduleLocked?: boolean;
+  nameEditableWhenLocked?: boolean;
   rankingExcludedMemberIds?: string[];
   includeInClubRecords?: boolean;
 }): Tournament {
@@ -147,6 +148,7 @@ function toDomainTournament(tournament: {
     status: tournament.status,
     type: fromDbTournamentType(tournament.type),
     scheduleLocked: tournament.scheduleLocked ?? false,
+    nameEditableWhenLocked: tournament.nameEditableWhenLocked ?? false,
     rankingExcludedMemberIds: tournament.rankingExcludedMemberIds ?? [],
     includeInClubRecords: tournament.includeInClubRecords ?? true,
   });
@@ -444,7 +446,14 @@ export async function updateTournamentName(clubSlug: ClubSlug, tournamentId: str
   const normalizedName = name.trim();
   if (!normalizedName) throw new Error("Tournament name is required");
 
-  await assertTournamentStructureEditableForClubId(club.id, tournamentId);
+  const existing = await prisma.tournament.findFirst({
+    where: { id: tournamentId, clubId: club.id },
+    select: { id: true, scheduleLocked: true, nameEditableWhenLocked: true }
+  });
+  if (!existing) throw new Error("Tournament not found: " + tournamentId);
+  if (existing.scheduleLocked && !existing.nameEditableWhenLocked) {
+    throw new Error("This tournament schedule is locked");
+  }
 
   return toDomainTournament(
     await prisma.tournament.update({
@@ -752,6 +761,7 @@ export async function replaceTournamentState(clubSlug: ClubSlug, state: Tourname
         status: tournament.status,
         type: toDbTournamentType(tournament.type),
         scheduleLocked: tournament.scheduleLocked ?? false,
+        nameEditableWhenLocked: tournament.nameEditableWhenLocked ?? false,
         rankingExcludedMemberIds: tournament.rankingExcludedMemberIds ?? [],
         includeInClubRecords: tournament.includeInClubRecords ?? true,
       }

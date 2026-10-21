@@ -141,6 +141,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
       ? "tournament"
       : "general");
   const isCompleted = tournament.status === "completed";
+  const canEditTournamentName = scheduleLocked ? tournament.nameEditableWhenLocked === true : !isCompleted;
   const tournamentParticipantIds = state.tournamentParticipantIds[tournament.id] ?? [];
   const isRandomKdkTournament = tournamentType === "general" && state.groups.some((group) => group.scheduleFormat === "random");
   const usesKdkCourtScheduling = state.groups.length > 0 && state.groups.every((group) => group.scheduleFormat === "kdk-v2010" || group.scheduleFormat === "hanul-aa");
@@ -1363,20 +1364,21 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
 
         {activeTab === "setup" && (
           <div className="tab-panel stack" key="setup">
-            {scheduleLocked && <p className="notice-text event-lock-notice" role="note">이벤트 대회는 수정 불가합니다. J.H.Park에게 문의해주세요.</p>}
-            <fieldset className="locked-setup-fields stack" disabled={scheduleLocked}>
+            {scheduleLocked && <p className="notice-text event-lock-notice" role="note">{tournament.nameEditableWhenLocked ? "이벤트 대회는 대회명과 경기 점수만 수정할 수 있습니다. J.H.Park에게 문의해주세요." : "이벤트 대회는 수정 불가합니다. J.H.Park에게 문의해주세요."}</p>}
             <section className="section-card stack">
               <div className="today-card-top"><strong className="section-head">대회 기본정보</strong><span className="group-format-badge">{tournamentType === "general" ? "일반 대회" : tournamentType === "team-battle" ? "청백전 · 단체전" : "토너먼트"}</span></div>
               <label className="field boxed-field">
                 <span>대회명</span>
-                <input disabled={isCompleted} onBlur={(event) => persistName(tournament.id, event.target.value)} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
+                <input disabled={!canEditTournamentName} onBlur={(event) => persistName(tournament.id, event.target.value)} onChange={(event) => updateTournament("name", event.target.value)} value={tournament.name} />
               </label>
               <label className="field boxed-field">
                 <span>날짜</span>
-                <input onChange={(event) => updateTournament("date", event.target.value)} type="date" value={tournament.date} />
+                <input disabled={scheduleLocked} onChange={(event) => updateTournament("date", event.target.value)} type="date" value={tournament.date} />
               </label>
 
             </section>
+
+            <fieldset className="locked-setup-fields stack" disabled={scheduleLocked}>
 
             <section className="section-card stack">
               <button className="accordion-head" onClick={() => setParticipantPanelOpen((open) => !open)} type="button">

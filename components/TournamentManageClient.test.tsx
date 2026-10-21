@@ -278,6 +278,25 @@ describe("TournamentManageClient save timing", () => {
     expect(Array.from(container.querySelectorAll(".explicit-round-head strong")).map((heading) => heading.textContent)).toEqual(["1라운드", "2라운드"]);
   }, 15_000);
 
+  it("allows only the tournament name to change for a name-editable locked event", async () => {
+    const state = makeLockedEventState();
+    state.tournament = { ...state.tournament, nameEditableWhenLocked: true };
+    state.tournaments = [state.tournament];
+
+    render(<TournamentManageClient initialState={state} clubSlug="joogo" />);
+    fireEvent.click(screen.getByRole("button", { name: "설정" }));
+
+    const nameInput = screen.getByLabelText("대회명") as HTMLInputElement;
+    const dateInput = screen.getByLabelText("날짜") as HTMLInputElement;
+    expect(nameInput.disabled).toBe(false);
+    expect(dateInput.disabled).toBe(true);
+    expect(screen.getByText("이벤트 대회는 대회명과 경기 점수만 수정할 수 있습니다. J.H.Park에게 문의해주세요.")).toBeTruthy();
+
+    fireEvent.change(nameInput, { target: { value: "가을 이벤트 청백전" } });
+    fireEvent.blur(nameInput);
+    await waitFor(() => expect(updateTournamentNameAction).toHaveBeenCalledWith("joogo", "t1", "가을 이벤트 청백전"));
+  });
+
   it("hides round ordering controls when a team battle schedule is locked", () => {
     const state = makeLockedEventState();
     state.tournament = { ...state.tournament, type: "team-battle" };

@@ -83,6 +83,35 @@ describe("tournament repository mapping", () => {
     expect(prisma.tournament.delete).not.toHaveBeenCalled();
   });
 
+  it("allows renaming a locked tournament when name editing is explicitly enabled", async () => {
+    prisma.club.findUnique.mockResolvedValue({ id: "joogo", slug: "joogo" });
+    prisma.tournament.findFirst.mockResolvedValue({
+      id: "joogo-event",
+      scheduleLocked: true,
+      nameEditableWhenLocked: true
+    });
+    prisma.tournament.update.mockResolvedValue({
+      id: "joogo-event",
+      name: "가을 이벤트 청백전",
+      date: new Date("2026-10-25T00:00:00.000Z"),
+      publicSlug: "3710",
+      status: "draft",
+      type: "team_battle",
+      scheduleLocked: true,
+      nameEditableWhenLocked: true,
+      rankingExcludedMemberIds: [],
+      includeInClubRecords: true
+    });
+
+    await expect(updateTournamentName("joogo", "joogo-event", "  가을 이벤트 청백전  "))
+      .resolves.toMatchObject({ name: "가을 이벤트 청백전", nameEditableWhenLocked: true });
+
+    expect(prisma.tournament.update).toHaveBeenCalledWith({
+      where: { id: "joogo-event" },
+      data: { name: "가을 이벤트 청백전" }
+    });
+  });
+
   it("rejects replacing a locked tournament even when client state says it is editable", async () => {
     const state = {
       version: 9,
