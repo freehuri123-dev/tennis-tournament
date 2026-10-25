@@ -259,8 +259,8 @@ it("removes overall ranking and renders team standings when a fixed pair league 
     expect(screen.queryByText("청백전 대진표")).toBeNull();
     expect(screen.getByText("청백전 팀 스코어")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "팀 스코어" }).getAttribute("aria-selected")).toBe("true");
-    expect(container.querySelector(".team-battle-scoreboard")?.textContent).toContain("청팀1:백팀0");
-    expect(screen.getByText("완료 1라운드")).toBeTruthy();
+    expect(container.querySelector(".team-battle-scoreboard")?.textContent).toContain("청팀2:백팀1");
+    expect(screen.getByText("완료 3경기")).toBeTruthy();
     expect(screen.getByText("팀 기여도")).toBeTruthy();
     expect(screen.getByLabelText("김철수 승률 67%")).toBeTruthy();
   });

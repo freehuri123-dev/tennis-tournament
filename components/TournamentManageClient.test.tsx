@@ -1212,7 +1212,7 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(screen.getByText(`${memberName("m3")} · ${memberName("m4")} — 경기 1, 경기 2`)).toBeTruthy();
   });
 
-  it("shows one team point for the winner of a completed team-battle round", () => {
+  it("shows the total match wins for a team battle", () => {
     const state = makeStateWithMatch();
     state.tournament = { ...state.tournament, type: "team-battle" };
     state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
@@ -1235,8 +1235,8 @@ it("creates and saves a five-pair round robin league", async () => {
     const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
     fireEvent.click(screen.getByRole("button", { name: "순위" }));
 
-    expect(container.querySelector(".team-battle-scoreboard")?.textContent).toContain("청팀1:백팀0");
-    expect(screen.getByText("완료 1라운드")).toBeTruthy();
+    expect(container.querySelector(".team-battle-scoreboard")?.textContent).toContain("청팀3:백팀1");
+    expect(screen.getByText("완료 4경기")).toBeTruthy();
   });
 
   it("allows a member outside tournament participants to substitute into a team battle match", async () => {

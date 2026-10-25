@@ -194,7 +194,7 @@ describe("team battle", () => {
     expect(matches[0]).toMatchObject({ id: "completed-1", sideAScore: 6, sideBScore: 4, status: "completed" });
   });
 
-  it("calculates only completed team results", () => {
+  it("totals wins from completed team-battle matches", () => {
     const matches: Match[] = Array.from({ length: 12 }, (_, index) => ({
       id: `result-${index + 1}`,
       tournamentId: "t1",
@@ -222,6 +222,6 @@ describe("team battle", () => {
       return match;
     });
 
-    expect(calculateTeamBattleResult(scored)).toEqual({ blueWins: 1, whiteWins: 0, draws: 1, completedRounds: 2 });
+    expect(calculateTeamBattleResult(scored)).toEqual({ blueWins: 8, whiteWins: 3, draws: 0, completedMatches: 11 });
   });
 });

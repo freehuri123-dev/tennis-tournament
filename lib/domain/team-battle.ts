@@ -12,7 +12,7 @@ export type TeamBattleResult = {
   blueWins: number;
   whiteWins: number;
   draws: number;
-  completedRounds: number;
+  completedMatches: number;
 };
 
 export type TeamGrade = "A" | "B" | "C" | "D";
@@ -542,18 +542,12 @@ export function groupTeamBattleMatchesByRound(matches: Match[]): Array<{ roundNu
   return [...rounds.entries()].map(([round, roundMatches]) => ({ roundNumber: round, matches: roundMatches }));
 }
 export function calculateTeamBattleResult(matches: Match[]): TeamBattleResult {
-  return groupTeamBattleMatchesByRound(matches).reduce<TeamBattleResult>((result, round) => {
-    const isCompleted = round.matches.length > 0 && round.matches.every((match) =>
-      match.status === "completed" && match.sideAScore !== null && match.sideBScore !== null
-    );
-    if (!isCompleted) return result;
-
-    result.completedRounds += 1;
-    const blueMatchWins = round.matches.filter((match) => match.sideAScore! > match.sideBScore!).length;
-    const whiteMatchWins = round.matches.filter((match) => match.sideBScore! > match.sideAScore!).length;
-    if (blueMatchWins > whiteMatchWins) result.blueWins += 1;
-    else if (whiteMatchWins > blueMatchWins) result.whiteWins += 1;
+  return matches.reduce<TeamBattleResult>((result, match) => {
+    if (match.status !== "completed" || match.sideAScore === null || match.sideBScore === null) return result;
+    result.completedMatches += 1;
+    if (match.sideAScore > match.sideBScore) result.blueWins += 1;
+    else if (match.sideBScore > match.sideAScore) result.whiteWins += 1;
     else result.draws += 1;
     return result;
-  }, { blueWins: 0, whiteWins: 0, draws: 0, completedRounds: 0 });
+  }, { blueWins: 0, whiteWins: 0, draws: 0, completedMatches: 0 });
 }
