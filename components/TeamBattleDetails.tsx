@@ -12,18 +12,18 @@ type ContributionRow = {
   percent: number;
 };
 
-function calculateContribution(members: Member[], matches: Match[], side: "blue" | "white"): ContributionRow[] {
-  const winsByMemberId = new Map(calculateRankings(members, matches).map((row) => [row.memberId, row.wins]));
-  const teamWins = matches.filter((match) => {
-    if (match.status !== "completed" || match.sideAScore === null || match.sideBScore === null) return false;
-    return side === "blue" ? match.sideAScore > match.sideBScore : match.sideBScore > match.sideAScore;
-  }).length;
+function calculateContribution(members: Member[], matches: Match[]): ContributionRow[] {
+  const rankingsByMemberId = new Map(calculateRankings(members, matches).map((row) => [row.memberId, row]));
 
   return members
-    .map((member) => ({
-      member,
-      percent: teamWins > 0 ? Math.round(((winsByMemberId.get(member.id) ?? 0) / teamWins) * 100) : 0
-    }))
+    .map((member) => {
+      const ranking = rankingsByMemberId.get(member.id);
+      const completedMatches = ranking ? ranking.wins + ranking.draws + ranking.losses : 0;
+      return {
+        member,
+        percent: completedMatches > 0 ? Math.round(((ranking?.wins ?? 0) / completedMatches) * 100) : 0
+      };
+    })
     .sort((left, right) => right.percent - left.percent || left.member.name.localeCompare(right.member.name, "ko"));
 }
 
@@ -51,15 +51,15 @@ export function TeamBattleRoster({ blueMembers, whiteMembers }: Omit<TeamBattleD
 
 export function TeamBattleContributionDetails({ blueMembers, whiteMembers, matches }: TeamBattleDetailsProps) {
   const teams = [
-    { side: "blue" as const, label: "청팀", rows: calculateContribution(blueMembers, matches, "blue") },
-    { side: "white" as const, label: "백팀", rows: calculateContribution(whiteMembers, matches, "white") }
+    { side: "blue" as const, label: "청팀", rows: calculateContribution(blueMembers, matches) },
+    { side: "white" as const, label: "백팀", rows: calculateContribution(whiteMembers, matches) }
   ];
 
   return (
     <section className="team-battle-contribution-section">
       <div className="team-battle-contribution-head">
         <strong>팀 기여도</strong>
-        <small>팀 승리 참여 비율</small>
+        <small>개인 경기 승률</small>
       </div>
       <div className="team-battle-contribution-grid">
         {teams.map(({ side, label, rows }) => (
@@ -75,7 +75,7 @@ export function TeamBattleContributionDetails({ blueMembers, whiteMembers, match
                     <strong>{member.name}</strong>
                     <b>{percent}%</b>
                   </div>
-                  <div className="team-contribution-track" aria-label={`${member.name} 팀 승리 기여도 ${percent}%`}>
+                  <div className="team-contribution-track" aria-label={`${member.name} 승률 ${percent}%`}>
                     <span style={{ width: `${percent}%` }} />
                   </div>
                 </div>
@@ -85,7 +85,7 @@ export function TeamBattleContributionDetails({ blueMembers, whiteMembers, match
           </section>
         ))}
       </div>
-      <p className="team-contribution-note">기여도는 팀 전체 승리 경기 중 각 선수가 승리에 참여한 비율입니다.</p>
+      <p className="team-contribution-note">기여도는 각 선수의 완료 경기 중 승리한 경기의 비율입니다.</p>
     </section>
   );
 }

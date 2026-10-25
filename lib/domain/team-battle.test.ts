@@ -195,8 +195,33 @@ describe("team battle", () => {
   });
 
   it("calculates only completed team results", () => {
-    const matches = generateTeamBattleMatches({ tournamentId: "t1", groupId: "g1", blueMembers: blue, whiteMembers: white }).slice(0, 3);
-    const scored = matches.map((match, index) => index === 0 ? { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const } : index === 1 ? { ...match, sideAScore: 4, sideBScore: 6, status: "completed" as const } : match);
-    expect(calculateTeamBattleResult(scored)).toEqual({ blueWins: 1, whiteWins: 1, draws: 0, completedMatches: 2 });
+    const matches: Match[] = Array.from({ length: 12 }, (_, index) => ({
+      id: `result-${index + 1}`,
+      tournamentId: "t1",
+      groupId: "g1",
+      matchNumber: index + 1,
+      sideAPlayerIds: ["b1", "b2"],
+      sideBPlayerIds: ["w1", "w2"],
+      sideAScore: null,
+      sideBScore: null,
+      status: "waiting",
+      sortOrder: index + 1,
+      courtNumber: String((index % 4) + 1),
+      roundNumber: Math.floor(index / 4) + 1
+    }));
+    const scored = matches.map((match, index) => {
+      if (index < 4) {
+        return { ...match, sideAScore: index < 3 ? 6 : 3, sideBScore: index < 3 ? 3 : 6, status: "completed" as const };
+      }
+      if (index < 8) {
+        return { ...match, sideAScore: index < 6 ? 6 : 3, sideBScore: index < 6 ? 3 : 6, status: "completed" as const };
+      }
+      if (index < 11) {
+        return { ...match, sideAScore: 6, sideBScore: 3, status: "completed" as const };
+      }
+      return match;
+    });
+
+    expect(calculateTeamBattleResult(scored)).toEqual({ blueWins: 1, whiteWins: 0, draws: 1, completedRounds: 2 });
   });
 });

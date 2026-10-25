@@ -1212,6 +1212,33 @@ it("creates and saves a five-pair round robin league", async () => {
     expect(screen.getByText(`${memberName("m3")} · ${memberName("m4")} — 경기 1, 경기 2`)).toBeTruthy();
   });
 
+  it("shows one team point for the winner of a completed team-battle round", () => {
+    const state = makeStateWithMatch();
+    state.tournament = { ...state.tournament, type: "team-battle" };
+    state.tournaments = [{ ...state.tournaments[0], type: "team-battle" }];
+    state.groups = [{ ...state.groups[0], scheduleFormat: "team-battle" }];
+    state.groupMemberIds = { g1: state.members.map((member) => member.id) };
+    state.tournamentParticipantIds = { t1: state.members.map((member) => member.id) };
+    state.teamAssignments = { t1: { m1: "blue", m2: "blue", m3: "white", m4: "white" } };
+    state.matches = Array.from({ length: 4 }, (_, index) => ({
+      ...state.matches[0],
+      id: `round-1-court-${index + 1}`,
+      matchNumber: index + 1,
+      sortOrder: index + 1,
+      roundNumber: 1,
+      courtNumber: String(index + 1),
+      sideAScore: index < 3 ? 6 : 3,
+      sideBScore: index < 3 ? 3 : 6,
+      status: "completed" as const
+    }));
+
+    const { container } = render(<TournamentManageClient initialState={state} clubSlug="stc" />);
+    fireEvent.click(screen.getByRole("button", { name: "순위" }));
+
+    expect(container.querySelector(".team-battle-scoreboard")?.textContent).toContain("청팀1:백팀0");
+    expect(screen.getByText("완료 1라운드")).toBeTruthy();
+  });
+
   it("allows a member outside tournament participants to substitute into a team battle match", async () => {
     const state = makeStateWithMatch();
     state.tournament = { ...state.tournament, type: "team-battle" };

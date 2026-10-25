@@ -2135,7 +2135,7 @@ export function TournamentManageClient({ initialState, clubSlug }: TournamentMan
                       <strong>:</strong>
                       <div className="team-score"><span>백팀</span><b>{teamBattleResult.whiteWins}</b></div>
                     </div>
-                    <p className="notice-text">완료 {teamBattleResult.completedMatches}경기{teamBattleResult.draws > 0 ? ` · 무승부 ${teamBattleResult.draws}경기` : ""}</p>
+                    <p className="notice-text">완료 {teamBattleResult.completedRounds}라운드{teamBattleResult.draws > 0 ? ` · 무승부 ${teamBattleResult.draws}라운드` : ""}</p>
                     <TeamBattleContributionDetails blueMembers={blueTeamMembers} whiteMembers={whiteTeamMembers} matches={state.matches} />
                   </div>
                 ) : isTournamentFormat(group) ? (
